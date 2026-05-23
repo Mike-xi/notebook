@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>复习笔记</title>
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body class="home">
+  <header class="topbar">
+    <div class="title-block">
+      <span class="eyebrow">个人复习</span>
+      <h1>笔记库</h1>
+    </div>
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input type="search" id="search" placeholder="搜索课程、标签...">
+    </div>
+    <button class="icon-btn" id="logout-btn" title="退出登录">⎋</button>
+  </header>
+
+  <main>
+    <section id="recent-section" hidden>
+      <h2 class="section-title">最近阅读</h2>
+      <div id="recent" class="card-row"></div>
+    </section>
+
+    <section>
+      <h2 class="section-title">全部课程</h2>
+      <div id="courses" class="card-grid"></div>
+    </section>
+  </main>
+
+  <script src="/assets/app.js"></script>
+</body>
+</html>

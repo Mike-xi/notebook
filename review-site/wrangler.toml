@@ -1,0 +1,15 @@
+name = "review-site"
+compatibility_date = "2024-09-01"
+pages_build_output_dir = "."
+
+# D1 数据库绑定
+# 在 Cloudflare Dashboard 创建 D1 后，把 database_id 填进来
+[[d1_databases]]
+binding = "DB"
+database_name = "review-db"
+database_id = "REPLACE_WITH_YOUR_DATABASE_ID"
+
+# 环境变量（敏感值不写在这里，用 wrangler secret 或 Dashboard 配置）
+# 需要在 Pages 项目设置里配置：
+#   SITE_PASSWORD  - 你的访问密码
+#   AUTH_SECRET    - 任意随机字符串（用于签名 cookie，越长越好）

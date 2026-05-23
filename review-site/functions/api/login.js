@@ -1,0 +1,35 @@
+import { createSessionToken, makeAuthCookie } from '../_lib/auth.js';
+
+export async function onRequestPost({ request, env }) {
+  if (!env.SITE_PASSWORD || !env.AUTH_SECRET) {
+    return jsonResp({ error: 'server not configured' }, 500);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResp({ error: 'invalid body' }, 400);
+  }
+
+  if (!body?.password || body.password !== env.SITE_PASSWORD) {
+    // 简单延时，降低暴力枚举速度
+    await new Promise((r) => setTimeout(r, 500));
+    return jsonResp({ ok: false }, 401);
+  }
+
+  const token = await createSessionToken(env);
+  return new Response(JSON.stringify({ ok: true }), {
+    headers: {
+      'Content-Type': 'application/json',
+      'Set-Cookie': makeAuthCookie(token),
+    },
+  });
+}
+
+function jsonResp(obj, status = 200) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}

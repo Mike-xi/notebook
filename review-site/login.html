@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 · 复习笔记</title>
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body class="login">
+  <main class="login-card">
+    <span class="eyebrow">Welcome back</span>
+    <h1>笔记库</h1>
+    <form id="login-form">
+      <label for="password">访问密码</label>
+      <input type="password" id="password" autocomplete="current-password" required autofocus>
+      <button type="submit" id="submit-btn">进入 →</button>
+      <p id="error" class="error-msg" hidden>密码错误</p>
+    </form>
+  </main>
+
+  <script>
+    const form = document.getElementById('login-form');
+    const err = document.getElementById('error');
+    const btn = document.getElementById('submit-btn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      err.hidden = true;
+      btn.disabled = true;
+      btn.textContent = '验证中...';
+
+      const password = document.getElementById('password').value;
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password }),
+        });
+        if (res.ok) {
+          location.href = '/';
+          return;
+        }
+        err.hidden = false;
+      } catch {
+        err.hidden = false;
+        err.textContent = '网络错误，重试';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '进入 →';
+      }
+    });
+  </script>
+</body>
+</html>

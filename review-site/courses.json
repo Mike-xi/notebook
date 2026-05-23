@@ -1,0 +1,26 @@
+[
+  {
+    "file": "ml-final.html",
+    "title": "机器学习期末复习",
+    "subject": "ML",
+    "description": "CNN、SVM、PCA、决策树、ResNet 等",
+    "color": "#7B6BF1",
+    "tags": ["ml", "深度学习", "ResNet"]
+  },
+  {
+    "file": "math-final.html",
+    "title": "高等数学期末复习",
+    "subject": "数学",
+    "description": "拉格朗日乘子、多元积分、PDE",
+    "color": "#F1916B",
+    "tags": ["数学", "积分", "PDE"]
+  },
+  {
+    "file": "physics-final.html",
+    "title": "大学物理期末复习",
+    "subject": "物理",
+    "description": "杨氏模量、不确定度传递",
+    "color": "#6BC0F1",
+    "tags": ["物理", "实验"]
+  }
+]
