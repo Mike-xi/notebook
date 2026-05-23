@@ -7,7 +7,7 @@ pages_build_output_dir = "."
 [[d1_databases]]
 binding = "DB"
 database_name = "review-db"
-database_id = "REPLACE_WITH_YOUR_DATABASE_ID"
+database_id = "f3c5143b-9d1d-4820-b254-a220b34e1fe1"
 
 # 环境变量（敏感值不写在这里，用 wrangler secret 或 Dashboard 配置）
 # 需要在 Pages 项目设置里配置：
