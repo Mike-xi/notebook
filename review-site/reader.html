@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>阅读器</title>
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body class="reader">
+  <header class="reader-toolbar">
+    <a class="back-btn" href="/">←</a>
+    <div class="doc-info">
+      <span class="doc-subject" id="doc-subject"></span>
+      <span class="doc-title" id="doc-title">加载中...</span>
+    </div>
+    <div class="reader-progress">
+      <span id="progress-pct">0%</span>
+    </div>
+    <div class="reader-actions">
+      <button class="icon-btn" id="bookmark-btn" title="加书签">☆</button>
+      <button class="icon-btn" id="bookmarks-toggle" title="查看书签">☰</button>
+    </div>
+  </header>
+
+  <aside id="bookmarks-panel" hidden>
+    <div class="panel-header">
+      <h3>书签</h3>
+      <button class="icon-btn" id="panel-close">✕</button>
+    </div>
+    <ul id="bookmarks-list"></ul>
+    <p id="bookmarks-empty" class="empty-hint">还没有书签</p>
+  </aside>
+
+  <iframe id="content" src="" sandbox="allow-same-origin allow-scripts allow-popups"></iframe>
+
+  <script src="/assets/reader.js"></script>
+</body>
+</html>
