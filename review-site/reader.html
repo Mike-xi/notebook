@@ -7,20 +7,21 @@
   <link rel="stylesheet" href="/assets/style.css">
 </head>
 <body class="reader">
-  <header class="reader-toolbar">
-    <a class="back-btn" href="/">←</a>
-    <div class="doc-info">
-      <span class="doc-subject" id="doc-subject"></span>
-      <span class="doc-title" id="doc-title">加载中...</span>
+  <iframe id="content" src="" title="复习文档"></iframe>
+
+  <div class="reader-bar" id="reader-bar">
+    <a class="rb-btn rb-back" href="/" title="返回笔记库">←</a>
+    <div class="rb-info">
+      <span class="rb-subject" id="doc-subject"></span>
+      <span class="rb-title" id="doc-title">加载中…</span>
     </div>
-    <div class="reader-progress">
-      <span id="progress-pct">0%</span>
-    </div>
-    <div class="reader-actions">
-      <button class="icon-btn" id="bookmark-btn" title="加书签">☆</button>
-      <button class="icon-btn" id="bookmarks-toggle" title="查看书签">☰</button>
-    </div>
-  </header>
+    <span class="rb-progress" id="progress-pct">0%</span>
+    <button class="rb-btn" id="bookmark-btn" title="加书签">☆</button>
+    <button class="rb-btn" id="bookmarks-toggle" title="书签列表">☰</button>
+  </div>
+
+  <!-- 鼠标移到顶部时唤出工具栏的感应区 -->
+  <div class="reader-hotzone" id="reader-hotzone"></div>
 
   <aside id="bookmarks-panel" hidden>
     <div class="panel-header">
@@ -30,8 +31,6 @@
     <ul id="bookmarks-list"></ul>
     <p id="bookmarks-empty" class="empty-hint">还没有书签</p>
   </aside>
-
-  <iframe id="content" src="" sandbox="allow-same-origin allow-scripts allow-popups"></iframe>
 
   <script src="/assets/reader.js"></script>
 </body>

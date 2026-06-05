@@ -1,0 +1,1810 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Python 程序设计 · 知识点系统归纳</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Noto+Serif+SC:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F6F1E4;
+  --paper-2:#EFE7D2;
+  --ink:#1C1A17;
+  --ink-soft:#3C3A36;
+  --ink-fade:#6B6760;
+  --rule:rgba(28,26,23,.14);
+  --rule-soft:rgba(28,26,23,.08);
+  --cinnabar:#B23A2B;
+  --cinnabar-dark:#8B2A1D;
+  --jade:#4A6B5C;
+  --code-bg:rgba(28,26,23,.045);
+  --code-border:rgba(28,26,23,.10);
+  --highlight:rgba(178,58,43,.10);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:"Noto Sans SC","Inter","Helvetica Neue",-apple-system,BlinkMacSystemFont,sans-serif;
+  font-size:15px;
+  line-height:1.75;
+  font-feature-settings:"ss01","cv11";
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  background-image:
+    radial-gradient(circle at 20% 10%,rgba(178,58,43,.025) 0,transparent 40%),
+    radial-gradient(circle at 80% 80%,rgba(74,107,92,.025) 0,transparent 40%);
+}
+::selection{background:var(--cinnabar);color:var(--paper)}
+
+/* Hero / cover */
+.cover{
+  max-width:1200px;
+  margin:0 auto;
+  padding:88px 40px 64px;
+  border-bottom:1px solid var(--rule);
+  position:relative;
+}
+.cover .meta-line{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  font-family:"JetBrains Mono",monospace;
+  font-size:11px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  color:var(--ink-fade);
+  margin-bottom:48px;
+}
+.cover .meta-line .seal{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  color:var(--cinnabar);
+}
+.cover .meta-line .seal::before{
+  content:"";
+  width:6px;height:6px;
+  background:var(--cinnabar);
+  border-radius:50%;
+}
+.cover h1{
+  font-family:"Cormorant Garamond","Noto Serif SC",serif;
+  font-weight:500;
+  font-size:clamp(56px,8vw,108px);
+  line-height:.95;
+  letter-spacing:-.02em;
+  margin:0 0 12px;
+  color:var(--ink);
+}
+.cover h1 .accent{
+  color:var(--cinnabar);
+  font-style:italic;
+  font-weight:400;
+}
+.cover .subtitle{
+  font-family:"Noto Serif SC",serif;
+  font-size:24px;
+  font-weight:400;
+  color:var(--ink-soft);
+  letter-spacing:.02em;
+  margin:0 0 56px;
+}
+.cover .abstract{
+  max-width:680px;
+  font-size:16px;
+  line-height:1.85;
+  color:var(--ink-soft);
+  margin-bottom:48px;
+  border-left:2px solid var(--cinnabar);
+  padding-left:24px;
+}
+.cover .stats{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:32px;
+  padding-top:32px;
+  border-top:1px solid var(--rule);
+}
+.stat .num{
+  font-family:"Cormorant Garamond",serif;
+  font-size:42px;
+  font-weight:500;
+  color:var(--cinnabar);
+  line-height:1;
+}
+.stat .lbl{
+  font-family:"JetBrains Mono",monospace;
+  font-size:10px;
+  letter-spacing:.15em;
+  text-transform:uppercase;
+  color:var(--ink-fade);
+  margin-top:6px;
+}
+
+/* Two-column layout */
+.layout{
+  max-width:1200px;
+  margin:0 auto;
+  padding:0 40px;
+  display:grid;
+  grid-template-columns:240px 1fr;
+  gap:56px;
+  align-items:start;
+}
+nav.toc{
+  position:sticky;
+  top:32px;
+  max-height:calc(100vh - 64px);
+  overflow-y:auto;
+  padding:48px 0 32px;
+  font-size:13px;
+  scrollbar-width:thin;
+  scrollbar-color:var(--rule) transparent;
+}
+nav.toc::-webkit-scrollbar{width:4px}
+nav.toc::-webkit-scrollbar-thumb{background:var(--rule);border-radius:2px}
+nav.toc .toc-title{
+  font-family:"JetBrains Mono",monospace;
+  font-size:10px;
+  letter-spacing:.2em;
+  text-transform:uppercase;
+  color:var(--ink-fade);
+  margin-bottom:20px;
+  padding-bottom:12px;
+  border-bottom:1px solid var(--rule);
+}
+nav.toc .toc-part{
+  margin-bottom:24px;
+}
+nav.toc .toc-part > .part-name{
+  font-family:"Cormorant Garamond",serif;
+  font-style:italic;
+  font-size:15px;
+  color:var(--cinnabar);
+  margin-bottom:6px;
+  letter-spacing:.02em;
+}
+nav.toc a{
+  display:block;
+  padding:5px 0 5px 12px;
+  color:var(--ink-soft);
+  text-decoration:none;
+  border-left:1px solid var(--rule);
+  transition:all .15s ease;
+  font-size:13px;
+}
+nav.toc a:hover{
+  color:var(--cinnabar);
+  border-left-color:var(--cinnabar);
+  padding-left:16px;
+}
+nav.toc a .ch-num{
+  font-family:"JetBrains Mono",monospace;
+  font-size:10px;
+  color:var(--ink-fade);
+  margin-right:8px;
+}
+nav.toc a:hover .ch-num{color:var(--cinnabar)}
+
+main{
+  padding:48px 0 120px;
+  min-width:0;
+}
+
+/* Part divider */
+.part{
+  margin:80px 0 48px;
+  padding-top:48px;
+  border-top:2px solid var(--ink);
+  position:relative;
+}
+.part:first-child{margin-top:0;padding-top:0;border-top:none}
+.part-eyebrow{
+  font-family:"JetBrains Mono",monospace;
+  font-size:11px;
+  letter-spacing:.25em;
+  text-transform:uppercase;
+  color:var(--cinnabar);
+  margin-bottom:8px;
+}
+.part-title{
+  font-family:"Cormorant Garamond","Noto Serif SC",serif;
+  font-size:56px;
+  font-weight:500;
+  line-height:1;
+  margin:0 0 8px;
+  letter-spacing:-.01em;
+}
+.part-title .italic{font-style:italic;font-weight:400;color:var(--cinnabar)}
+.part-desc{
+  font-family:"Noto Serif SC",serif;
+  font-size:17px;
+  color:var(--ink-soft);
+  max-width:640px;
+  margin:0;
+}
+
+/* Chapter */
+.chapter{
+  margin:72px 0;
+  scroll-margin-top:24px;
+}
+.chapter-head{
+  display:flex;
+  align-items:baseline;
+  gap:20px;
+  margin-bottom:8px;
+  padding-bottom:16px;
+  border-bottom:1px solid var(--rule);
+}
+.chapter-num{
+  font-family:"Cormorant Garamond",serif;
+  font-style:italic;
+  font-size:38px;
+  color:var(--cinnabar);
+  line-height:1;
+  flex-shrink:0;
+}
+.chapter-title{
+  font-family:"Noto Serif SC",serif;
+  font-size:28px;
+  font-weight:600;
+  margin:0;
+  line-height:1.2;
+  letter-spacing:-.005em;
+}
+.chapter-en{
+  font-family:"Cormorant Garamond",serif;
+  font-style:italic;
+  font-size:14px;
+  color:var(--ink-fade);
+  margin-left:auto;
+  flex-shrink:0;
+}
+.chapter-lead{
+  font-family:"Noto Serif SC",serif;
+  font-size:16px;
+  color:var(--ink-soft);
+  margin:20px 0 32px;
+  line-height:1.75;
+  font-style:italic;
+}
+
+/* Section heading */
+h3.sec{
+  font-family:"Noto Sans SC",sans-serif;
+  font-size:18px;
+  font-weight:600;
+  margin:36px 0 14px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  color:var(--ink);
+}
+h3.sec::before{
+  content:"";
+  display:inline-block;
+  width:14px;height:2px;
+  background:var(--cinnabar);
+}
+h4.sub{
+  font-family:"Noto Sans SC",sans-serif;
+  font-size:15px;
+  font-weight:600;
+  margin:24px 0 10px;
+  color:var(--cinnabar-dark);
+}
+
+/* Prose */
+p{margin:10px 0}
+.lead{font-size:15.5px;color:var(--ink-soft);margin-bottom:16px}
+strong{color:var(--ink);font-weight:600}
+em{color:var(--cinnabar-dark);font-style:italic}
+
+/* Code */
+code{
+  font-family:"JetBrains Mono",monospace;
+  font-size:.88em;
+  background:var(--code-bg);
+  padding:1px 6px;
+  border-radius:3px;
+  border:1px solid var(--code-border);
+  color:var(--cinnabar-dark);
+}
+pre{
+  font-family:"JetBrains Mono",monospace;
+  font-size:13px;
+  line-height:1.65;
+  background:#FBF8EF;
+  border:1px solid var(--code-border);
+  border-left:3px solid var(--cinnabar);
+  padding:14px 18px;
+  border-radius:4px;
+  overflow-x:auto;
+  margin:14px 0;
+  color:var(--ink);
+}
+pre code{
+  background:none;
+  border:none;
+  padding:0;
+  color:inherit;
+  font-size:inherit;
+}
+.kw{color:#A0410E;font-weight:500}
+.str{color:#5A6B2E}
+.cm{color:var(--ink-fade);font-style:italic}
+.num{color:#7B3B8A}
+.fn{color:#205A8C}
+.sf{color:var(--cinnabar)}
+
+/* Tables */
+.tbl{
+  width:100%;
+  border-collapse:collapse;
+  margin:16px 0 24px;
+  font-size:13.5px;
+}
+.tbl thead th{
+  text-align:left;
+  font-family:"Noto Sans SC",sans-serif;
+  font-weight:600;
+  font-size:12px;
+  letter-spacing:.04em;
+  color:var(--ink);
+  padding:10px 14px;
+  border-bottom:2px solid var(--ink);
+  background:transparent;
+}
+.tbl tbody td{
+  padding:8px 14px;
+  border-bottom:1px solid var(--rule-soft);
+  vertical-align:top;
+}
+.tbl tbody tr:hover td{background:var(--highlight)}
+.tbl td:first-child{
+  font-family:"JetBrains Mono",monospace;
+  font-size:12.5px;
+  color:var(--cinnabar-dark);
+  white-space:nowrap;
+}
+.tbl .col-narrow{width:30%}
+.tbl .col-narrower{width:18%}
+
+/* Callout */
+.callout{
+  background:rgba(178,58,43,.04);
+  border:1px solid rgba(178,58,43,.18);
+  padding:14px 18px;
+  border-radius:4px;
+  margin:16px 0;
+  font-size:14px;
+}
+.callout .label{
+  font-family:"JetBrains Mono",monospace;
+  font-size:10px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+  color:var(--cinnabar);
+  margin-bottom:6px;
+}
+.callout.tip{background:rgba(74,107,92,.05);border-color:rgba(74,107,92,.22)}
+.callout.tip .label{color:var(--jade)}
+.callout.warn{background:rgba(178,58,43,.07);border-color:rgba(178,58,43,.28)}
+
+/* Inline grid (two-col side-by-side notes) */
+.grid-2{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:20px;
+  margin:16px 0;
+}
+.grid-3{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:16px;
+  margin:16px 0;
+}
+.card{
+  border:1px solid var(--rule);
+  padding:14px 16px;
+  background:rgba(255,255,255,.3);
+  border-radius:4px;
+}
+.card h5{
+  font-size:13px;
+  font-weight:600;
+  margin:0 0 6px;
+  color:var(--cinnabar-dark);
+  font-family:"Noto Sans SC",sans-serif;
+}
+.card p{margin:0;font-size:13.5px;color:var(--ink-soft)}
+
+ul,ol{padding-left:22px;margin:8px 0}
+li{margin:4px 0}
+ul.tight li,ol.tight li{margin:2px 0}
+
+/* Complexity tag */
+.complexity{
+  display:inline-block;
+  font-family:"JetBrains Mono",monospace;
+  font-size:11px;
+  padding:2px 8px;
+  background:var(--ink);
+  color:var(--paper);
+  border-radius:3px;
+  margin-left:6px;
+  letter-spacing:.02em;
+}
+.complexity.best{background:var(--jade)}
+.complexity.bad{background:var(--cinnabar)}
+
+/* Footer */
+footer{
+  max-width:1200px;
+  margin:0 auto;
+  padding:48px 40px 64px;
+  border-top:1px solid var(--rule);
+  font-family:"JetBrains Mono",monospace;
+  font-size:11px;
+  letter-spacing:.1em;
+  color:var(--ink-fade);
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:16px;
+}
+footer .quote{
+  font-family:"Cormorant Garamond",serif;
+  font-style:italic;
+  font-size:15px;
+  letter-spacing:.01em;
+  color:var(--ink-soft);
+  max-width:600px;
+  text-transform:none;
+}
+
+/* Responsive */
+@media (max-width:980px){
+  .layout{grid-template-columns:1fr;gap:24px}
+  nav.toc{position:static;max-height:none;border:1px solid var(--rule);padding:24px;border-radius:4px}
+  .cover{padding:56px 24px 40px}
+  .layout{padding:0 24px}
+  footer{padding:32px 24px}
+  .cover .stats{grid-template-columns:repeat(2,1fr)}
+  .grid-2,.grid-3{grid-template-columns:1fr}
+  .part-title{font-size:40px}
+}
+@media (max-width:560px){
+  .cover h1{font-size:48px}
+  .chapter-en{display:none}
+  .chapter-head{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+
+<section class="cover">
+  <div class="meta-line">
+    <span>NAOE 1302 · Python 程序设计</span>
+    <span class="seal">SJTU · 知识点归纳</span>
+  </div>
+  <h1>Python<br><span class="accent">程序设计</span> 全景</h1>
+  <p class="subtitle">从语法基础到算法初步 · 一份系统的复习手册</p>
+  <p class="abstract">
+    本文档整合并提炼了课程全部讲义内容，按知识演进顺序重新编排为五卷十七章，
+    覆盖<strong>基础语法、控制结构、面向对象、线性数据结构、算法初步</strong>五大主题。
+    每章均含核心概念、关键语法、参考表格与典型代码示例，可作为通读式学习材料或临考查阅手册使用。
+  </p>
+  <div class="stats">
+    <div class="stat"><div class="num">5</div><div class="lbl">卷 Volumes</div></div>
+    <div class="stat"><div class="num">17</div><div class="lbl">章 Chapters</div></div>
+    <div class="stat"><div class="num">16</div><div class="lbl">讲义来源 Sources</div></div>
+    <div class="stat"><div class="num">∞</div><div class="lbl">练习空间 Practice</div></div>
+  </div>
+</section>
+
+<div class="layout">
+
+<nav class="toc">
+  <div class="toc-title">目 录 · Contents</div>
+
+  <div class="toc-part">
+    <div class="part-name">卷一 · 入门基础</div>
+    <a href="#c1"><span class="ch-num">01</span>Python 概述</a>
+    <a href="#c2"><span class="ch-num">02</span>变量与数据类型</a>
+    <a href="#c3"><span class="ch-num">03</span>字符串</a>
+    <a href="#c4"><span class="ch-num">04</span>列表 / 元组 / 字典</a>
+    <a href="#c5"><span class="ch-num">05</span>文件操作</a>
+  </div>
+
+  <div class="toc-part">
+    <div class="part-name">卷二 · 控制结构</div>
+    <a href="#c6"><span class="ch-num">06</span>运算符与表达式</a>
+    <a href="#c7"><span class="ch-num">07</span>选择结构 if</a>
+    <a href="#c8"><span class="ch-num">08</span>循环结构 for / while</a>
+  </div>
+
+  <div class="toc-part">
+    <div class="part-name">卷三 · 函数与模块</div>
+    <a href="#c9"><span class="ch-num">09</span>函数基础</a>
+    <a href="#c10"><span class="ch-num">10</span>参数传递</a>
+    <a href="#c11"><span class="ch-num">11</span>作用域与模块</a>
+  </div>
+
+  <div class="toc-part">
+    <div class="part-name">卷四 · 面向对象</div>
+    <a href="#c12"><span class="ch-num">12</span>类与对象</a>
+    <a href="#c13"><span class="ch-num">13</span>继承与组合</a>
+    <a href="#c14"><span class="ch-num">14</span>异常处理</a>
+  </div>
+
+  <div class="toc-part">
+    <div class="part-name">卷五 · 数据结构与算法</div>
+    <a href="#c15"><span class="ch-num">15</span>栈与队列</a>
+    <a href="#c16"><span class="ch-num">16</span>递归</a>
+    <a href="#c17"><span class="ch-num">17</span>查找与排序</a>
+  </div>
+</nav>
+
+<main>
+
+<!-- ============ PART 1 ============ -->
+<div class="part">
+  <div class="part-eyebrow">Volume One</div>
+  <h2 class="part-title">卷一 · <span class="italic">入门基础</span></h2>
+  <p class="part-desc">从语言本身的特征讲起，建立对 Python 变量模型、内置数据类型与文件交互的整体认知。</p>
+</div>
+
+<!-- Ch 1 -->
+<article class="chapter" id="c1">
+  <header class="chapter-head">
+    <span class="chapter-num">01</span>
+    <h2 class="chapter-title">Python 概述</h2>
+    <span class="chapter-en">Overview · Setup · First Line</span>
+  </header>
+  <p class="chapter-lead">Python 是一门动态、解释型、面向对象的高级语言，由 Guido van Rossum 于 1989 年开始设计，1991 年发布首个版本。本课程采用 <code>Python 3.10.10</code> + Jupyter Notebook / VS Code 环境。</p>
+
+  <h3 class="sec">语言核心特征</h3>
+  <div class="grid-3">
+    <div class="card"><h5>解释型 / 跨平台</h5><p>源代码即可执行；通过解释器运行于 Windows / Linux / macOS。</p></div>
+    <div class="card"><h5>动态类型</h5><p>变量无需声明，类型由赋值时的值决定；运行时可重新指向不同类型对象。</p></div>
+    <div class="card"><h5>语法精简</h5><p>用缩进表达代码块，省去花括号；可读性极高。</p></div>
+    <div class="card"><h5>丰富数据结构</h5><p>内置 list、tuple、dict、set；标准库与第三方包生态庞大。</p></div>
+    <div class="card"><h5>面向对象</h5><p>一切皆对象；同时支持过程式、函数式风格。</p></div>
+    <div class="card"><h5>健壮性</h5><p>提供异常机制、垃圾回收、堆栈跟踪等保障。</p></div>
+  </div>
+
+  <h3 class="sec">开发环境</h3>
+  <ul class="tight">
+    <li><strong>Jupyter Notebook</strong>：基于网页的交互式环境，单元格执行、即时输出，适合学习与数据分析（推荐通过 Anaconda 安装）。</li>
+    <li><strong>VS Code</strong>：通用代码编辑器，安装 Python 扩展后即可获得调试、智能提示、终端集成。</li>
+    <li><strong>命令行</strong>：直接键入 <code>python</code> 进入交互模式，提示符 <code>&gt;&gt;&gt;</code>。</li>
+  </ul>
+
+  <h3 class="sec">第一行代码：print</h3>
+<pre><code><span class="kw">print</span>(<span class="str">"Hello, Python world!"</span>)   <span class="cm"># 输出字符串</span>
+<span class="kw">print</span>(<span class="num">2</span> + <span class="num">3</span>)                    <span class="cm"># 输出表达式结果 5</span>
+<span class="cm"># 注释以 # 开头；所有符号必须使用英文标点</span></code></pre>
+  <div class="callout tip">
+    <div class="label">关键习惯</div>
+    所有标点必须是<strong>英文符号</strong>（括号、引号、冒号、逗号）。错误时 Python 会给出 <code>traceback</code>，提示行号与错误类型，应学会阅读这些信息。
+  </div>
+</article>
+
+<!-- Ch 2 -->
+<article class="chapter" id="c2">
+  <header class="chapter-head">
+    <span class="chapter-num">02</span>
+    <h2 class="chapter-title">变量与数据类型</h2>
+    <span class="chapter-en">Variables · Types · Assignment</span>
+  </header>
+  <p class="chapter-lead">变量是一个可被赋值的<em>标签</em>，指向内存中的某个对象。Python 采用基于值的内存管理：相同值默认共享同一内存位置。</p>
+
+  <h3 class="sec">命名规则</h3>
+  <ul class="tight">
+    <li>首字符必须是<strong>字母或下划线</strong>，其余可含字母、数字、下划线。</li>
+    <li>不能使用空格、连字符或其他特殊字符；区分大小写（<code>tax</code> ≠ <code>Tax</code>）。</li>
+    <li>不能使用 Python 关键字作变量名（<code>if</code>、<code>else</code>、<code>def</code>、<code>class</code>、<code>True</code>、<code>None</code> 等）。</li>
+    <li>不建议覆盖内置函数名（<code>list</code>、<code>str</code>、<code>type</code>……）。</li>
+    <li>风格建议：简短而具有描述性，多单词用下划线分隔（<code>student_name</code>）。</li>
+  </ul>
+
+  <h3 class="sec">简单数据类型</h3>
+  <table class="tbl">
+    <thead><tr><th class="col-narrower">类型</th><th class="col-narrow">含义</th><th>示例</th></tr></thead>
+    <tbody>
+      <tr><td>int</td><td>整数</td><td><code>num = 1</code></td></tr>
+      <tr><td>float</td><td>浮点数（含小数点）</td><td><code>cost = 2.99</code></td></tr>
+      <tr><td>str</td><td>字符串（单/双引号皆可）</td><td><code>name = "Ada"</code></td></tr>
+      <tr><td>bool</td><td>布尔值，首字母大写</td><td><code>flag = True</code> / <code>False</code></td></tr>
+    </tbody>
+  </table>
+  <p>用内置函数 <code>type(x)</code> 查看变量类型；用 <code>id(x)</code> 查看其内存地址。</p>
+
+  <h3 class="sec">赋值方式</h3>
+<pre><code><span class="cm"># 普通赋值</span>
+message = <span class="str">"Hello"</span>
+
+<span class="cm"># 多重赋值（同值）</span>
+a = b = c = <span class="num">0</span>
+
+<span class="cm"># 多元赋值（按顺序对应）</span>
+x, y, z = <span class="num">1</span>, <span class="str">'two'</span>, <span class="num">3.0</span>
+
+<span class="cm"># 变量交换（Python 特色）</span>
+a, b = b, a</code></pre>
+
+  <h3 class="sec">类型转换</h3>
+  <table class="tbl">
+    <thead><tr><th class="col-narrower">函数</th><th>作用</th><th>示例</th></tr></thead>
+    <tbody>
+      <tr><td>int(x)</td><td>转为整数</td><td><code>int('42')</code> → <code>42</code></td></tr>
+      <tr><td>float(x)</td><td>转为浮点</td><td><code>float('3.14')</code> → <code>3.14</code></td></tr>
+      <tr><td>str(x)</td><td>转为字符串</td><td><code>str(2024)</code> → <code>'2024'</code></td></tr>
+      <tr><td>hex(x) / oct(x)</td><td>整数转十六/八进制字符串</td><td><code>hex(255)</code> → <code>'0xff'</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sec">用户输入：input</h3>
+<pre><code>age = <span class="kw">input</span>(<span class="str">'请输入年龄: '</span>)   <span class="cm"># input 返回值永远是字符串</span>
+age = <span class="kw">int</span>(age)                <span class="cm"># 参与数学运算前必须转换</span></code></pre>
+  <div class="callout warn">
+    <div class="label">易错点</div>
+    通过 <code>input()</code> 获得的内容<strong>始终是字符串</strong>，看起来像数字也不能直接做加减。要么用 <code>int()/float()</code> 转换，要么留作字符串处理。
+  </div>
+</article>
+
+<!-- Ch 3 -->
+<article class="chapter" id="c3">
+  <header class="chapter-head">
+    <span class="chapter-num">03</span>
+    <h2 class="chapter-title">字符串</h2>
+    <span class="chapter-en">Strings · Slicing · Methods</span>
+  </header>
+  <p class="chapter-lead">字符串是一系列字符，属于<em>序列</em>类型，可被索引、切片、拼接。它不可变 —— 所有"修改"方法都返回新字符串。</p>
+
+  <h3 class="sec">索引与切片</h3>
+  <p>正索引从 <code>0</code> 开始；负索引从 <code>-1</code>（最后一个）反向计数。切片语法 <code>s[i:j:k]</code> 表示从 <code>i</code> 到 <code>j-1</code>（左闭右开）、步长 <code>k</code>。</p>
+<pre><code>s = <span class="str">"Hello, Python!"</span>
+s[<span class="num">0</span>]        <span class="cm"># 'H'</span>
+s[-<span class="num">1</span>]       <span class="cm"># '!'</span>
+s[:<span class="num">5</span>]       <span class="cm"># 'Hello'    省略起始 = 0</span>
+s[<span class="num">7</span>:]       <span class="cm"># 'Python!'  省略终止 = 末尾</span>
+s[::<span class="num">2</span>]      <span class="cm"># 'Hlo yhn'  每隔两个</span>
+s[::-<span class="num">1</span>]     <span class="cm"># 反转字符串</span></code></pre>
+
+  <h3 class="sec">大小写与空白处理</h3>
+  <table class="tbl">
+    <thead><tr><th class="col-narrow">方法</th><th>返回值</th></tr></thead>
+    <tbody>
+      <tr><td>s.upper()</td><td>全部转大写</td></tr>
+      <tr><td>s.lower()</td><td>全部转小写</td></tr>
+      <tr><td>s.title()</td><td>每个单词首字母大写</td></tr>
+      <tr><td>s.capitalize()</td><td>仅第一个字符大写</td></tr>
+      <tr><td>s.swapcase()</td><td>大小写互换</td></tr>
+      <tr><td>s.strip() / lstrip() / rstrip()</td><td>去除两端 / 左端 / 右端空白</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sec">拼接、重复、转义</h3>
+<pre><code>first + <span class="str">" "</span> + last     <span class="cm"># + 拼接，两侧必须都是字符串</span>
+<span class="str">'Python'</span> * <span class="num">3</span>            <span class="cm"># 重复 → 'PythonPythonPython'</span>
+<span class="kw">str</span>(<span class="num">2024</span>) + <span class="str">' year'</span>    <span class="cm"># 数字必须先转字符串</span>
+
+<span class="cm"># 转义字符</span>
+<span class="str">"\t"</span>   <span class="cm"># 制表符</span>
+<span class="str">"\n"</span>   <span class="cm"># 换行符</span>
+<span class="str">"\\"</span>   <span class="cm"># 反斜杠本身</span></code></pre>
+
+  <h3 class="sec">分割与查找</h3>
+  <table class="tbl">
+    <thead><tr><th class="col-narrow">方法</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>s.split(sep)</td><td>按 sep 切分，返回列表（默认按任意空白）</td></tr>
+      <tr><td>s.rsplit(sep)</td><td>从右端开始切分</td></tr>
+      <tr><td>s.splitlines()</td><td>按行切分</td></tr>
+      <tr><td>s.partition(sep)</td><td>切成 (head, sep, tail) 三元组</td></tr>
+      <tr><td>s.replace(old, new)</td><td>将 old 全部替换为 new</td></tr>
+      <tr><td>'a' in s / not in</td><td>成员检查，返回 True/False</td></tr>
+      <tr><td>len(s) / min(s) / max(s)</td><td>长度 / 最小字符 / 最大字符</td></tr>
+    </tbody>
+  </table>
+</article>
+
+<!-- Ch 4 -->
+<article class="chapter" id="c4">
+  <header class="chapter-head">
+    <span class="chapter-num">04</span>
+    <h2 class="chapter-title">列表 / 元组 / 字典</h2>
+    <span class="chapter-en">List · Tuple · Dict</span>
+  </header>
+  <p class="chapter-lead">Python 内置四大数据结构中最常用的三种：列表是<em>有序、可变</em>的元素序列；元组是<em>有序、不可变</em>的轻量集合；字典是<em>键-值映射</em>。</p>
+
+  <h3 class="sec">列表 List</h3>
+  <p>用方括号创建，元素任意类型，可随时增删改。</p>
+<pre><code>structures = [<span class="str">'steel'</span>, <span class="str">'concrete'</span>, <span class="str">'timber'</span>, <span class="str">'masonry'</span>]
+structures[<span class="num">0</span>]          <span class="cm"># 'steel'</span>
+structures[-<span class="num">1</span>]         <span class="cm"># 'masonry'</span>
+structures[<span class="num">1</span>:<span class="num">3</span>]        <span class="cm"># ['concrete', 'timber']</span>
+structures[<span class="num">2</span>] = <span class="str">'wood'</span> <span class="cm"># 修改元素</span></code></pre>
+
+  <table class="tbl">
+    <thead><tr><th class="col-narrow">方法</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>lst.append(x)</td><td>末尾追加单个元素</td></tr>
+      <tr><td>lst.insert(i, x)</td><td>在索引 i 处插入元素，原元素后移</td></tr>
+      <tr><td>lst.extend(other)</td><td>末尾追加另一列表的全部元素</td></tr>
+      <tr><td>del lst[i]</td><td>按索引删除（不返回值）</td></tr>
+      <tr><td>lst.pop(i=-1)</td><td>删除并<strong>返回</strong>索引 i 处元素（默认末尾）</td></tr>
+      <tr><td>lst.remove(x)</td><td>删除第一个等于 x 的元素</td></tr>
+      <tr><td>lst.count(x)</td><td>统计 x 出现次数</td></tr>
+      <tr><td>lst.index(x)</td><td>返回 x 第一次出现的索引</td></tr>
+      <tr><td>lst.sort(reverse=False)</td><td><strong>原地</strong>排序，永久改变列表</td></tr>
+      <tr><td>sorted(lst)</td><td>返回排序后的<strong>新</strong>列表，原列表不变</td></tr>
+      <tr><td>lst.reverse()</td><td>原地反转</td></tr>
+      <tr><td>len(lst)</td><td>元素个数</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sec">元组 Tuple</h3>
+  <p>用圆括号创建，<strong>不可修改元素</strong>，常用于表达"一组应当被绑在一起、不应被更动"的值。</p>
+<pre><code>dimensions = (<span class="num">20</span>, <span class="num">5</span>)
+empty      = ()
+single     = (<span class="num">20</span>,)        <span class="cm"># 单元素元组逗号不可省！</span>
+not_tuple  = (<span class="num">20</span>)         <span class="cm"># 这是整数，不是元组</span>
+
+<span class="cm"># 元组本身不能修改，但可以重新绑定整个变量</span>
+dimensions = (<span class="num">200</span>, <span class="num">50</span>, <span class="num">1</span>)   <span class="cm"># 合法</span>
+dimensions[<span class="num">0</span>] = <span class="num">30</span>           <span class="cm"># 报错 TypeError</span></code></pre>
+
+  <h3 class="sec">字典 Dict</h3>
+  <p>用花括号创建，由<strong>键-值对</strong>组成；键必须不可变且唯一，值可以是任何对象。</p>
+<pre><code>grid = {<span class="str">'type'</span>: <span class="str">'structured'</span>, <span class="str">'points'</span>: <span class="num">5000</span>}
+
+grid[<span class="str">'type'</span>]                    <span class="cm"># 访问 → 'structured'</span>
+grid[<span class="str">'cells'</span>] = <span class="num">4</span>               <span class="cm"># 新增键值对</span>
+grid[<span class="str">'points'</span>] = <span class="num">9</span>              <span class="cm"># 修改现有值</span>
+<span class="kw">del</span> grid[<span class="str">'cells'</span>]                <span class="cm"># 删除键值对</span></code></pre>
+
+  <table class="tbl">
+    <thead><tr><th class="col-narrow">方法</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>d.keys()</td><td>返回所有键的视图</td></tr>
+      <tr><td>d.values()</td><td>返回所有值的视图</td></tr>
+      <tr><td>d.items()</td><td>返回所有 (key, value) 二元组视图</td></tr>
+      <tr><td>d.get(key, default)</td><td>取值；不存在返回 default 而非报错</td></tr>
+      <tr><td>d.pop(key)</td><td>删除键并返回其值</td></tr>
+      <tr><td>d.popitem()</td><td>弹出并返回一个键值对</td></tr>
+      <tr><td>d.update(other)</td><td>用另一字典更新当前字典</td></tr>
+      <tr><td>d.setdefault(k, v)</td><td>k 存在则取其值；否则插入并返回 v</td></tr>
+      <tr><td>d.clear()</td><td>清空所有键值对</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sec">嵌套结构</h3>
+  <p>列表与字典可以任意嵌套，是 Python 表示真实世界结构化数据的基础。</p>
+<pre><code><span class="cm"># 字典列表：管理一组同类对象</span>
+aliens = [
+    {<span class="str">'color'</span>: <span class="str">'green'</span>, <span class="str">'points'</span>: <span class="num">5</span>},
+    {<span class="str">'color'</span>: <span class="str">'yellow'</span>, <span class="str">'points'</span>: <span class="num">10</span>},
+]
+
+<span class="cm"># 字典中嵌套列表：一个键对应多个值</span>
+pizza = {<span class="str">'crust'</span>: <span class="str">'thick'</span>,
+         <span class="str">'toppings'</span>: [<span class="str">'mushrooms'</span>, <span class="str">'cheese'</span>]}
+
+<span class="cm"># 字典中嵌套字典：以键标识对象</span>
+users = {
+    <span class="str">'aeinstein'</span>: {<span class="str">'first'</span>: <span class="str">'Albert'</span>, <span class="str">'location'</span>: <span class="str">'Princeton'</span>},
+    <span class="str">'mcurie'</span>:    {<span class="str">'first'</span>: <span class="str">'Marie'</span>,  <span class="str">'location'</span>: <span class="str">'Paris'</span>},
+}</code></pre>
+</article>
+
+<!-- Ch 5 -->
+<article class="chapter" id="c5">
+  <header class="chapter-head">
+    <span class="chapter-num">05</span>
+    <h2 class="chapter-title">文件操作</h2>
+    <span class="chapter-en">File I/O · os Module</span>
+  </header>
+  <p class="chapter-lead">读写文件是数据处理的第一步。推荐使用 <code>with open() as</code> 结构，它会自动在合适的时候关闭文件，避免资源泄漏。</p>
+
+  <h3 class="sec">打开模式</h3>
+  <table class="tbl">
+    <thead><tr><th class="col-narrower">模式</th><th>含义</th></tr></thead>
+    <tbody>
+      <tr><td>'r'</td><td>只读（默认），文件不存在则报错</td></tr>
+      <tr><td>'w'</td><td>写入；存在则<strong>清空</strong>原内容，不存在则新建</td></tr>
+      <tr><td>'a'</td><td>追加；写在文件末尾，原内容保留</td></tr>
+      <tr><td>'rb' / 'wb' / 'ab'</td><td>二进制模式（图片、音频等非文本）</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sec">两种打开方式</h3>
+  <div class="grid-2">
+    <div class="card">
+      <h5>open + close（传统）</h5>
+<pre style="margin:8px 0"><code>fo = <span class="kw">open</span>(<span class="str">'foo.txt'</span>, <span class="str">'w'</span>)
+fo.write(<span class="str">'hi'</span>)
+fo.close()</code></pre>
+      <p>必须手动 close；遇异常容易遗漏。</p>
+    </div>
+    <div class="card">
+      <h5>with open（推荐）</h5>
+<pre style="margin:8px 0"><code><span class="kw">with</span> <span class="kw">open</span>(<span class="str">'foo.txt'</span>) <span class="kw">as</span> f:
+    text = f.read()</code></pre>
+      <p>代码块退出时自动关闭，更安全。</p>
+    </div>
+  </div>
+
+  <h3 class="sec">读与写</h3>
+<pre><code><span class="cm"># 读取整个文件为一个字符串</span>
+<span class="kw">with</span> <span class="kw">open</span>(<span class="str">'pi_digits.txt'</span>) <span class="kw">as</span> f:
+    contents = f.read()
+
+<span class="cm"># 按行读取为列表</span>
+<span class="kw">with</span> <span class="kw">open</span>(<span class="str">'pi_digits.txt'</span>) <span class="kw">as</span> f:
+    lines = f.readlines()
+    <span class="kw">for</span> line <span class="kw">in</span> lines:
+        <span class="kw">print</span>(line.rstrip())     <span class="cm"># readlines 会保留行末 \n</span>
+
+<span class="cm"># 写入：write 不会自动换行，需要手动加 \n</span>
+<span class="kw">with</span> <span class="kw">open</span>(<span class="str">'out.txt'</span>, <span class="str">'w'</span>) <span class="kw">as</span> f:
+    f.write(<span class="str">'I love programming.\n'</span>)
+    f.write(<span class="str">'I love games.\n'</span>)</code></pre>
+
+  <h3 class="sec">文件路径</h3>
+  <ul class="tight">
+    <li><strong>相对路径</strong>：相对于当前运行程序所在目录。Linux/macOS 用 <code>/</code>，Windows 用 <code>\</code>（建议在前面加 <code>r</code> 表示 raw 字符串以避免转义问题）。</li>
+    <li><strong>绝对路径</strong>：完整路径，与当前目录无关。例 <code>r'C:\Users\me\data\x.txt'</code>。</li>
+  </ul>
+
+  <h3 class="sec">os 模块：文件夹与文件管理</h3>
+<pre><code><span class="kw">import</span> os
+
+os.getcwd()                       <span class="cm"># 当前工作目录</span>
+os.mkdir(<span class="str">'myDir'</span>)                <span class="cm"># 创建文件夹</span>
+os.rmdir(<span class="str">'myDir'</span>)                <span class="cm"># 删除空文件夹</span>
+os.rename(<span class="str">'old.txt'</span>, <span class="str">'new.txt'</span>)  <span class="cm"># 重命名</span>
+os.remove(<span class="str">'new.txt'</span>)              <span class="cm"># 删除文件</span></code></pre>
+</article>
+
+<!-- ============ PART 2 ============ -->
+<div class="part">
+  <div class="part-eyebrow">Volume Two</div>
+  <h2 class="part-title">卷二 · <span class="italic">控制结构</span></h2>
+  <p class="part-desc">程序的三种基本结构：顺序、选择、循环。配合运算符与条件判断，可以表达任意复杂的控制流。</p>
+</div>
+
+<!-- Ch 6 -->
+<article class="chapter" id="c6">
+  <header class="chapter-head">
+    <span class="chapter-num">06</span>
+    <h2 class="chapter-title">运算符与表达式</h2>
+    <span class="chapter-en">Operators · Expressions</span>
+  </header>
+  <p class="chapter-lead">Python 提供算术、赋值、比较、逻辑、按位五类运算符，与运算对象组合即成表达式。</p>
+
+  <h3 class="sec">算术运算符</h3>
+  <table class="tbl">
+    <thead><tr><th class="col-narrower">运算符</th><th class="col-narrow">含义</th><th>示例</th></tr></thead>
+    <tbody>
+      <tr><td>+  -  *  /</td><td>加减乘除</td><td><code>14 / 7</code> → <code>2.0</code>（始终浮点）</td></tr>
+      <tr><td>**</td><td>幂运算</td><td><code>7 ** 2</code> → <code>49</code></td></tr>
+      <tr><td>//</td><td>整除（向下取整）</td><td><code>15 // 4</code> → <code>3</code></td></tr>
+      <tr><td>%</td><td>取余</td><td><code>15 % 7</code> → <code>1</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sec">赋值与自反赋值</h3>
+<pre><code>x = <span class="num">5</span>            <span class="cm"># 基本赋值</span>
+x += <span class="num">3</span>           <span class="cm"># 等价于 x = x + 3</span>
+<span class="cm"># 同理：-= *= /= //= **= %=</span></code></pre>
+
+  <h3 class="sec">比较运算符</h3>
+  <p>返回 <code>True</code> 或 <code>False</code>，可作用于数字、字符串（按字符 ASCII 值逐字比较）。</p>
+  <table class="tbl">
+    <thead><tr><th>运算符</th><th>含义</th><th>运算符</th><th>含义</th></tr></thead>
+    <tbody>
+      <tr><td>&lt;  &lt;=</td><td>小于 / 小于等于</td><td>&gt;  &gt;=</td><td>大于 / 大于等于</td></tr>
+      <tr><td>==</td><td>相等</td><td>!=</td><td>不等</td></tr>
+    </tbody>
+  </table>
+  <div class="callout warn">
+    <div class="label">极易混淆</div>
+    <code>=</code> 是赋值；<code>==</code> 是比较。把 <code>if x = 5</code> 写成赋值会引发 <code>SyntaxError</code>。
+  </div>
+
+  <h3 class="sec">逻辑运算符</h3>
+  <table class="tbl">
+    <thead><tr><th class="col-narrower">运算符</th><th>规则</th></tr></thead>
+    <tbody>
+      <tr><td>and</td><td>两个操作数都为 True 才为 True（短路求值：左侧 False 即返回）</td></tr>
+      <tr><td>or</td><td>有任一为 True 即为 True（左侧 True 即返回）</td></tr>
+      <tr><td>not</td><td>单目运算符；取反</td></tr>
+    </tbody>
+  </table>
+<pre><code>num = <span class="num">15</span>
+(num % <span class="num">2</span> == <span class="num">0</span>) <span class="kw">and</span> (num % <span class="num">3</span> == <span class="num">0</span>)   <span class="cm"># False（不能被2整除）</span>
+(num % <span class="num">2</span> == <span class="num">0</span>) <span class="kw">or</span> (num % <span class="num">3</span> == <span class="num">0</span>)    <span class="cm"># True（能被3整除）</span></code></pre>
+
+  <h3 class="sec">按位运算符（了解）</h3>
+  <p>作用于整数的二进制位。常见操作：</p>
+  <table class="tbl">
+    <thead><tr><th class="col-narrower">运算符</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>&amp;</td><td>按位与：对应位都为 1 才为 1</td></tr>
+      <tr><td>|</td><td>按位或：任一位为 1 就为 1</td></tr>
+      <tr><td>^</td><td>按位异或：不同则为 1</td></tr>
+      <tr><td>~</td><td>按位取反（单目）</td></tr>
+      <tr><td>&lt;&lt;</td><td>左移：高位舍弃、低位补 0，等于乘以 2 的 n 次幂</td></tr>
+      <tr><td>&gt;&gt;</td><td>右移：低位舍弃、高位补 0，等于整除 2 的 n 次幂</td></tr>
+    </tbody>
+  </table>
+</article>
+
+<!-- Ch 7 -->
+<article class="chapter" id="c7">
+  <header class="chapter-head">
+    <span class="chapter-num">07</span>
+    <h2 class="chapter-title">选择结构 if</h2>
+    <span class="chapter-en">Conditional Branching</span>
+  </header>
+  <p class="chapter-lead">通过判断条件决定执行哪一路代码。Python 用<em>缩进</em>而非花括号来表达代码块，缩进务必使用统一的 Tab 或空格。</p>
+
+  <h3 class="sec">三种形式</h3>
+<pre><code><span class="cm"># 单分支</span>
+<span class="kw">if</span> num &lt; <span class="num">0</span>:
+    num = -num
+
+<span class="cm"># 双分支</span>
+<span class="kw">if</span> a &gt; b:
+    <span class="kw">print</span>(<span class="str">'a 大'</span>)
+<span class="kw">else</span>:
+    <span class="kw">print</span>(<span class="str">'b 大或相等'</span>)
+
+<span class="cm"># 多分支</span>
+<span class="kw">if</span> score &gt;= <span class="num">90</span>:
+    grade = <span class="str">'A'</span>
+<span class="kw">elif</span> score &gt;= <span class="num">80</span>:
+    grade = <span class="str">'B'</span>
+<span class="kw">elif</span> score &gt;= <span class="num">60</span>:
+    grade = <span class="str">'D'</span>
+<span class="kw">else</span>:
+    grade = <span class="str">'Fail'</span></code></pre>
+
+  <h3 class="sec">嵌套与组合</h3>
+  <p>条件可用 <code>and</code>、<code>or</code>、<code>not</code> 组合，避免过度嵌套。下方两种写法等价：</p>
+  <div class="grid-2">
+    <div class="card">
+      <h5>嵌套</h5>
+<pre style="margin:8px 0"><code><span class="kw">if</span> x &gt; <span class="num">0</span>:
+    <span class="kw">if</span> y &gt; <span class="num">0</span>:
+        <span class="kw">print</span>(<span class="str">'第一象限'</span>)</code></pre>
+    </div>
+    <div class="card">
+      <h5>逻辑组合</h5>
+<pre style="margin:8px 0"><code><span class="kw">if</span> x &gt; <span class="num">0</span> <span class="kw">and</span> y &gt; <span class="num">0</span>:
+    <span class="kw">print</span>(<span class="str">'第一象限'</span>)</code></pre>
+    </div>
+  </div>
+  <div class="callout tip">
+    <div class="label">缩进守则</div>
+    每个 <code>if</code>、<code>elif</code>、<code>else</code> 后必须有冒号，下一行必须缩进。同一分支内所有语句缩进相同；退出分支时取消缩进。
+  </div>
+</article>
+
+<!-- Ch 8 -->
+<article class="chapter" id="c8">
+  <header class="chapter-head">
+    <span class="chapter-num">08</span>
+    <h2 class="chapter-title">循环结构 for / while</h2>
+    <span class="chapter-en">Loops · break · continue</span>
+  </header>
+  <p class="chapter-lead">两种循环：<code>for</code> 适合<em>已知次数</em>或对序列迭代；<code>while</code> 适合<em>条件控制</em>的不定次循环。</p>
+
+  <h3 class="sec">for-in 循环</h3>
+<pre><code><span class="cm"># 直接遍历序列</span>
+<span class="kw">for</span> ch <span class="kw">in</span> <span class="str">'Python'</span>:
+    <span class="kw">print</span>(ch)
+
+<span class="cm"># 用 range() 控制次数</span>
+<span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(<span class="num">10</span>):           <span class="cm"># 0,1,...,9</span>
+    <span class="kw">print</span>(i)
+
+<span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(<span class="num">1</span>, <span class="num">100</span>, <span class="num">2</span>):     <span class="cm"># 1,3,5,...,99（奇数）</span>
+    <span class="kw">print</span>(i)
+
+<span class="cm"># for-else：循环完整执行后才执行 else</span>
+<span class="kw">for</span> x <span class="kw">in</span> seq:
+    process(x)
+<span class="kw">else</span>:
+    <span class="kw">print</span>(<span class="str">'循环正常结束'</span>)</code></pre>
+
+  <h3 class="sec">range(start, stop, step)</h3>
+  <table class="tbl">
+    <thead><tr><th>调用</th><th>产生序列</th></tr></thead>
+    <tbody>
+      <tr><td>range(6)</td><td>0, 1, 2, 3, 4, 5</td></tr>
+      <tr><td>range(4, 8)</td><td>4, 5, 6, 7</td></tr>
+      <tr><td>range(4, 10, 2)</td><td>4, 6, 8</td></tr>
+      <tr><td>range(10, 0, -1)</td><td>10, 9, 8, …, 1（倒序）</td></tr>
+    </tbody>
+  </table>
+  <p><code>stop</code> 不可省略，且<strong>不包含</strong>在结果中（左闭右开）。</p>
+
+  <h3 class="sec">while 循环</h3>
+<pre><code>num = <span class="num">1</span>
+<span class="kw">while</span> num &lt;= <span class="num">50</span>:
+    <span class="kw">if</span> num % <span class="num">3</span> == <span class="num">0</span>:
+        <span class="kw">print</span>(num)
+    num += <span class="num">1</span>           <span class="cm"># 必须显式修改循环变量，否则死循环</span></code></pre>
+  <div class="callout warn">
+    <div class="label">while 关键</div>
+    务必让循环条件能朝着"为假"的方向演进，否则会陷入<strong>死循环</strong>。两件事不能忘：① 循环前初始化控制变量；② 循环体内更新控制变量。
+  </div>
+
+  <h3 class="sec">break 与 continue</h3>
+  <div class="grid-2">
+    <div class="card">
+      <h5>break</h5>
+      <p>立即跳出<strong>所在层</strong>的循环，不再判断后续条件。多重循环中只跳出一层。</p>
+<pre style="margin:8px 0"><code><span class="kw">for</span> x <span class="kw">in</span> <span class="kw">range</span>(<span class="num">10</span>):
+    <span class="kw">if</span> x == <span class="num">5</span>:
+        <span class="kw">break</span>     <span class="cm"># 提前结束</span>
+    <span class="kw">print</span>(x)</code></pre>
+    </div>
+    <div class="card">
+      <h5>continue</h5>
+      <p>跳过本次循环剩余语句，直接回到循环头判断条件。</p>
+<pre style="margin:8px 0"><code><span class="kw">for</span> x <span class="kw">in</span> <span class="kw">range</span>(<span class="num">10</span>):
+    <span class="kw">if</span> x % <span class="num">2</span> == <span class="num">0</span>:
+        <span class="kw">continue</span>  <span class="cm"># 跳过偶数</span>
+    <span class="kw">print</span>(x)</code></pre>
+    </div>
+  </div>
+
+  <h3 class="sec">循环嵌套</h3>
+  <p>外层每执行一次，内层完整运行一遍。可用于二维表格、求最大公约数等问题。</p>
+<pre><code><span class="cm"># 求两正整数的最大公约数（辗转相减法）</span>
+<span class="kw">while</span> x1 != x2:
+    <span class="kw">if</span> x1 &gt; x2:
+        x1 -= x2
+    <span class="kw">else</span>:
+        x2 -= x1
+<span class="kw">print</span>(x1)            <span class="cm"># 此时 x1 == x2 即为 gcd</span></code></pre>
+</article>
+
+<!-- ============ PART 3 ============ -->
+<div class="part">
+  <div class="part-eyebrow">Volume Three</div>
+  <h2 class="part-title">卷三 · <span class="italic">函数与模块</span></h2>
+  <p class="part-desc">函数是组织代码、复用逻辑的最小单元；模块则是函数与类的容器。理解参数传递与作用域是写好程序的关键。</p>
+</div>
+
+<!-- Ch 9 -->
+<article class="chapter" id="c9">
+  <header class="chapter-head">
+    <span class="chapter-num">09</span>
+    <h2 class="chapter-title">函数基础</h2>
+    <span class="chapter-en">Functions · Definition · Return</span>
+  </header>
+  <p class="chapter-lead">函数把一段可复用的逻辑封装为一个名字。Python 的函数分为三类：<strong>内置函数</strong>（直接可用）、<strong>标准库函数</strong>（需 import）、<strong>自定义函数</strong>（用 def 创建）。</p>
+
+  <h3 class="sec">定义与调用</h3>
+<pre><code><span class="kw">def</span> <span class="fn">max3</span>(x1, x2, x3):
+    <span class="str">"""返回三个数中的最大值"""</span>
+    temp = x1 <span class="kw">if</span> x1 &gt; x2 <span class="kw">else</span> x2
+    <span class="kw">return</span> temp <span class="kw">if</span> temp &gt; x3 <span class="kw">else</span> x3
+
+result = max3(<span class="num">3</span>, <span class="num">7</span>, <span class="num">5</span>)        <span class="cm"># 调用，传入实参</span></code></pre>
+  <ul class="tight">
+    <li><code>def</code> 关键字必须 + 空格 + 函数名 + 圆括号 + 冒号。</li>
+    <li>函数体整体缩进；可选的首行文档字符串（docstring）描述功能。</li>
+    <li><code>return</code> 必须在函数体内、可省略；省略则返回 <code>None</code>。</li>
+  </ul>
+
+  <h3 class="sec">返回值的多种形态</h3>
+<pre><code><span class="cm"># 返回单值</span>
+<span class="kw">def</span> <span class="fn">sq</span>(n): <span class="kw">return</span> n * n
+
+<span class="cm"># 返回多值（实为元组）</span>
+<span class="kw">def</span> <span class="fn">stats</span>(a, b): <span class="kw">return</span> a + b, a * b, a / b
+s, p, q = stats(<span class="num">10</span>, <span class="num">3</span>)         <span class="cm"># 元组解包</span>
+
+<span class="cm"># 返回列表</span>
+<span class="kw">def</span> <span class="fn">stats</span>(a, b): <span class="kw">return</span> [a+b, a*b, a/b]
+
+<span class="cm"># 返回字典</span>
+<span class="kw">def</span> <span class="fn">person</span>(first, last):
+    <span class="kw">return</span> {<span class="str">'first'</span>: first, <span class="str">'last'</span>: last}</code></pre>
+</article>
+
+<!-- Ch 10 -->
+<article class="chapter" id="c10">
+  <header class="chapter-head">
+    <span class="chapter-num">10</span>
+    <h2 class="chapter-title">参数传递</h2>
+    <span class="chapter-en">Positional · Default · Keyword · *args / **kwargs</span>
+  </header>
+  <p class="chapter-lead">Python 提供多种灵活的参数传递方式，可以同时混用，但要注意顺序与规则。</p>
+
+  <h3 class="sec">四种基本方式</h3>
+  <table class="tbl">
+    <thead><tr><th class="col-narrow">类型</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>位置参数</td><td>按顺序对应；顺序错就传错</td></tr>
+      <tr><td>默认参数</td><td>定义时给出默认值，调用时可省略；必须放在形参表<strong>最右端</strong></td></tr>
+      <tr><td>关键字参数</td><td>调用时用 <code>name=value</code> 指定；顺序无关紧要</td></tr>
+      <tr><td>混合调用</td><td>位置参数必须在关键字参数之前</td></tr>
+    </tbody>
+  </table>
+
+<pre><code><span class="kw">def</span> <span class="fn">per</span>(name, gender, city=<span class="str">'Shanghai'</span>):
+    <span class="kw">return</span> [name, gender, city]
+
+per(<span class="str">'Tom'</span>, <span class="str">'M'</span>)                       <span class="cm"># city 用默认值</span>
+per(<span class="str">'Tom'</span>, <span class="str">'M'</span>, <span class="str">'Beijing'</span>)              <span class="cm"># 位置参数</span>
+per(name=<span class="str">'Tom'</span>, gender=<span class="str">'M'</span>)             <span class="cm"># 关键字参数</span>
+per(gender=<span class="str">'M'</span>, name=<span class="str">'Tom'</span>)             <span class="cm"># 顺序无关</span></code></pre>
+
+  <h3 class="sec">不定长参数 *args 与 **kwargs</h3>
+  <p>当无法预先知道参数个数时使用："收纳"<em>多余</em>的实参；用在调用时则是"拆分"。</p>
+  <div class="grid-2">
+    <div class="card">
+      <h5>*args：元组收纳</h5>
+<pre style="margin:8px 0"><code><span class="kw">def</span> <span class="fn">count</span>(name, *scores):
+    total = <span class="kw">sum</span>(scores)
+    <span class="kw">print</span>(name, total)
+
+count(<span class="str">'Tom'</span>, <span class="num">76</span>, <span class="num">68</span>, <span class="num">99</span>, <span class="num">84</span>)
+<span class="cm"># scores → (76, 68, 99, 84)</span></code></pre>
+    </div>
+    <div class="card">
+      <h5>**kwargs：字典收纳</h5>
+<pre style="margin:8px 0"><code><span class="kw">def</span> <span class="fn">stu</span>(term, **persons):
+    <span class="kw">for</span> k, v <span class="kw">in</span> persons.items():
+        <span class="kw">print</span>(k, v)
+
+stu(<span class="str">'2024'</span>, Mary=<span class="num">90</span>, Eric=<span class="num">75</span>)</code></pre>
+    </div>
+  </div>
+
+  <h3 class="sec">拆分调用</h3>
+<pre><code>nums = [<span class="num">78</span>, <span class="num">99</span>, <span class="num">65</span>]
+scores = {<span class="str">'a'</span>: <span class="num">90</span>, <span class="str">'b'</span>: <span class="num">80</span>}
+
+count(<span class="str">'Tom'</span>, *nums)         <span class="cm"># 拆分列表 → count('Tom', 78, 99, 65)</span>
+stu(<span class="str">'2024'</span>, **scores)      <span class="cm"># 拆分字典 → stu('2024', a=90, b=80)</span></code></pre>
+
+  <h3 class="sec">可变 vs 不可变参数</h3>
+  <div class="callout">
+    <div class="label">关键概念</div>
+    Python 中函数对<strong>不可变对象</strong>（数、字符串、元组）的修改不会影响实参；对<strong>可变对象</strong>（列表、字典）的修改会直接反映到实参，因为它们共享同一内存地址。
+  </div>
+</article>
+
+<!-- Ch 11 -->
+<article class="chapter" id="c11">
+  <header class="chapter-head">
+    <span class="chapter-num">11</span>
+    <h2 class="chapter-title">作用域与模块</h2>
+    <span class="chapter-en">Scope · global · Modules · Standard Library</span>
+  </header>
+  <p class="chapter-lead">变量起作用的范围称为<em>作用域</em>。函数内部、外部、内置三种层级；模块则是把函数 / 类装入文件以便复用。</p>
+
+  <h3 class="sec">三种作用域</h3>
+  <table class="tbl">
+    <thead><tr><th class="col-narrow">作用域</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>局部 Local</td><td>函数 / 程序块内部创建的变量；函数返回即消亡</td></tr>
+      <tr><td>全局 Global</td><td>文件层面定义的变量；可被各函数引用</td></tr>
+      <tr><td>内置 Built-in</td><td>Python 解释器提供的，如 <code>len</code>、<code>print</code></td></tr>
+    </tbody>
+  </table>
+  <p>查找顺序：<strong>局部 → 全局 → 内置</strong>。若同名，优先级也是这个顺序。</p>
+
+  <h3 class="sec">global 关键字</h3>
+  <p>函数内如果需要修改全局变量，必须先用 <code>global</code> 声明，否则会创建同名局部变量。</p>
+<pre><code>m = <span class="num">0</span>
+<span class="kw">def</span> <span class="fn">add</span>():
+    <span class="kw">global</span> m              <span class="cm"># 声明 m 是全局变量</span>
+    m += <span class="num">10</span>
+add()
+<span class="kw">print</span>(m)                  <span class="cm"># 10</span></code></pre>
+
+  <h3 class="sec">模块导入</h3>
+  <p>把函数 / 类放进 <code>.py</code> 文件即为模块，可在其他程序里导入使用。</p>
+<pre><code><span class="kw">import</span> math
+math.sqrt(<span class="num">16</span>)              <span class="cm"># 调用需加模块名.方法名</span>
+
+<span class="kw">from</span> math <span class="kw">import</span> sqrt, pi  <span class="cm"># 只导入指定函数</span>
+sqrt(<span class="num">16</span>)                   <span class="cm"># 无需前缀直接调用</span>
+
+<span class="kw">from</span> math <span class="kw">import</span> *         <span class="cm"># 导入全部（不推荐，可能命名冲突）</span>
+
+<span class="kw">import</span> numpy <span class="kw">as</span> np         <span class="cm"># 别名简化输入</span>
+<span class="kw">from</span> math <span class="kw">import</span> sqrt <span class="kw">as</span> s <span class="cm"># 给函数取别名</span></code></pre>
+
+  <h3 class="sec">常用标准库</h3>
+
+  <h4 class="sub">math 模块</h4>
+  <table class="tbl">
+    <thead><tr><th class="col-narrower">方法</th><th>含义</th></tr></thead>
+    <tbody>
+      <tr><td>sqrt(x)</td><td>平方根 <code>math.sqrt(9)</code> = 3.0</td></tr>
+      <tr><td>pow(x, y)</td><td>幂运算 <code>math.pow(5, 3)</code> = 125.0</td></tr>
+      <tr><td>fmod(x, y)</td><td>浮点取余</td></tr>
+      <tr><td>hypot(x, y)</td><td>√(x² + y²)</td></tr>
+      <tr><td>gcd(a, b)</td><td>最大公约数</td></tr>
+    </tbody>
+  </table>
+
+  <h4 class="sub">random 模块</h4>
+  <table class="tbl">
+    <thead><tr><th class="col-narrower">方法</th><th>含义</th></tr></thead>
+    <tbody>
+      <tr><td>choice(seq)</td><td>从有序集合随机挑一个元素</td></tr>
+      <tr><td>randint(a, b)</td><td>随机整数 [a, b]，两端均含</td></tr>
+      <tr><td>randrange(start, stop, step)</td><td>类似 range，随机一个值（不含 stop）</td></tr>
+      <tr><td>sample(seq, k)</td><td>不重复地随机取 k 个，返回列表</td></tr>
+      <tr><td>shuffle(seq)</td><td>原地打乱可变序列</td></tr>
+    </tbody>
+  </table>
+
+  <h4 class="sub">time / calendar 模块</h4>
+  <table class="tbl">
+    <thead><tr><th class="col-narrower">方法</th><th>含义</th></tr></thead>
+    <tbody>
+      <tr><td>time.time()</td><td>从 1970/1/1 至今的浮点秒数（时间戳）</td></tr>
+      <tr><td>time.ctime()</td><td>当前日期时间字符串</td></tr>
+      <tr><td>time.sleep(secs)</td><td>线程延迟指定秒数</td></tr>
+      <tr><td>calendar.prcal(year)</td><td>打印整年日历</td></tr>
+      <tr><td>calendar.prmonth(year, month)</td><td>打印指定月日历</td></tr>
+      <tr><td>calendar.isleap(year)</td><td>是否闰年</td></tr>
+    </tbody>
+  </table>
+</article>
+
+<!-- ============ PART 4 ============ -->
+<div class="part">
+  <div class="part-eyebrow">Volume Four</div>
+  <h2 class="part-title">卷四 · <span class="italic">面向对象</span></h2>
+  <p class="part-desc">把数据和操作绑在一起 —— 这是 OOP 的核心思想。掌握类、实例、继承、组合与异常处理，便能写出层次清晰、可维护的中大型程序。</p>
+</div>
+
+<!-- Ch 12 -->
+<article class="chapter" id="c12">
+  <header class="chapter-head">
+    <span class="chapter-num">12</span>
+    <h2 class="chapter-title">类与对象</h2>
+    <span class="chapter-en">Class · Instance · Attributes · Methods</span>
+  </header>
+  <p class="chapter-lead">类（class）是"对象的设计蓝图"。一个类的实例（instance）拥有自己的属性（数据）与方法（行为）。Python 内置类型本身就是类 —— <code>list</code>、<code>dict</code>、<code>str</code> 都是。</p>
+
+  <h3 class="sec">定义一个类</h3>
+<pre><code><span class="kw">class</span> <span class="fn">Dog</span>:
+    <span class="str">"""一次模拟小狗的简单尝试"""</span>
+
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="sf">self</span>, name, age):
+        <span class="str">"""初始化属性"""</span>
+        <span class="sf">self</span>.name = name
+        <span class="sf">self</span>.age = age
+
+    <span class="kw">def</span> <span class="fn">sit</span>(<span class="sf">self</span>):
+        <span class="kw">print</span>(<span class="str">f"{</span><span class="sf">self</span><span class="str">.name} is sitting."</span>)</code></pre>
+  <ul class="tight">
+    <li><code>class</code> 关键字定义类；类名遵循<strong>大驼峰</strong>命名（Pascal）。</li>
+    <li><code>__init__</code> 是<strong>构造方法</strong>，创建实例时自动调用，用于初始化属性。</li>
+    <li><code>self</code> 是惯例名称，代表实例自身；定义方法时必为第一个参数，调用时<strong>不要</strong>手动传入。</li>
+    <li>形如 <code>self.x</code> 的变量称为<strong>实例变量</strong>，属于该实例。</li>
+  </ul>
+
+  <h3 class="sec">创建实例与调用</h3>
+<pre><code>my_dog = Dog(<span class="str">'Willie'</span>, <span class="num">6</span>)       <span class="cm"># Python 自动传入 self</span>
+<span class="kw">print</span>(my_dog.name)               <span class="cm"># 点号访问属性</span>
+my_dog.sit()                     <span class="cm"># 点号调用方法</span></code></pre>
+
+  <h3 class="sec">修改属性值的三种方式</h3>
+  <div class="grid-3">
+    <div class="card"><h5>直接修改</h5>
+<pre style="margin:8px 0"><code>obj.x = <span class="num">23</span></code></pre>
+      <p>简单粗暴；外部代码直接接触内部状态。</p>
+    </div>
+    <div class="card"><h5>通过方法设置</h5>
+<pre style="margin:8px 0"><code><span class="kw">def</span> <span class="fn">update</span>(<span class="sf">self</span>, v):
+    <span class="sf">self</span>.x = v</code></pre>
+      <p>可在方法内做合法性校验。</p>
+    </div>
+    <div class="card"><h5>通过方法递增</h5>
+<pre style="margin:8px 0"><code><span class="kw">def</span> <span class="fn">add</span>(<span class="sf">self</span>, d):
+    <span class="sf">self</span>.x += d</code></pre>
+      <p>只增加增量，不接受任意值。</p>
+    </div>
+  </div>
+
+  <h3 class="sec">类变量 vs 实例变量</h3>
+  <table class="tbl">
+    <thead><tr><th class="col-narrow">实例变量</th><th>类变量</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>在 <code>__init__</code> 中定义，形如 <code>self.x</code></td>
+        <td>在类内、方法外定义</td>
+      </tr>
+      <tr>
+        <td>每个实例独立拥有</td>
+        <td>所有实例共享</td>
+      </tr>
+      <tr>
+        <td>用 <code>obj.x</code> 访问</td>
+        <td>用 <code>ClassName.x</code> 访问</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 class="sec">访问控制（约定）</h3>
+  <ul class="tight">
+    <li><code>self.x</code>：公开属性，外部可直接访问。</li>
+    <li><code>self._x</code>：单下划线，约定为"内部使用"，不强制。</li>
+    <li><code>self.__x</code>：双下划线触发<em>名称改写</em>（name mangling），外部不能直接通过 <code>obj.__x</code> 访问。</li>
+  </ul>
+
+  <h3 class="sec">运算符重载</h3>
+  <p>用 dunder 方法（双下划线方法）让自定义类支持内置运算符。</p>
+  <table class="tbl">
+    <thead><tr><th class="col-narrower">运算符</th><th>对应方法</th><th>调用方式</th></tr></thead>
+    <tbody>
+      <tr><td>+</td><td>__add__(self, other)</td><td>self + other</td></tr>
+      <tr><td>-</td><td>__sub__(self, other)</td><td>self - other</td></tr>
+      <tr><td>==</td><td>__eq__(self, other)</td><td>self == other</td></tr>
+      <tr><td>&lt;</td><td>__lt__(self, other)</td><td>self &lt; other</td></tr>
+      <tr><td>len()</td><td>__len__(self)</td><td>len(self)</td></tr>
+      <tr><td>print()</td><td>__str__(self)</td><td>print(self)</td></tr>
+      <tr><td>for-in 迭代</td><td>__iter__ 或 __getitem__</td><td>for e in self</td></tr>
+    </tbody>
+  </table>
+
+<pre><code><span class="kw">class</span> <span class="fn">Coordinate</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="sf">self</span>, x, y):
+        <span class="sf">self</span>.x, <span class="sf">self</span>.y = x, y
+
+    <span class="kw">def</span> <span class="fn">__add__</span>(<span class="sf">self</span>, other):
+        <span class="kw">return</span> Coordinate(<span class="sf">self</span>.x + other.x, <span class="sf">self</span>.y + other.y)
+
+    <span class="kw">def</span> <span class="fn">__str__</span>(<span class="sf">self</span>):
+        <span class="kw">return</span> <span class="str">f'({</span><span class="sf">self</span><span class="str">.x}, {</span><span class="sf">self</span><span class="str">.y})'</span>
+
+a, b = Coordinate(<span class="num">1</span>, <span class="num">2</span>), Coordinate(-<span class="num">1</span>, -<span class="num">1</span>)
+<span class="kw">print</span>(a + b)         <span class="cm"># (0, 1)</span></code></pre>
+</article>
+
+<!-- Ch 13 -->
+<article class="chapter" id="c13">
+  <header class="chapter-head">
+    <span class="chapter-num">13</span>
+    <h2 class="chapter-title">继承与组合</h2>
+    <span class="chapter-en">Inheritance · Composition · Modules of Classes</span>
+  </header>
+  <p class="chapter-lead">两种构建复杂类的方式：<em>继承</em>表达 "is-a" 关系（电动船<strong>是</strong>一种船），<em>组合</em>表达 "has-a" 关系（电动船<strong>有</strong>一块电池）。</p>
+
+  <h3 class="sec">继承：定义子类</h3>
+<pre><code><span class="kw">class</span> <span class="fn">Ship</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="sf">self</span>, make, model, year):
+        <span class="sf">self</span>.make = make
+        <span class="sf">self</span>.model = model
+        <span class="sf">self</span>.year = year
+
+<span class="kw">class</span> <span class="fn">ElectricShip</span>(Ship):           <span class="cm"># 括号内填父类名</span>
+    <span class="str">"""电动船的独特之处"""</span>
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="sf">self</span>, make, model, year):
+        <span class="kw">super</span>().__init__(make, model, year)  <span class="cm"># 调用父类的 __init__</span>
+        <span class="sf">self</span>.battery_size = <span class="num">40</span>             <span class="cm"># 子类特有属性</span>
+
+    <span class="kw">def</span> <span class="fn">describe_battery</span>(<span class="sf">self</span>):           <span class="cm"># 子类特有方法</span>
+        <span class="kw">print</span>(<span class="str">f"This ship has a {</span><span class="sf">self</span><span class="str">.battery_size}-kWh battery."</span>)</code></pre>
+  <ul class="tight">
+    <li>子类自动获得父类的属性和方法，可以追加新的、也可以<strong>重写</strong>同名方法。</li>
+    <li><code>super().method()</code> 在子类中调用父类的对应方法；常见于初始化。</li>
+    <li>父类（superclass）必须先定义、放在子类代码之前。</li>
+  </ul>
+
+  <h3 class="sec">方法重写</h3>
+<pre><code><span class="kw">class</span> <span class="fn">ElectricShip</span>(Ship):
+    <span class="kw">def</span> <span class="fn">get_descriptive_name</span>(<span class="sf">self</span>):           <span class="cm"># 与父类同名 → 重写</span>
+        <span class="kw">return</span> <span class="str">f"{</span><span class="kw">super</span><span class="str">().get_descriptive_name()} (Electric)"</span></code></pre>
+  <p>调用 <code>my_ship.get_descriptive_name()</code> 时，Python 先在子类中查找，找到即用，忽略父类同名方法。</p>
+
+  <h3 class="sec">组合：将实例用作属性</h3>
+  <p>当一个类内容过多，可将其中一部分功能拆成独立的类，再以"属性"形式接入。</p>
+<pre><code><span class="kw">class</span> <span class="fn">Battery</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="sf">self</span>, size=<span class="num">40</span>):
+        <span class="sf">self</span>.size = size
+    <span class="kw">def</span> <span class="fn">describe</span>(<span class="sf">self</span>):
+        <span class="kw">print</span>(<span class="str">f"Battery: {</span><span class="sf">self</span><span class="str">.size}-kWh"</span>)
+
+<span class="kw">class</span> <span class="fn">ElectricShip</span>(Ship):
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="sf">self</span>, make, model, year):
+        <span class="kw">super</span>().__init__(make, model, year)
+        <span class="sf">self</span>.battery = Battery()       <span class="cm"># 实例作为属性</span>
+
+ship = ElectricShip(<span class="str">'CSSC'</span>, <span class="str">'Container'</span>, <span class="num">2024</span>)
+ship.battery.describe()              <span class="cm"># 通过属性链式调用</span></code></pre>
+
+  <h3 class="sec">类与模块</h3>
+  <p>把类放到独立的 <code>.py</code> 文件中，按需 import：</p>
+<pre><code><span class="cm"># 单个类</span>
+<span class="kw">from</span> ship <span class="kw">import</span> Ship
+
+<span class="cm"># 多个类</span>
+<span class="kw">from</span> ship <span class="kw">import</span> Ship, ElectricShip
+
+<span class="cm"># 整个模块</span>
+<span class="kw">import</span> ship
+s = ship.Ship(...)
+
+<span class="cm"># 起别名</span>
+<span class="kw">from</span> electric_ship <span class="kw">import</span> ElectricShip <span class="kw">as</span> ES</code></pre>
+
+  <h3 class="sec">编程风格约定（PEP 8 节选）</h3>
+  <ul class="tight">
+    <li>类名用<strong>大驼峰</strong>（PascalCase）：<code>MyShip</code>。</li>
+    <li>实例名、函数名、模块名用<strong>下划线</strong>（snake_case）：<code>my_ship</code>。</li>
+    <li>类与类之间空两行，类内方法之间空一行。</li>
+    <li>每个类、模块顶部应有 docstring 说明用途。</li>
+  </ul>
+</article>
+
+<!-- Ch 14 -->
+<article class="chapter" id="c14">
+  <header class="chapter-head">
+    <span class="chapter-num">14</span>
+    <h2 class="chapter-title">异常处理</h2>
+    <span class="chapter-en">try · except · else · pass</span>
+  </header>
+  <p class="chapter-lead">异常（exception）是 Python 表示运行时错误的特殊对象。若不处理，程序会终止并打印 traceback；学会捕获异常能让程序更健壮。</p>
+
+  <h3 class="sec">基本结构</h3>
+<pre><code><span class="kw">try</span>:
+    answer = <span class="num">5</span> / <span class="num">0</span>
+<span class="kw">except</span> ZeroDivisionError:
+    <span class="kw">print</span>(<span class="str">"You can't divide by zero!"</span>)
+<span class="kw">else</span>:
+    <span class="kw">print</span>(answer)               <span class="cm"># try 成功才执行</span></code></pre>
+  <ul class="tight">
+    <li><code>try</code>：尝试执行可能出错的代码。</li>
+    <li><code>except 异常类型</code>：捕获并处理该类异常；可写多个 except 处理不同异常。</li>
+    <li><code>else</code>：可选，当 try 全部成功（未发生异常）时执行。</li>
+    <li><code>finally</code>：可选，不论是否异常都会执行（清理资源）。</li>
+  </ul>
+
+  <h3 class="sec">常见内置异常</h3>
+  <table class="tbl">
+    <thead><tr><th class="col-narrow">异常类</th><th>触发情形</th></tr></thead>
+    <tbody>
+      <tr><td>ZeroDivisionError</td><td>除数为零</td></tr>
+      <tr><td>FileNotFoundError</td><td>文件不存在</td></tr>
+      <tr><td>NameError</td><td>变量未定义</td></tr>
+      <tr><td>TypeError</td><td>类型不匹配（如字符串 + 整数）</td></tr>
+      <tr><td>ValueError</td><td>值不合法（如 <code>int('abc')</code>）</td></tr>
+      <tr><td>IndexError</td><td>列表索引越界</td></tr>
+      <tr><td>KeyError</td><td>字典中无该键</td></tr>
+      <tr><td>RecursionError</td><td>递归层数超过限制</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sec">文件不存在的处理</h3>
+<pre><code><span class="kw">from</span> pathlib <span class="kw">import</span> Path
+
+path = Path(<span class="str">'alice.txt'</span>)
+<span class="kw">try</span>:
+    contents = path.read_text(encoding=<span class="str">'utf-8'</span>)
+<span class="kw">except</span> FileNotFoundError:
+    <span class="kw">print</span>(<span class="str">f"Sorry, {path} does not exist."</span>)
+<span class="kw">else</span>:
+    words = contents.split()
+    <span class="kw">print</span>(<span class="str">f"{path} has about {</span><span class="kw">len</span><span class="str">(words)} words."</span>)</code></pre>
+
+  <h3 class="sec">静默失败：pass</h3>
+  <p>如果希望某异常发生时<strong>什么也不做</strong>，可用 <code>pass</code>。慎用 —— 静默掩盖错误会让 debug 困难。</p>
+<pre><code><span class="kw">try</span>:
+    contents = path.read_text()
+<span class="kw">except</span> FileNotFoundError:
+    <span class="kw">pass</span>     <span class="cm"># 不报错，也不打印任何信息</span></code></pre>
+
+  <h3 class="sec">阅读 traceback</h3>
+  <p>traceback 自下而上读取效果更好：<strong>最后一行</strong>是异常类型与消息，最有助于定位问题；上方逐层显示调用链与代码行号。</p>
+</article>
+
+<!-- ============ PART 5 ============ -->
+<div class="part">
+  <div class="part-eyebrow">Volume Five</div>
+  <h2 class="part-title">卷五 · <span class="italic">数据结构与算法</span></h2>
+  <p class="part-desc">从工程世界走向算法世界 —— 用 Python 实现经典线性结构与算法策略，理解时间复杂度的取舍。</p>
+</div>
+
+<!-- Ch 15 -->
+<article class="chapter" id="c15">
+  <header class="chapter-head">
+    <span class="chapter-num">15</span>
+    <h2 class="chapter-title">栈与队列</h2>
+    <span class="chapter-en">Stack · Queue · Linear Structures</span>
+  </header>
+  <p class="chapter-lead"><em>线性结构</em>是有序的数据集合，每个数据项有唯一的前驱与后继。栈与队列是最常用的两种受限线性结构，区别在于增删元素的"端"。</p>
+
+  <h3 class="sec">栈 Stack — LIFO</h3>
+  <p>"后进先出"（Last In First Out）。所有增删都发生在同一端 — <strong>栈顶</strong>。典型应用：浏览器返回、撤销操作、括号匹配、进制转换。</p>
+
+  <h4 class="sub">抽象数据类型 Stack 的操作</h4>
+  <table class="tbl">
+    <thead><tr><th class="col-narrow">操作</th><th>语义</th></tr></thead>
+    <tbody>
+      <tr><td>Stack()</td><td>创建空栈</td></tr>
+      <tr><td>push(item)</td><td>压入栈顶</td></tr>
+      <tr><td>pop()</td><td>弹出并返回栈顶元素</td></tr>
+      <tr><td>peek()</td><td>查看栈顶元素但不移除</td></tr>
+      <tr><td>isEmpty()</td><td>是否为空</td></tr>
+      <tr><td>size()</td><td>元素个数</td></tr>
+    </tbody>
+  </table>
+
+  <h4 class="sub">用 list 实现 Stack</h4>
+<pre><code><span class="kw">class</span> <span class="fn">Stack</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="sf">self</span>):
+        <span class="sf">self</span>.items = []
+
+    <span class="kw">def</span> <span class="fn">push</span>(<span class="sf">self</span>, item):
+        <span class="sf">self</span>.items.append(item)        <span class="cm"># 列表末尾作栈顶 → O(1)</span>
+
+    <span class="kw">def</span> <span class="fn">pop</span>(<span class="sf">self</span>):
+        <span class="kw">return</span> <span class="sf">self</span>.items.pop()
+
+    <span class="kw">def</span> <span class="fn">peek</span>(<span class="sf">self</span>):
+        <span class="kw">return</span> <span class="sf">self</span>.items[-<span class="num">1</span>]
+
+    <span class="kw">def</span> <span class="fn">isEmpty</span>(<span class="sf">self</span>):
+        <span class="kw">return</span> <span class="sf">self</span>.items == []
+
+    <span class="kw">def</span> <span class="fn">size</span>(<span class="sf">self</span>):
+        <span class="kw">return</span> <span class="kw">len</span>(<span class="sf">self</span>.items)</code></pre>
+  <div class="callout tip">
+    <div class="label">实现取舍</div>
+    若把列表的<strong>首端</strong>当作栈顶，push/pop 复杂度变为 <span class="complexity bad">O(n)</span>（因要移动所有元素）。用<strong>末端</strong>作栈顶则为 <span class="complexity best">O(1)</span>。
+  </div>
+
+  <h4 class="sub">应用一：括号匹配</h4>
+  <p>从左到右扫描，遇左括号入栈、遇右括号则与栈顶配对。栈最终为空 → 匹配成功。可扩展到 <code>() [] {}</code> 多种括号混用。</p>
+
+  <h4 class="sub">应用二：十进制转任意进制</h4>
+  <p>核心算法：不断 <code>n // base</code>、<code>n % base</code>，余数顺序与输出顺序相反 —— 正好利用栈反转。</p>
+<pre><code><span class="kw">def</span> <span class="fn">to_base</span>(n, base):
+    digits = <span class="str">"0123456789ABCDEF"</span>
+    stack = Stack()
+    <span class="kw">while</span> n &gt; <span class="num">0</span>:
+        stack.push(n % base)
+        n = n // base
+    out = <span class="str">""</span>
+    <span class="kw">while</span> <span class="kw">not</span> stack.isEmpty():
+        out += digits[stack.pop()]
+    <span class="kw">return</span> out</code></pre>
+
+  <h3 class="sec">队列 Queue — FIFO</h3>
+  <p>"先进先出"（First In First Out）。一端入队（<strong>队尾 rear</strong>），另一端出队（<strong>队首 front</strong>）。日常排队、打印任务调度、进程调度、键盘缓冲都是队列。</p>
+
+  <h4 class="sub">操作定义</h4>
+  <table class="tbl">
+    <thead><tr><th class="col-narrow">操作</th><th>语义</th></tr></thead>
+    <tbody>
+      <tr><td>Queue()</td><td>创建空队列</td></tr>
+      <tr><td>enqueue(item)</td><td>加入队尾</td></tr>
+      <tr><td>dequeue()</td><td>从队首移除并返回</td></tr>
+      <tr><td>isEmpty()</td><td>是否为空</td></tr>
+      <tr><td>size()</td><td>元素个数</td></tr>
+    </tbody>
+  </table>
+
+<pre><code><span class="kw">class</span> <span class="fn">Queue</span>:
+    <span class="kw">def</span> <span class="fn">__init__</span>(<span class="sf">self</span>):
+        <span class="sf">self</span>.items = []
+    <span class="kw">def</span> <span class="fn">enqueue</span>(<span class="sf">self</span>, item):
+        <span class="sf">self</span>.items.insert(<span class="num">0</span>, item)     <span class="cm"># 首端入队 O(n)</span>
+    <span class="kw">def</span> <span class="fn">dequeue</span>(<span class="sf">self</span>):
+        <span class="kw">return</span> <span class="sf">self</span>.items.pop()           <span class="cm"># 末端出队 O(1)</span>
+    <span class="kw">def</span> <span class="fn">isEmpty</span>(<span class="sf">self</span>):
+        <span class="kw">return</span> <span class="sf">self</span>.items == []
+    <span class="kw">def</span> <span class="fn">size</span>(<span class="sf">self</span>):
+        <span class="kw">return</span> <span class="kw">len</span>(<span class="sf">self</span>.items)</code></pre>
+
+  <h4 class="sub">经典应用：约瑟夫问题（热土豆）</h4>
+  <p>n 人围圈传球，传 <code>k</code> 次后手中拿球的人出列；重复直到只剩一人。用队列模拟：队首即"当前持球者"，传球 = 出队再入队，传完 <code>k</code> 次后出队首并丢弃。</p>
+</article>
+
+<!-- Ch 16 -->
+<article class="chapter" id="c16">
+  <header class="chapter-head">
+    <span class="chapter-num">16</span>
+    <h2 class="chapter-title">递归</h2>
+    <span class="chapter-en">Recursion · Divide &amp; Conquer · Fractals</span>
+  </header>
+  <p class="chapter-lead">递归是将问题<em>分解为规模更小的相同问题</em>的解题策略；在程序中表现为<strong>函数调用自身</strong>。许多复杂问题用递归表述既简洁又优雅。</p>
+
+  <h3 class="sec">递归三定律</h3>
+  <div class="grid-3">
+    <div class="card">
+      <h5>① 基本结束条件</h5>
+      <p>最小规模的问题必须能直接、不再递归地解决，否则会无限调用导致 <code>RecursionError</code>。</p>
+    </div>
+    <div class="card">
+      <h5>② 减小规模</h5>
+      <p>每次递归调用要朝着"基本结束条件"前进 —— 通常是缩短列表、减少整数、缩小区间等。</p>
+    </div>
+    <div class="card">
+      <h5>③ 调用自身</h5>
+      <p>函数体内调用自身，传入"更小规模"的参数；用其返回值合成当前问题的解。</p>
+    </div>
+  </div>
+
+  <h3 class="sec">入门示例：数列求和</h3>
+<pre><code><span class="kw">def</span> <span class="fn">list_sum</span>(nums):
+    <span class="kw">if</span> <span class="kw">len</span>(nums) == <span class="num">1</span>:            <span class="cm"># ① 基本结束条件</span>
+        <span class="kw">return</span> nums[<span class="num">0</span>]
+    <span class="kw">return</span> nums[<span class="num">0</span>] + list_sum(nums[<span class="num">1</span>:])  <span class="cm"># ② 缩小 + ③ 调用自身</span></code></pre>
+
+  <h3 class="sec">整数转任意进制（递归版）</h3>
+<pre><code><span class="kw">def</span> <span class="fn">to_str</span>(n, base):
+    digits = <span class="str">"0123456789ABCDEF"</span>
+    <span class="kw">if</span> n &lt; base:                       <span class="cm"># 最小规模</span>
+        <span class="kw">return</span> digits[n]
+    <span class="kw">return</span> to_str(n // base, base) + digits[n % base]</code></pre>
+
+  <h3 class="sec">递归调用的实现：调用栈</h3>
+  <p>每次函数调用，系统把"现场"打包成<em>栈帧</em>压入调用栈；返回时弹出。递归层数过多会导致<strong>栈溢出</strong>。</p>
+<pre><code><span class="kw">import</span> sys
+sys.getrecursionlimit()        <span class="cm"># 默认上限通常 1000</span>
+sys.setrecursionlimit(<span class="num">3000</span>)     <span class="cm"># 可调高，但要小心</span></code></pre>
+
+  <h3 class="sec">递归可视化：海龟作图 turtle</h3>
+  <table class="tbl">
+    <thead><tr><th class="col-narrower">方法</th><th>含义</th></tr></thead>
+    <tbody>
+      <tr><td>forward(n) / backward(n)</td><td>前进 / 后退 n 像素</td></tr>
+      <tr><td>left(a) / right(a)</td><td>左转 / 右转 a 度</td></tr>
+      <tr><td>penup() / pendown()</td><td>抬笔 / 落笔</td></tr>
+      <tr><td>pensize(s) / pencolor(c)</td><td>笔粗细 / 颜色</td></tr>
+    </tbody>
+  </table>
+  <p>用海龟画<strong>分形树</strong>、<strong>谢尔宾斯基三角形</strong>是观察递归调用最直观的方式：每个图形都由更小的相似图形构成。</p>
+
+  <h3 class="sec">经典递归问题</h3>
+
+  <h4 class="sub">汉诺塔 Hanoi</h4>
+  <p>将 n 个盘子从开始柱借助中间柱搬到目标柱，规则是大盘不能压小盘，每次只能搬一个。</p>
+<pre><code><span class="kw">def</span> <span class="fn">hanoi</span>(n, start, mid, end):
+    <span class="kw">if</span> n == <span class="num">1</span>:
+        <span class="kw">print</span>(<span class="str">f'{start} → {end}'</span>)
+        <span class="kw">return</span>
+    hanoi(n - <span class="num">1</span>, start, end, mid)   <span class="cm"># 顶上 n-1 盘 移到中间柱</span>
+    <span class="kw">print</span>(<span class="str">f'{start} → {end}'</span>)        <span class="cm"># 最大盘 移到目标柱</span>
+    hanoi(n - <span class="num">1</span>, mid, start, end)   <span class="cm"># 中间柱上 n-1 盘 移到目标柱</span></code></pre>
+  <p>移动次数为 <code>2ⁿ − 1</code>。64 个盘子需 5849 亿年（每秒一次）。</p>
+
+  <h4 class="sub">迷宫探索</h4>
+  <p>用二维列表表示迷宫（<code>+</code> 表墙、空格表通道）。从某点出发，分别尝试向北、南、西、东走，每个方向再递归调用自身。<strong>关键：撒"面包屑"</strong>避免回头走入死循环。</p>
+  <p>基本结束条件：① 撞墙；② 踩到面包屑；③ 到达边缘（找到出口）；④ 四向都失败。</p>
+</article>
+
+<!-- Ch 17 -->
+<article class="chapter" id="c17">
+  <header class="chapter-head">
+    <span class="chapter-num">17</span>
+    <h2 class="chapter-title">查找与排序</h2>
+    <span class="chapter-en">Search · Sort · Complexity</span>
+  </header>
+  <p class="chapter-lead">查找与排序是算法学习的起点。掌握不同方法的时间复杂度，才能在实际场景中作出合适选择。</p>
+
+  <h3 class="sec">查找算法</h3>
+
+  <h4 class="sub">顺序查找 Sequential Search</h4>
+  <p>从头到尾逐个比较，直到找到或遍历结束。无需数据有序。</p>
+<pre><code><span class="kw">def</span> <span class="fn">seq_search</span>(lst, item):
+    <span class="kw">for</span> i, x <span class="kw">in</span> <span class="kw">enumerate</span>(lst):
+        <span class="kw">if</span> x == item:
+            <span class="kw">return</span> <span class="kw">True</span>
+    <span class="kw">return</span> <span class="kw">False</span></code></pre>
+  <table class="tbl">
+    <thead><tr><th class="col-narrow">情形</th><th>最好</th><th>最坏</th><th>平均</th></tr></thead>
+    <tbody>
+      <tr><td>数据项存在</td><td>1</td><td>n</td><td>n/2</td></tr>
+      <tr><td>数据项不存在</td><td>n（无序） / 提前结束（有序）</td><td>n</td><td>n / n/2</td></tr>
+    </tbody>
+  </table>
+  <p>整体时间复杂度 <span class="complexity bad">O(n)</span>。有序表能在<strong>不存在时</strong>提前退出，但量级不变。</p>
+
+  <h4 class="sub">二分查找 Binary Search <span class="complexity best">O(log n)</span></h4>
+  <p>仅适用于<strong>有序表</strong>。每次比较中间项，将待查范围缩小一半。</p>
+<pre><code><span class="kw">def</span> <span class="fn">binary_search</span>(lst, item):
+    <span class="kw">if</span> <span class="kw">len</span>(lst) == <span class="num">0</span>:
+        <span class="kw">return</span> <span class="kw">False</span>
+    mid = <span class="kw">len</span>(lst) // <span class="num">2</span>
+    <span class="kw">if</span> lst[mid] == item:
+        <span class="kw">return</span> <span class="kw">True</span>
+    <span class="kw">if</span> item &lt; lst[mid]:
+        <span class="kw">return</span> binary_search(lst[:mid], item)
+    <span class="kw">return</span> binary_search(lst[mid+<span class="num">1</span>:], item)</code></pre>
+  <div class="callout">
+    <div class="label">分而治之</div>
+    递归本质上就是分治策略，二分查找是其经典应用：把问题切成两半、解决其中一半（另一半丢弃）。但要注意切片操作本身有 O(k) 开销，工程实现常用左右索引代替切片。
+  </div>
+
+  <h3 class="sec">排序算法</h3>
+
+  <table class="tbl">
+    <thead>
+      <tr><th class="col-narrow">算法</th><th>平均时间</th><th>最好</th><th>最坏</th><th>空间</th><th>稳定</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>冒泡排序 Bubble</td><td>O(n²)</td><td>O(n)*</td><td>O(n²)</td><td>O(1)</td><td>✓</td></tr>
+      <tr><td>选择排序 Selection</td><td>O(n²)</td><td>O(n²)</td><td>O(n²)</td><td>O(1)</td><td>✗</td></tr>
+      <tr><td>插入排序 Insertion</td><td>O(n²)</td><td>O(n)</td><td>O(n²)</td><td>O(1)</td><td>✓</td></tr>
+      <tr><td>谢尔排序 Shell</td><td>~O(n^1.5)</td><td>—</td><td>—</td><td>O(1)</td><td>✗</td></tr>
+      <tr><td>归并排序 Merge</td><td>O(n log n)</td><td>O(n log n)</td><td>O(n log n)</td><td>O(n)</td><td>✓</td></tr>
+      <tr><td>快速排序 Quick</td><td>O(n log n)</td><td>O(n log n)</td><td>O(n²)</td><td>O(log n)</td><td>✗</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:12px;color:var(--ink-fade)">* 冒泡的改进版：若某趟无交换则提前结束，可达 O(n)。</p>
+
+  <h4 class="sub">冒泡排序</h4>
+  <p>每趟相邻两两比较交换，让本趟最大者"冒泡"到末端。共 <code>n − 1</code> 趟。</p>
+<pre><code><span class="kw">def</span> <span class="fn">bubble</span>(lst):
+    <span class="kw">for</span> i <span class="kw">in</span> <span class="kw">range</span>(<span class="kw">len</span>(lst) - <span class="num">1</span>, <span class="num">0</span>, -<span class="num">1</span>):
+        <span class="kw">for</span> j <span class="kw">in</span> <span class="kw">range</span>(i):
+            <span class="kw">if</span> lst[j] &gt; lst[j+<span class="num">1</span>]:
+                lst[j], lst[j+<span class="num">1</span>] = lst[j+<span class="num">1</span>], lst[j]</code></pre>
+
+  <h4 class="sub">选择排序</h4>
+  <p>冒泡的改进：每趟只<strong>记录</strong>最大值的位置，最后再做<strong>一次</strong>交换。比对次数同冒泡，交换次数减为 O(n)。</p>
+
+  <h4 class="sub">插入排序</h4>
+  <p>维护一个已排序子列表，每次把新元素插入到合适位置（移动而非交换，更省时）。在数据"接近有序"时表现极佳。</p>
+
+  <h4 class="sub">谢尔排序</h4>
+  <p>插入排序的变体：先按较大间隔分组、组内插入排序，逐步缩小间隔到 1。利用插入排序在"接近有序"时的高效，整体快于 O(n²)。</p>
+
+  <h4 class="sub">归并排序 Merge Sort</h4>
+  <p>典型的分治策略：将列表对半切分 → 递归排序两半 → 合并两个有序列表。</p>
+<pre><code><span class="kw">def</span> <span class="fn">merge_sort</span>(lst):
+    <span class="kw">if</span> <span class="kw">len</span>(lst) &lt;= <span class="num">1</span>:
+        <span class="kw">return</span> lst
+    mid = <span class="kw">len</span>(lst) // <span class="num">2</span>
+    left  = merge_sort(lst[:mid])
+    right = merge_sort(lst[mid:])
+    <span class="cm"># 归并 left 和 right …</span>
+    <span class="kw">return</span> merged</code></pre>
+  <p>分裂 O(log n)，每层归并 O(n)，整体 <span class="complexity best">O(n log n)</span>。代价：需要 <strong>O(n) 额外空间</strong>。</p>
+
+  <h4 class="sub">快速排序 Quick Sort</h4>
+  <p>选一个"中值"作枢轴（pivot），将列表分为小于和大于两半，分别递归排序。无需额外空间，但若枢轴选取不佳（如已有序列表选第一个），会退化为 O(n²)。改进：三点取样（取首、中、尾的中位数）。</p>
+
+  <div class="callout">
+    <div class="label">如何选择</div>
+    实际工程中并不是越快越好：① 若数据动态变化、查找少 → 顺序查找 + 无序表可能更经济；② 若空间受限 → 选择 / 插入排序原地操作；③ 一次性大数据排序 → 优先归并 / 快速排序；④ Python 内置 <code>sort()</code> 和 <code>sorted()</code> 使用 <em>Timsort</em>（归并 + 插入的混合），通常无需自己实现。
+  </div>
+</article>
+
+</main>
+</div>
+
+<footer>
+  <span>Python 程序设计 · 知识点系统归纳 · NAOE 1302 · SJTU</span>
+  <span class="quote">"The important thing is not to stop questioning." —— A. Einstein</span>
+</footer>
+
+</body>
+</html>
+
+

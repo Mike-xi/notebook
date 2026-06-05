@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>概率论与数理统计 · 期末复习手册</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+:root{
+  --paper:#fbfaf7; --paper-2:#f5f2ea; --paper-3:#efeadf;
+  --ink:#211f1b; --ink-soft:#4c473f; --muted:#8c8678; --line:#e4ded1; --line-2:#d8d1c0;
+  --accent:#b0835f; --accent-deep:#8a5a36; --accent-soft:#f0e6da;
+  --core:#9a4a2c; --core-soft:#f6e4db;
+  --imp:#9a7a2c; 
+  --exam:#3f6079; --exam-soft:#e4ecf1;
+  --pitfall-bg:#f7efe4;
+  --sans:"Noto Sans SC",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --serif:"Noto Serif SC","Newsreader",Georgia,serif;
+  --maxw:880px;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:var(--sans); font-size:16.5px; line-height:1.78;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+.katex{font-size:1.04em;}
+.layout{display:flex; align-items:flex-start;}
+
+/* ---------- Sidebar ---------- */
+.sidebar{
+  position:sticky; top:0; height:100vh; width:268px; flex:0 0 268px;
+  border-right:1px solid var(--line); background:var(--paper);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.sb-head{padding:26px 24px 16px; border-bottom:1px solid var(--line);}
+.sb-head .ey{font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--accent-deep); font-weight:700;}
+.sb-head h1{font-family:var(--serif); font-weight:700; font-size:21px; line-height:1.3; margin:8px 0 2px;}
+.sb-head .sub{font-size:12.5px; color:var(--muted);}
+.sb-nav{flex:1; overflow-y:auto; padding:12px 0 30px;}
+.sb-nav::-webkit-scrollbar{width:8px;} .sb-nav::-webkit-scrollbar-thumb{background:var(--line-2); border-radius:8px;}
+.sb-nav a{display:block; text-decoration:none; color:var(--ink-soft);}
+.sb-ch{padding:9px 24px 6px; font-family:var(--serif); font-weight:600; font-size:14.5px; color:var(--ink); border-top:1px solid var(--line); margin-top:4px;}
+.sb-ch .n{color:var(--accent); margin-right:7px; font-variant-numeric:tabular-nums;}
+.sb-ch:first-of-type{border-top:none;}
+.sb-sub{padding:5px 24px 5px 40px; font-size:13px; color:var(--ink-soft); border-left:2px solid transparent; transition:.15s;}
+.sb-sub:hover{color:var(--accent-deep); background:var(--paper-2);}
+.sb-sub.active{color:var(--accent-deep); border-left-color:var(--accent); background:var(--accent-soft); font-weight:500;}
+
+/* ---------- Main ---------- */
+.main{flex:1; min-width:0;}
+.toolbar{
+  position:sticky; top:0; z-index:50; background:rgba(251,250,247,.92);
+  backdrop-filter:blur(8px); border-bottom:1px solid var(--line);
+  display:flex; align-items:center; gap:18px; padding:11px 40px;
+}
+.toolbar .tt{font-family:var(--serif); font-weight:600; font-size:14px; color:var(--ink-soft); margin-right:auto;}
+.switch{display:inline-flex; align-items:center; gap:9px; cursor:pointer; user-select:none; font-size:13.5px; color:var(--ink-soft); font-weight:500;}
+.switch .track{width:42px; height:23px; border-radius:20px; background:var(--line-2); position:relative; transition:.2s;}
+.switch .track::after{content:""; position:absolute; top:2.5px; left:2.5px; width:18px; height:18px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.2); transition:.2s;}
+body.reveal-all .switch .track{background:var(--accent);}
+body.reveal-all .switch .track::after{transform:translateX(19px);}
+.btn{font-family:var(--sans); font-size:13px; font-weight:500; color:var(--ink-soft); background:none; border:1px solid var(--line-2); border-radius:6px; padding:6px 12px; cursor:pointer; transition:.15s;}
+.btn:hover{border-color:var(--accent); color:var(--accent-deep);}
+
+.wrap{max-width:var(--maxw); margin:0 auto; padding:0 40px 140px;}
+.hero{padding:60px 0 30px; border-bottom:2px solid var(--ink); margin-bottom:8px;}
+.hero .ey{font-size:12px; letter-spacing:.24em; text-transform:uppercase; color:var(--accent-deep); font-weight:700;}
+.hero h1{font-family:var(--serif); font-weight:700; font-size:42px; line-height:1.18; margin:14px 0 12px; letter-spacing:-.01em;}
+.hero p{font-size:15px; color:var(--ink-soft); max-width:640px; margin:0;}
+.hero .meta{display:flex; gap:26px; flex-wrap:wrap; margin-top:22px; font-size:13px; color:var(--muted);}
+.hero .meta b{color:var(--ink); font-weight:600;}
+
+/* legend */
+.legend{display:flex; flex-wrap:wrap; gap:10px 18px; margin:26px 0 8px; padding:16px 20px; background:var(--paper-2); border-radius:8px; font-size:12.5px; color:var(--ink-soft);}
+.legend .li{display:inline-flex; align-items:center; gap:7px;}
+
+/* ---------- Chapters ---------- */
+.chapter{padding-top:54px;}
+.ch-head{margin-bottom:8px;}
+.ch-head .cn{font-family:var(--serif); font-size:13px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; color:var(--accent);}
+.ch-head h2{font-family:var(--serif); font-weight:700; font-size:31px; margin:6px 0 0; line-height:1.25;}
+.ch-head .cd{font-size:14px; color:var(--muted); margin-top:8px;}
+.ch-rule{height:1px; background:var(--line-2); margin:18px 0 4px;}
+
+.topic{padding-top:30px;}
+.topic > h3{font-family:var(--serif); font-weight:600; font-size:22px; margin:0 0 4px; display:flex; align-items:baseline; gap:10px;}
+.topic > h3 .h3n{color:var(--accent); font-size:15px; font-weight:600;}
+
+/* blocks */
+.block{margin:18px 0; padding:0;}
+.block .bh{display:flex; align-items:center; gap:10px; margin-bottom:7px; flex-wrap:wrap;}
+.kick{font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; padding:2.5px 9px; border-radius:4px;}
+.kick.def{background:var(--ink); color:var(--paper);}
+.kick.thm{background:var(--accent); color:#fff;}
+.kick.formula{background:var(--accent-soft); color:var(--accent-deep);}
+.kick.concl{background:var(--paper-3); color:var(--ink-soft);}
+.kick.pitfall{background:var(--core); color:#fff;}
+.kick.exam{background:var(--exam); color:#fff;}
+.bh h4{font-family:var(--serif); font-weight:600; font-size:16.5px; margin:0; color:var(--ink);}
+.block .bb{font-size:15.5px;}
+.block.boxed .bb{background:var(--paper-2); border:1px solid var(--line); border-radius:8px; padding:14px 18px;}
+.block.pitfall .bb{background:var(--pitfall-bg); border:1px solid #ecdcc7; border-radius:8px; padding:14px 18px;}
+.block.exam .bb{background:var(--exam-soft); border:1px solid #cfdde6; border-radius:8px; padding:14px 18px;}
+.block p{margin:.5em 0;}
+.block ul{margin:.5em 0; padding-left:1.3em;}
+.block li{margin:.3em 0;}
+
+/* importance pill */
+.imp{font-size:11px; font-weight:700; padding:2px 9px; border-radius:20px; letter-spacing:.04em; white-space:nowrap;}
+.imp-core{background:var(--core-soft); color:var(--core); border:1px solid #e6c4b4;}
+.imp-imp{background:#f5eccf; color:#7c6212; border:1px solid #e3d39c;}
+.imp-basic{background:var(--paper-3); color:var(--muted); border:1px solid var(--line-2);}
+.imp.ml{margin-left:auto;}
+
+/* formula display */
+.fml{margin:14px 0; padding:12px 18px; background:var(--paper-2); border-radius:8px; overflow-x:auto;}
+.fml.plain{background:none; padding:6px 0;}
+.eqn-note{font-size:13px; color:var(--muted); margin-top:6px;}
+
+/* tables */
+.tbl{width:100%; border-collapse:collapse; margin:14px 0; font-size:14.5px;}
+.tbl th,.tbl td{border:1px solid var(--line-2); padding:8px 12px; text-align:center; vertical-align:middle;}
+.tbl th{background:var(--paper-3); font-weight:600; font-family:var(--serif);}
+.tbl tr:nth-child(even) td{background:var(--paper-2);}
+.tbl td.lft{text-align:left;}
+
+/* inline emphasis */
+.term{color:var(--accent-deep); font-weight:600;}
+mark{background:rgba(176,131,95,.22); color:inherit; padding:0 2px; border-radius:3px;}
+.note{font-size:13.5px; color:var(--muted);}
+
+/* ---------- Fill-in-the-blank ---------- */
+.fb{cursor:pointer; color:var(--accent-deep); font-weight:600; background:rgba(176,131,95,.17); border-radius:3px; padding:0 .18em; transition:background .12s; white-space:nowrap;}
+.fb.wide{white-space:normal;}
+body:not(.reveal-all) .fb:not(.on){
+  color:transparent; background:transparent; border-bottom:2px dotted var(--accent); border-radius:0; padding:0 .18em;
+}
+body:not(.reveal-all) .fb:not(.on) > *{visibility:hidden;}
+body:not(.reveal-all) .fb:not(.on):hover{background:var(--accent-soft);}
+.fb-b{display:block; margin:14px 0; cursor:pointer; padding:12px 18px; border-radius:8px; background:rgba(176,131,95,.12); border:1px solid var(--accent-soft);}
+body:not(.reveal-all) .fb-b:not(.on){background:repeating-linear-gradient(45deg,var(--paper-2),var(--paper-2) 9px,#efe7da 9px,#efe7da 18px); border:1px dashed var(--accent); text-align:center;}
+body:not(.reveal-all) .fb-b:not(.on) > *{visibility:hidden;}
+body:not(.reveal-all) .fb-b:not(.on)::after{content:"点击显示答案"; visibility:visible; position:absolute; left:50%; transform:translateX(-50%); color:var(--accent-deep); font-size:12.5px; font-weight:600; letter-spacing:.05em;}
+.fb-b{position:relative;}
+
+.backtop{position:fixed; right:26px; bottom:26px; width:44px; height:44px; border-radius:50%; background:var(--ink); color:var(--paper); border:none; cursor:pointer; font-size:18px; opacity:0; pointer-events:none; transition:.2s; z-index:60; box-shadow:0 3px 12px rgba(0,0,0,.25);}
+.backtop.show{opacity:.9; pointer-events:auto;}
+
+@media (max-width:900px){
+  .sidebar{display:none;}
+  .toolbar{padding:11px 20px;}
+  .wrap{padding:0 22px 100px;}
+  .hero h1{font-size:32px;}
+}
+@media print{
+  .sidebar,.toolbar,.backtop{display:none!important;}
+  body{font-size:11pt;}
+  .fb,.fb-b{color:var(--accent-deep)!important; background:none!important; border:none!important;}
+  .fb > *,.fb-b > *{visibility:visible!important;}
+  .fb-b::after{display:none!important;}
+  .chapter{page-break-inside:auto;} .block{page-break-inside:avoid;}
+  .wrap{max-width:100%;}
+}
+</style>
+</head>
+<body class="reveal-all">
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sb-head">
+      <div class="ey">期末复习</div>
+      <h1>概率论与<br>数理统计</h1>
+      <div class="sub">公式 · 定理 · 结论速查手册</div>
+    </div>
+    <nav class="sb-nav" id="nav"></nav>
+  </aside>
+  <div class="main">
+    <div class="toolbar">
+      <span class="tt">复习手册</span>
+      <label class="switch" id="toggle" title="切换：显示全部答案 / 自测填空模式">
+        <span class="track"></span>
+        <span id="toggleLabel">答案：全部显示</span>
+      </label>
+      <button class="btn" onclick="window.print()">打印 / PDF</button>
+    </div>
+    <div class="wrap">
+      <section class="hero" id="top">
+  <div class="ey">Probability &amp; Mathematical Statistics</div>
+  <h1>概率论与数理统计<br>期末复习手册</h1>
+  <p>按章节系统整理课程的<strong>定义、公式、定理与重要结论</strong>，标注重要程度与考试高频考点，并把课件中的关键“填空”补全。可在右上角切换<strong>「全部显示」与「自测填空」</strong>两种模式复习。</p>
+  <div class="meta">
+    <span><b>7</b> 章 · 全程覆盖</span>
+    <span><b>3</b> 级重要度标注</span>
+    <span>高频考点 <b>来自 5 套真题</b></span>
+    <span>支持 <b>打印 / 导出 PDF</b></span>
+  </div>
+</section>
+
+<div class="legend">
+  <span class="li"><span class="imp imp-core">核心必考</span> 几乎每年必考，务必掌握</span>
+  <span class="li"><span class="imp imp-imp">重要</span> 常考，需理解会用</span>
+  <span class="li"><span class="imp imp-basic">了解即可</span> 知道概念即可</span>
+  <span class="li"><span class="kick exam" style="border-radius:4px">高频考点</span> 真题中反复出现</span>
+  <span class="li"><span class="kick pitfall" style="border-radius:4px">易错</span> 容易出错处</span>
+</div>
+
+<section class="chapter" id="c1">
+  <div class="ch-head">
+    <div class="cn">第 1 章</div>
+    <h2>随机事件与概率</h2>
+    <div class="cd">样本空间 · 事件运算 · 古典/几何概型 · 概率公理 · 条件概率 · 全概率与 Bayes · 独立性</div>
+  </div>
+  <div class="ch-rule"></div>
+
+  <!-- 1.1 -->
+  <div class="topic" id="c1-1">
+    <h3><span class="h3n">1.1</span> 随机事件及其运算</h3>
+
+    <div class="block">
+      <div class="bh"><span class="kick def">定义</span><h4>随机试验 · 样本空间 · 事件</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <p><span class="term">随机试验 $E$</span>：①可在相同条件下重复进行；②所有可能结果不止一个且事先已知；③每次试验前无法预知哪个结果出现。</p>
+        <ul>
+          <li><span class="term">样本空间 $\Omega$</span>：$E$ 所有可能结果组成的集合；其元素 $\omega$ 称为<span class="term">样本点</span>。</li>
+          <li><span class="term">随机事件</span>：$\Omega$ 的子集 $A\subset\Omega$。$A$ 发生 $\iff$ 试验结果 $\omega\in A$。</li>
+          <li><span class="term">基本事件</span>：仅含一个样本点的事件；$\Omega$ 为必然事件，$\varnothing$ 为不可能事件。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick concl">事件运算</span><h4>事件的关系与运算（对应集合运算）</h4></div>
+      <div class="bb">
+        <ul>
+          <li><b>包含</b> $A\subset B$：$A$ 发生则 $B$ 必发生。<b>相等</b> $A=B\iff A\subset B$ 且 $B\subset A$。</li>
+          <li><b>和（并）</b> $A\cup B$：$A,B$ <span class="fb">至少一个</span>发生。</li>
+          <li><b>积（交）</b> $A\cap B=AB$：$A,B$ <span class="fb">同时</span>发生。</li>
+          <li><b>差</b> $A-B=A\bar B$：$A$ 发生<span class="fb">且 $B$ 不发生</span>。</li>
+          <li><b>互斥（互不相容）</b>：$AB=\varnothing$。<b>对立（互逆）</b>：$A\cup B=\Omega$ 且 $AB=\varnothing$，记 $B=\bar A$。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick formula">运算律</span><h4>常用运算律</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <p>交换律、结合律、分配律 $A\cup(BC)=(A\cup B)(A\cup C)$，以及最常用的</p>
+        <div class="fml">$\textbf{对偶律（De Morgan）：}\quad \overline{\bigcup_{i=1}^{n}A_i}=\bigcap_{i=1}^{n}\overline{A_i},\qquad \overline{\bigcap_{i=1}^{n}A_i}=\bigcup_{i=1}^{n}\overline{A_i}$</div>
+        <p class="note">差化积：$A-B=A\bar B=A-(AB)$；运算顺序：先括号 → 再交 → 再并/差。</p>
+      </div>
+    </div>
+
+    <div class="block exam">
+      <div class="bh"><span class="kick exam">高频考点</span><h4>用 $A,B,C$ 表示复合事件</h4></div>
+      <div class="bb">
+        <ul>
+          <li>都不发生：<span class="fb">$\bar A\bar B\bar C$</span>；至少一个发生：<span class="fb">$A\cup B\cup C$</span>。</li>
+          <li>恰好一个发生：<span class="fb wide">$A\bar B\bar C\cup\bar A B\bar C\cup\bar A\bar B C$</span>。</li>
+          <li>恰好两个发生：<span class="fb wide">$AB\bar C\cup A\bar B C\cup\bar A B C$</span>；不多于两个：<span class="fb">$\overline{ABC}$</span>。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="block pitfall">
+      <div class="bh"><span class="kick pitfall">易错</span><h4>互斥 ≠ 对立 ≠ 独立</h4></div>
+      <div class="bb"><p>互斥强调“不能同时发生”（$AB=\varnothing$）；对立还要求“必有一个发生”；独立是概率上的关系（$P(AB)=P(A)P(B)$）。<mark>互斥与独立一般不能同时成立</mark>（除非某事件概率为 0）。</p></div>
+    </div>
+  </div>
+
+  <!-- 1.2 -->
+  <div class="topic" id="c1-2">
+    <h3><span class="h3n">1.2</span> 概率（古典 · 几何 · 公理化）</h3>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick formula">公式</span><h4>古典概型与几何概型</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <p><b>古典概型</b>（有限个样本点、等可能）：$\displaystyle P(A)=$ <span class="fb">$\dfrac{\#A}{\#\Omega}=\dfrac{k}{n}$</span>。</p>
+        <p><b>几何概型</b>（$\Omega$ 为有界区域，均匀取点）：$\displaystyle P(A)=$ <span class="fb">$\dfrac{m(A)}{m(\Omega)}$</span>（长度/面积/体积之比）。</p>
+        <p class="note">重要结论：几何概型中 <mark>概率为 0 的事件不一定是不可能事件</mark>（如取到某一指定点）；概率为 1 也不一定必然。</p>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick def">定义</span><h4>概率的公理化定义（Kolmogorov）</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <p>设 $P(\cdot)$ 为事件域 $\mathscr F$ 上的集函数，满足三条公理：</p>
+        <ul>
+          <li><b>非负性</b>：$P(A)\ge 0$；</li>
+          <li><b>规范性</b>：$P(\Omega)=1$；</li>
+          <li><b>可列可加性</b>：$A_1,A_2,\dots$ 两两互斥时 $P\!\left(\bigcup_{i=1}^{\infty}A_i\right)=$ <span class="fb">$\sum_{i=1}^{\infty}P(A_i)$</span>。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick formula">性质</span><h4>概率的基本性质与加法公式</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <ul>
+          <li>$P(\varnothing)=0$；$P(\bar A)=$ <span class="fb">$1-P(A)$</span>。</li>
+          <li>单调性：$A\subset B\Rightarrow P(B-A)=$ <span class="fb">$P(B)-P(A)$</span>，且 $P(A)\le P(B)$。</li>
+        </ul>
+        <div class="fml">$P(A\cup B)=P(A)+P(B)-P(AB)$</div>
+        <div class="fml">$P\!\Big(\bigcup_{i=1}^n A_i\Big)=\sum_i P(A_i)-\sum_{i&lt;j}P(A_iA_j)+\sum_{i&lt;j&lt;k}P(A_iA_jA_k)-\cdots+(-1)^{n-1}P(A_1\cdots A_n)$</div>
+        <p class="eqn-note">上式为<span class="term">容斥原理</span>，常用于“至少有一个配对/相同”类问题。</p>
+      </div>
+    </div>
+
+    <div class="block exam">
+      <div class="bh"><span class="kick exam">高频考点</span><h4>Bonferroni 不等式</h4></div>
+      <div class="bb"><p>“当 $A,B$ 同时发生时 $C$ 必发生”$\Rightarrow AB\subset C\Rightarrow P(C)\ge P(AB)\ge$ <span class="fb">$P(A)+P(B)-1$</span>。（真题选择题原型）</p></div>
+    </div>
+  </div>
+
+  <!-- 1.3 -->
+  <div class="topic" id="c1-3">
+    <h3><span class="h3n">1.3</span> 条件概率 · 全概率 · Bayes</h3>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick formula">三大公式</span><h4>条件概率 / 乘法公式 / 全概率 / Bayes</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <p><b>条件概率</b>（$P(A)&gt;0$）：$\displaystyle P(B\mid A)=$ <span class="fb">$\dfrac{P(AB)}{P(A)}$</span>。</p>
+        <div class="fml">$\textbf{乘法公式：}\ P(A_1A_2\cdots A_n)=P(A_1)P(A_2\mid A_1)P(A_3\mid A_1A_2)\cdots P(A_n\mid A_1\cdots A_{n-1})$</div>
+        <p>设 $\{B_j\}$ 为一个<span class="term">完备事件组</span>（两两互斥、并为 $\Omega$，$P(B_j)&gt;0$）：</p>
+        <div class="fml">$\textbf{全概率：}\ P(A)=\sum_{j}P(B_j)P(A\mid B_j)$</div>
+        <div class="fml">$\textbf{Bayes：}\ P(B_i\mid A)=\frac{P(B_i)P(A\mid B_i)}{\sum_{j}P(B_j)P(A\mid B_j)}$</div>
+        <p class="note">$P(B_i)$ 为<span class="term">先验概率</span>，$P(B_i\mid A)$ 为<span class="term">后验概率</span>。</p>
+      </div>
+    </div>
+
+    <div class="block exam">
+      <div class="bh"><span class="kick exam">高频考点</span><h4>全概率 + Bayes 应用题（必出大题）</h4></div>
+      <div class="bb">
+        <p>真题反复出现：保险公司分类索赔、射手分级进决赛、三盒取球、产品验收、医学诊断（血检+尿检）。<b>解题套路</b>：</p>
+        <ul>
+          <li>设“原因”为完备事件组 $B_j$ → 全概率求 $P(A)$；</li>
+          <li>问“已知结果反推原因”→ Bayes 求 $P(B_i\mid A)$。</li>
+          <li>多重检验独立时：$P(BC\mid A)=P(B\mid A)P(C\mid A)$（在 $A$ 条件下条件独立）。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1.4 -->
+  <div class="topic" id="c1-4">
+    <h3><span class="h3n">1.4</span> 事件的独立性</h3>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick def">定义</span><h4>独立性</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <p>$A,B$ <span class="term">相互独立</span> $\iff P(AB)=$ <span class="fb">$P(A)P(B)$</span>。</p>
+        <p>$A,B,C$ 相互独立需<b>同时</b>满足两两独立 <b>且</b> $P(ABC)=P(A)P(B)P(C)$（四个等式缺一不可）。</p>
+        <p class="note">$n$ 个事件相互独立：任取 $k$ 个 $(2\le k\le n)$ 的积概率都等于各自概率之积。</p>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick concl">结论</span><h4>独立性的运算</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <ul>
+          <li>$A,B$ 独立 $\Rightarrow$ $A,\bar B$；$\bar A,B$；$\bar A,\bar B$ 也都<span class="fb">相互独立</span>。</li>
+          <li>若 $A_1,\dots,A_n$ 相互独立，将其分组后各组分别做并/交/差/对立等运算，所得事件仍相互独立。</li>
+          <li>$A,B$ 独立 $\iff P(B\mid A)=P(B\mid\bar A)=P(B)$（$A$ 是否发生不影响 $B$）。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="block exam">
+      <div class="bh"><span class="kick exam">高频考点</span><h4>独立元件电路的通路概率</h4></div>
+      <div class="bb">
+        <p>设元件 $i$ 正常工作概率 $p$ 且相互独立，$A_i=\{$元件 $i$ 正常$\}$。<b>串联</b>通路：各事件之<span class="fb">积</span>，$P=\prod p_i$；<b>并联</b>通路：<span class="fb wide">$P=1-\prod(1-p_i)$</span>。复杂电路按“先并后串 / 全概率（按关键元件是否工作分类）”拆解。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="chapter" id="c2">
+  <div class="ch-head">
+    <div class="cn">第 2 章</div>
+    <h2>随机变量及其分布</h2>
+    <div class="cd">分布函数 · 离散型（0-1 / 二项 / 泊松 / 几何）· 连续型（均匀 / 指数 / 正态）· 随机变量函数的分布</div>
+  </div>
+  <div class="ch-rule"></div>
+
+  <!-- 2.1 -->
+  <div class="topic" id="c2-1">
+    <h3><span class="h3n">2.1</span> 随机变量与分布函数</h3>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick def">定义</span><h4>分布函数 $F(x)$</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <p>$\displaystyle F(x)=P(X\le x),\quad x\in\mathbb R$。</p>
+        <p><b>三条性质</b>（也是判定一个函数能否作为分布函数的充要条件）：</p>
+        <ul>
+          <li>单调<span class="fb">不减</span>；</li>
+          <li><span class="fb">右连续</span>：$F(x_0)=F(x_0+0)$；</li>
+          <li>$0\le F\le 1$，且 $F(-\infty)=$ <span class="fb">$0$</span>，$F(+\infty)=$ <span class="fb">$1$</span>。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick formula">公式</span><h4>用 $F(x)$ 计算概率</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <div class="fml">$P(a&lt;X\le b)=F(b)-F(a),\qquad P(X=a)=F(a)-F(a-0)$</div>
+        <p class="note">$P(X=a)$ 等于 $F$ 在 $a$ 处的<span class="term">跳跃高度</span>；连续型处处无跳跃，故 $P(X=a)=0$。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2.2 -->
+  <div class="topic" id="c2-2">
+    <h3><span class="h3n">2.2</span> 离散型随机变量</h3>
+
+    <div class="block">
+      <div class="bh"><span class="kick def">定义</span><h4>分布律</h4></div>
+      <div class="bb">
+        <p>$P(X=x_k)=p_k$，满足 $p_k\ge 0$ 且 $\sum_k p_k=$ <span class="fb">$1$</span>；分布函数 $F(x)=\sum_{x_k\le x}p_k$（阶梯函数）。</p>
+      </div>
+    </div>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick formula">四个常见离散分布</span><h4>分布律</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <ul>
+          <li><b>0-1 分布</b> $B(1,p)$：$P(X=k)=p^k(1-p)^{1-k},\ k=0,1$。</li>
+          <li><b>二项分布</b> $X\sim B(n,p)$（$n$ 重 Bernoulli 中 $A$ 发生次数）：<br>$\displaystyle P(X=k)=$ <span class="fb">$C_n^k p^k(1-p)^{n-k}$</span>$,\ k=0,1,\dots,n$。</li>
+          <li><b>泊松分布</b> $X\sim P(\lambda)$：$\displaystyle P(X=k)=$ <span class="fb">$\dfrac{\lambda^k}{k!}e^{-\lambda}$</span>$,\ k=0,1,2,\dots$</li>
+          <li><b>几何分布</b>（首次成功的试验次数）：$P(X=k)=(1-p)^{k-1}p,\ k=1,2,\dots$（具<span class="term">无记忆性</span>）。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick concl">结论</span><h4>泊松过程与指数分布的关系</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <p>若在任何长为 $t$ 的时段内事件发生次数 $N(t)\sim P(\lambda t)$（泊松过程），则相邻两次事件的<b>时间间隔</b> $T\sim$ <span class="fb">$E(\lambda)$</span>（指数分布）。</p>
+        <p class="note">反之亦然：独立指数间隔 $\Rightarrow$ 计数过程为泊松。这是指数分布"无记忆性"的本质来源。</p>
+      </div>
+    </div>
+
+
+    <div class="block">
+      <div class="bh"><span class="kick thm">定理</span><h4>泊松定理（二项的泊松近似）</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <p>当 $n\to\infty,\ np_n\to\lambda$ 时，$\displaystyle C_n^k p_n^k(1-p_n)^{n-k}\to$ <span class="fb">$\dfrac{\lambda^k}{k!}e^{-\lambda}$</span>。</p>
+        <p class="note">应用条件：$n$ 大、$p$ 小（$n\ge 20,\ p\le 0.05$ 即可用；$n\ge 100,\ np\le 10$ 更精确），取 $\lambda=np$。</p>
+      </div>
+    </div>
+
+    <div class="block exam">
+      <div class="bh"><span class="kick exam">高频考点</span><h4>二项 / 泊松的最可能取值</h4></div>
+      <div class="bb">
+        <p><b>二项</b>众数：当 $(n+1)p$ 不为整数时 $k_0=\lfloor (n+1)p\rfloor$；当 $(n+1)p$ 为整数时，<span class="fb wide">$k=(n+1)p$ 与 $(n+1)p-1$ 处概率同时取最大</span>。</p>
+        <p><b>泊松</b>：由 $P(X=1)=P(X=2)$ 可解出 $\lambda$（$\dfrac{\lambda}{1}=\dfrac{\lambda^2}{2}\Rightarrow\lambda=2$），再比较 $P(X=3),P(X=4)$ —— 真题选择题原型。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2.3 -->
+  <div class="topic" id="c2-3">
+    <h3><span class="h3n">2.3</span> 连续型随机变量</h3>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick def">定义</span><h4>概率密度 $f(x)$</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <p>存在非负可积 $f$ 使 $F(x)=\int_{-\infty}^x f(t)\,dt$。性质：$f(x)\ge 0$，$\int_{-\infty}^{+\infty}f=$ <span class="fb">$1$</span>。</p>
+        <div class="fml">$P(a&lt;X&lt;b)=P(a\le X\le b)=\int_a^b f(x)\,dx,\qquad f(x_0)=F'(x_0)$</div>
+        <p class="note">连续型 $P(X=a)=0$，但 $\{X=a\}$ <mark>未必是不可能事件</mark>；区间端点开闭不影响概率。</p>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick formula">三个常见连续分布</span><h4>密度与分布函数</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <ul>
+          <li><b>均匀分布</b> $X\sim U(a,b)$：$f(x)=\dfrac{1}{b-a},\ a&lt;x&lt;b$。</li>
+          <li><b>指数分布</b> $X\sim E(\lambda)$：$f(x)=\lambda e^{-\lambda x}\,(x&gt;0)$，$F(x)=$ <span class="fb">$1-e^{-\lambda x}\ (x\ge0)$</span>。</li>
+          <li><b>正态分布</b> $X\sim N(\mu,\sigma^2)$：$\displaystyle f(x)=\dfrac{1}{\sqrt{2\pi}\,\sigma}e^{-\frac{(x-\mu)^2}{2\sigma^2}}$（$\mu$ 位置参数，$\sigma$ 形状参数）。</li>
+        </ul>
+        <p class="note"><b>均匀分布的分布函数</b>：$F(x)=0\ (x\le a)$，$\dfrac{x-a}{b-a}\ (a&lt;x&lt;b)$，$1\ (x\ge b)$。</p>
+        <p class="note"><b>指数分布概率</b>：$P(a&lt;X\le b)=e^{-\lambda a}-e^{-\lambda b}$。</p>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick concl">结论</span><h4>指数分布无记忆性 · 正态标准化</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <p><b>无记忆性</b>：$X\sim E(\lambda)\Rightarrow P(X&gt;s+t\mid X&gt;s)=$ <span class="fb">$P(X&gt;t)=e^{-\lambda t}$</span>。</p>
+        <p><b>标准正态</b> $N(0,1)$：密度 $\varphi(x)=\frac{1}{\sqrt{2\pi}}e^{-x^2/2}$，分布函数 $\Phi(x)$，有 $\Phi(-x)=$ <span class="fb">$1-\Phi(x)$</span>。</p>
+        <div class="fml">$X\sim N(\mu,\sigma^2)\ \Longrightarrow\ \frac{X-\mu}{\sigma}\sim N(0,1),\quad P(X\le x)=\Phi\!\Big(\tfrac{x-\mu}{\sigma}\Big)$</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2.4 -->
+  <div class="topic" id="c2-4">
+    <h3><span class="h3n">2.4</span> 随机变量函数 $Y=g(X)$ 的分布</h3>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick formula">方法</span><h4>离散型 / 连续型求 $Y=g(X)$ 分布</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <p><b>离散型</b>：先求 $Y$ 的所有取值，再 $P(Y=y_k)=\sum_{g(x_i)=y_k}p_i$（注意合并相等值，如 $Y=X^2$）。</p>
+        <p><b>连续型 · 分布函数法（通用）</b>：$F_Y(y)=P(g(X)\le y)$ 化为关于 $X$ 的概率再求导。</p>
+        <div class="fml">$\textbf{公式法（}g\textbf{ 严格单调可导）：}\ f_Y(y)=f_X\big(h(y)\big)\,\big|h'(y)\big|,\quad h=g^{-1}$</div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick concl">重要结论</span><h4>正态的线性变换仍为正态</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <p>$X\sim N(\mu,\sigma^2),\ Y=aX+b\ (a\neq0)\Rightarrow Y\sim$ <span class="fb">$N(a\mu+b,\,a^2\sigma^2)$</span>。</p>
+        <p class="note">逆变换抽样：$U\sim U(0,1)\Rightarrow F^{-1}(U)$ 服从分布函数为 $F$ 的分布（Monte-Carlo 仿真基础）。</p>
+      </div>
+    </div>
+
+    <div class="block exam">
+      <div class="bh"><span class="kick exam">高频考点</span><h4>$Y=\sqrt X$、$Y=e^{X}$、$Y=\min\{X,c\}$ 型</h4></div>
+      <div class="bb">
+        <ul>
+          <li>$X\sim U(0,4),\ Y=\sqrt X$：用分布函数法，注意 $Y$ 的取值范围 $[0,2]$。</li>
+          <li>$X\sim E(1),\ Y=e^{X}$：$Y&gt;1$，$f_Y(y)=f_X(\ln y)\cdot\frac1y$。</li>
+          <li>$Y=\min\{X,c\}$（如 $E(\lambda)$ 截断）：分布函数<mark>在 $x=c$ 处有跳跃</mark>，是<span class="fb">混合型</span>（既非纯连续也非纯离散）。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="chapter" id="c3">
+  <div class="ch-head">
+    <div class="cn">第 3 章</div>
+    <h2>多维随机变量</h2>
+    <div class="cd">联合分布与边缘分布 · 二维均匀/正态 · 条件分布 · 独立性 · 函数的分布（和/商/平方和/极值）</div>
+  </div>
+  <div class="ch-rule"></div>
+
+  <!-- 3.1 -->
+  <div class="topic" id="c3-1">
+    <h3><span class="h3n">3.1</span> 二维随机变量及其分布</h3>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick def">定义</span><h4>联合分布函数 · 边缘分布</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <p>$F(x,y)=P(X\le x,\,Y\le y)$。<b>边缘</b>分布函数：$F_X(x)=F(x,+\infty)$，$F_Y(y)=F(+\infty,y)$。</p>
+        <p class="note"><mark>联合分布唯一决定边缘分布，反之不真</mark>（边缘相同、联合可不同）。</p>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick formula">公式</span><h4>离散型 / 连续型的联合与边缘</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <p><b>离散</b>：联合分布律 $p_{ij}=P(X=x_i,Y=y_j)$，$\sum_{i,j}p_{ij}=1$；边缘 $p_{i\cdot}=\sum_j p_{ij}$，$p_{\cdot j}=\sum_i p_{ij}$。</p>
+        <p><b>连续</b>：联合密度 $f(x,y)\ge0,\ \iint f=1$，$P\big((X,Y)\in G\big)=\iint_G f\,dx\,dy$。</p>
+        <div class="fml">$\textbf{边缘密度：}\quad f_X(x)=\int_{-\infty}^{+\infty}f(x,y)\,dy,\qquad f_Y(y)=\int_{-\infty}^{+\infty}f(x,y)\,dx$</div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick concl">两个常见二维分布</span><h4>二维均匀 · 二维正态</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <p><b>二维均匀</b>（区域 $D$，面积 $S_D$）：$f(x,y)=\dfrac{1}{S_D},\ (x,y)\in D$。</p>
+        <p><b>二维正态</b> $(X,Y)\sim N(\mu_1,\sigma_1^2;\mu_2,\sigma_2^2;\rho)$。<b>关键结论</b>：</p>
+        <ul>
+          <li>边缘分布 $X\sim N(\mu_1,\sigma_1^2),\ Y\sim N(\mu_2,\sigma_2^2)$（边缘<span class="fb">与 $\rho$ 无关</span>）；</li>
+          <li>$X,Y$ 都正态 <mark>不能推出</mark> $(X,Y)$ 联合正态（反例存在）。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3.2 -->
+  <div class="topic" id="c3-2">
+    <h3><span class="h3n">3.2</span> 条件分布</h3>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick formula">公式</span><h4>条件分布律 / 条件密度</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <p><b>离散</b>：$P(Y=y_j\mid X=x_i)=\dfrac{p_{ij}}{p_{i\cdot}}$。</p>
+        <div class="fml">$\textbf{连续条件密度：}\quad f_{Y\mid X}(y\mid x)=\frac{f(x,y)}{f_X(x)}\quad(f_X(x)&gt;0)$</div>
+        <p><b>连续型乘法/全概率/Bayes</b>：</p>
+        <div class="fml">$f(x,y)=f_X(x)\,f_{Y\mid X}(y\mid x),\qquad f_{X\mid Y}(x\mid y)=\frac{f_X(x)f_{Y\mid X}(y\mid x)}{\int f_X(x)f_{Y\mid X}(y\mid x)\,dx}$</div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick concl">结论</span><h4>二维正态的条件分布</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <div class="fml">$Y\mid X=x\ \sim\ N\!\Big(\mu_2+\rho\tfrac{\sigma_2}{\sigma_1}(x-\mu_1),\ \sigma_2^2(1-\rho^2)\Big)$</div>
+        <p class="note">条件期望是 $x$ 的线性函数（回归直线），条件方差与 $x$ 无关。</p>
+      </div>
+    </div>
+
+    <div class="block exam">
+      <div class="bh"><span class="kick exam">高频考点</span><h4>条件密度 + 条件概率（必出大题）</h4></div>
+      <div class="bb"><p>给定联合密度（如 $f=\frac{21}{4}x^2y,\ x^2\le y\le1$）求 $f_{X\mid Y}(x\mid y)$ 与 $P(X\le0.5\mid Y=0.8)$；或贝叶斯统计模型（先验指数 + 似然指数）求后验密度。<b>套路</b>：先求边缘 → 代条件密度公式 → 在条件密度上积分求条件概率。</p></div>
+    </div>
+  </div>
+
+  <!-- 3.3 -->
+  <div class="topic" id="c3-3">
+    <h3><span class="h3n">3.3</span> 随机变量的独立性</h3>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick thm">判定</span><h4>独立的等价条件</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <p>$X,Y$ 相互独立 $\iff F(x,y)=F_X(x)F_Y(y)\ (\forall x,y)$。</p>
+        <ul>
+          <li>离散：$p_{ij}=$ <span class="fb">$p_{i\cdot}\,p_{\cdot j}\ (\forall i,j)$</span>；</li>
+          <li>连续：$f(x,y)=$ <span class="fb">$f_X(x)f_Y(y)$</span>（在连续点）。</li>
+        </ul>
+        <p><b>因子分解定理</b>：$f(x,y)=r(x)g(y)$（变量可分离、区域为矩形）$\iff X,Y$ 独立。</p>
+        <p>若 $X,Y$ 独立，则 $g(X),h(Y)$ 也独立。</p>
+      </div>
+    </div>
+
+    <div class="block exam">
+      <div class="bh"><span class="kick exam">高频考点</span><h4>二维均匀分布：独立性与相关性判断</h4></div>
+      <div class="bb">
+        <ul>
+          <li>矩形域上均匀 $\Rightarrow$ 通常独立；非矩形域（如圆域、三角域 $0&lt;x&lt;y&lt;1$）$\Rightarrow$ <span class="fb">一般不独立</span>（积分上下限含对方变量、不能分离）。</li>
+          <li><b>圆域均匀</b>是经典反例：$X,Y$ <mark>不相关但不独立</mark>。</li>
+          <li>二维正态特例：$(X,Y)\sim N(\dots;\rho)$ 时，$X,Y$ 独立 $\iff$ 不相关 $\iff \rho=0$。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3.4 -->
+  <div class="topic" id="c3-4">
+    <h3><span class="h3n">3.4</span> 多维随机变量函数的分布</h3>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick formula">和的分布（卷积）</span><h4>$Z=X+Y$</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <div class="fml">$f_Z(z)=\int_{-\infty}^{+\infty}f(x,z-x)\,dx\ \xrightarrow{\ X,Y\text{ 独立}\ }\ \int_{-\infty}^{+\infty}f_X(x)f_Y(z-x)\,dx$</div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick concl">可加性</span><h4>独立同型分布之和</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <ul>
+          <li>$B(n_1,p)+B(n_2,p)=$ <span class="fb">$B(n_1+n_2,\,p)$</span>（同 $p$）。</li>
+          <li>$P(\lambda_1)+P(\lambda_2)=$ <span class="fb">$P(\lambda_1+\lambda_2)$</span>。</li>
+          <li>$N(\mu_1,\sigma_1^2)+N(\mu_2,\sigma_2^2)=$ <span class="fb">$N(\mu_1+\mu_2,\,\sigma_1^2+\sigma_2^2)$</span>（独立）。</li>
+          <li>一般 $\sum a_iX_i$（$X_i$ 独立正态）仍为正态。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick formula">平方和 → 卡方</span><h4>$\chi^2$ 分布的来源</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <p>$X_1,\dots,X_n$ 独立同分布 $N(0,1)\Rightarrow Z=X_1^2+\cdots+X_n^2\sim$ <span class="fb">$\chi^2(n)$</span>。</p>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick formula">极值分布</span><h4>$M=\max,\ N=\min$</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <p>$X_1,\dots,X_n$ 独立，$X_i\sim F_i$：</p>
+        <div class="fml">$F_M(u)=\prod_{i=1}^n F_i(u),\qquad F_N(v)=1-\prod_{i=1}^n\big(1-F_i(v)\big)$</div>
+        <p class="note">同分布 $E(\lambda)$ 时 $\min\sim E(n\lambda)$（串联系统寿命）。</p>
+      </div>
+    </div>
+
+    <div class="block exam">
+      <div class="bh"><span class="kick exam">高频考点</span><h4>商的分布 / 正态线性组合的方差</h4></div>
+      <div class="bb">
+        <ul>
+          <li>独立指数 $X\sim E(\lambda_1),Y\sim E(\lambda_2)$：$P(Y/X&gt;1)=\dfrac{\lambda_2}{\lambda_1+\lambda_2}$（真题选择）。</li>
+          <li>$D(aX+bY)=a^2DX+b^2DY+2ab\,\mathrm{Cov}(X,Y)$；独立时去掉协方差项（见第 4 章）。</li>
+          <li>$Z\sim$ 0-1，$Z$ 与 $X,Y$ 独立时求 $D(X+ZY)$：先按 $Z$ 取值用全方差/直接展开。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="chapter" id="c4">
+  <div class="ch-head">
+    <div class="cn">第 4 章</div>
+    <h2>随机变量的数字特征</h2>
+    <div class="cd">数学期望 · 方差 · 协方差与相关系数 · 矩 · 指示变量法</div>
+  </div>
+  <div class="ch-rule"></div>
+
+  <!-- 4.1 -->
+  <div class="topic" id="c4-1">
+    <h3><span class="h3n">4.1</span> 数学期望</h3>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick formula">公式</span><h4>期望与“无意识统计学家公式”</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <p>$\displaystyle E(X)=\sum_k x_k p_k$（离散）$\ /\ \int_{-\infty}^{+\infty}x f(x)\,dx$（连续）。</p>
+        <div class="fml">$E[g(X)]=\sum_k g(x_k)p_k\ \big/\ \int g(x)f(x)\,dx,\qquad E[g(X,Y)]=\iint g(x,y)f(x,y)\,dx\,dy$</div>
+        <p class="note">无需先求 $g(X)$ 的分布，直接对原分布加权。</p>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick formula">性质</span><h4>期望的线性与独立可乘</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <div class="fml">$E(aX+bY+c)=aE(X)+bE(Y)+c\quad(\text{恒成立，无需独立})$</div>
+        <p>$X,Y$ 独立 $\Rightarrow E(XY)=E(X)E(Y)$。<mark>逆命题不真</mark>：$E(XY)=EX\,EY$ 只说明不相关，不一定独立。</p>
+        <p class="note"><b>矩</b>：$k$ 阶原点矩 $E(X^k)$；$k$ 阶中心矩 $E(X-EX)^k$；二阶中心矩即方差。</p>
+      </div>
+    </div>
+
+    <div class="block exam">
+      <div class="bh"><span class="kick exam">高频考点</span><h4>指示变量法求期望（必考技巧）</h4></div>
+      <div class="bb">
+        <p>把计数变量拆成 0-1 指示变量之和 $X=\sum X_i$，再用 $E(X)=\sum E(X_i)$（<b>不要求独立</b>）。典型：</p>
+        <ul>
+          <li><b>配对问题</b>：$n$ 球放入 $n$ 盒，配对数 $X$，$E(X)=n\cdot\frac1n=$ <span class="fb">$1$</span>。</li>
+          <li>空盒子数、集齐所有点数所需次数 $E=6(1+\tfrac12+\cdots+\tfrac16)$ 等。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="block pitfall">
+      <div class="bh"><span class="kick pitfall">易错</span><h4>$E[(X-c)^2]$ 的最小值</h4></div>
+      <div class="bb"><p>$E[(X-c)^2]=D(X)+(EX-c)^2\ge D(X)=E[(X-\mu)^2]$，当且仅当 $c=EX$ 取等号（真题选择题）。</p></div>
+    </div>
+  </div>
+
+  <!-- 4.2 -->
+  <div class="topic" id="c4-2">
+    <h3><span class="h3n">4.2</span> 方差</h3>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick formula">公式</span><h4>方差定义与计算式</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <div class="fml">$D(X)=E\big[(X-EX)^2\big]=\ \underbrace{E(X^2)-\big(E(X)\big)^2}_{\text{最常用}}$</div>
+        <p>标准差 $\sigma_X=\sqrt{D(X)}$；<span class="term">标准化</span> $X^*=\dfrac{X-EX}{\sqrt{DX}}$，则 $E(X^*)=$ <span class="fb">$0$</span>，$D(X^*)=$ <span class="fb">$1$</span>。</p>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick formula">性质</span><h4>方差运算律</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <ul>
+          <li>$D(c)=0$，$D(cX)=$ <span class="fb">$c^2 D(X)$</span>，$D(X+c)=D(X)$。</li>
+          <li>一般：$D(X\pm Y)=D(X)+D(Y)\pm 2\,\mathrm{Cov}(X,Y)$。</li>
+          <li>独立时：$D(X\pm Y)=$ <span class="fb">$D(X)+D(Y)$</span>（注意是 <mark>加</mark>，不是减！）。</li>
+          <li>独立时：$D\big(\sum c_iX_i\big)=\sum c_i^2 D(X_i)$。</li>
+        </ul>
+        <p class="note">$D(X)=0\iff P(X=c)=1$（$X$ 几乎处处为常数）。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4.3 -->
+  <div class="topic" id="c4-3">
+    <h3><span class="h3n">4.3</span> 协方差与相关系数</h3>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick formula">公式</span><h4>协方差 / 相关系数</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <div class="fml">$\mathrm{Cov}(X,Y)=E\big[(X-EX)(Y-EY)\big]=\ E(XY)-E(X)E(Y)$</div>
+        <p>$\mathrm{Cov}(X,X)=D(X)$。<b>相关系数</b>：$\displaystyle \rho_{X,Y}=\frac{\mathrm{Cov}(X,Y)}{\sqrt{D(X)}\,\sqrt{D(Y)}}$（无量纲）。</p>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick formula">性质</span><h4>协方差的双线性与相关系数范围</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <ul>
+          <li>$\mathrm{Cov}(aX,bY)=ab\,\mathrm{Cov}(X,Y)$；$\mathrm{Cov}(X+Y,Z)=\mathrm{Cov}(X,Z)+\mathrm{Cov}(Y,Z)$。</li>
+          <li>$\mathrm{Cov}(aX+bY,\,cX+dY)=ac\,DX+(ad+bc)\,\mathrm{Cov}(X,Y)+bd\,DY$。</li>
+          <li><b>Cauchy–Schwarz</b>：$\big|\mathrm{Cov}(X,Y)\big|^2\le D(X)D(Y)\Rightarrow |\rho_{X,Y}|\le 1$。</li>
+          <li>$|\rho|=1\iff$ <span class="fb wide">存在 $a,b$ 使 $P(Y=aX+b)=1$（完全线性相关）</span>。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="block pitfall">
+      <div class="bh"><span class="kick pitfall">易错</span><h4>独立 vs 不相关</h4></div>
+      <div class="bb">
+        <p>$\rho=0$ 称<span class="term">不相关</span>（仅指无线性关系）。<b>独立 $\Rightarrow$ 不相关；不相关 $\not\Rightarrow$ 独立</b>。</p>
+        <p><mark>唯一例外</mark>：$(X,Y)$ 服从二维正态时，<b>独立 $\iff$ 不相关 $\iff \rho=0$</b>。</p>
+        <p class="note">不相关等价命题：$\rho=0\iff \mathrm{Cov}(X,Y)=0\iff E(XY)=E(X)E(Y)$。</p>
+      </div>
+    </div>
+
+    <div class="block exam">
+      <div class="bh"><span class="kick exam">高频考点</span><h4>协方差 / 相关系数计算题</h4></div>
+      <div class="bb">
+        <ul>
+          <li>多项分布型：购物网站买 A/B 人数 $X,Y$，$\mathrm{Cov}(X,Y)=-npq&lt;0$（此消彼长，负相关）。</li>
+          <li>两次试验计数 $X,Y$ 的 $\rho$（如 $A_1,A_2$ 发生次数）。</li>
+          <li>已知联合分布表含参数 $p,q$，由 $\mathrm{Cov}(X,Y)=$ 定值反解参数。</li>
+          <li>$X\sim N(0,1),\ X$ 与 $|X|$：不相关但不独立的经典例子。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="chapter" id="c5">
+  <div class="ch-head">
+    <div class="cn">第 5 章</div>
+    <h2>大数定律与中心极限定理</h2>
+    <div class="cd">Chebyshev 不等式 · 依概率收敛 · 三大大数定律 · 独立同分布中心极限定理 · 棣莫弗-拉普拉斯定理</div>
+  </div>
+  <div class="ch-rule"></div>
+
+  <!-- 5.1 -->
+  <div class="topic" id="c5-1">
+    <h3><span class="h3n">5.1</span> 大数定律</h3>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick thm">定理</span><h4>Chebyshev 不等式</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <p>$D(X)=\sigma^2$ 存在，则对任意 $\varepsilon&gt;0$：</p>
+        <div class="fml">$P\big(|X-E(X)|\ge\varepsilon\big)\le\frac{\sigma^2}{\varepsilon^2}\quad\Longleftrightarrow\quad P\big(|X-E(X)|&lt;\varepsilon\big)\ge 1-\frac{\sigma^2}{\varepsilon^2}$</div>
+        <p class="note">$3\sigma$：$P(|X-\mu|&lt;3\sigma)\ge 1-\frac19\approx 0.889$。用于<b>不知道分布</b>时对概率作粗略估计。</p>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick def">定义</span><h4>依概率收敛</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <p>$Y_n\xrightarrow{P}a$ 指：$\forall\varepsilon&gt;0,\ \lim\limits_{n\to\infty}P(|Y_n-a|&lt;\varepsilon)=1$。</p>
+        <p class="note">连续映射：$X_n\xrightarrow{P}a$ 且 $g$ 在 $a$ 处连续 $\Rightarrow g(X_n)\xrightarrow{P}g(a)$。</p>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick thm">三大大数定律</span><h4>频率/均值的稳定性</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <ul>
+          <li><b>Bernoulli</b>：$n$ 重独立试验中 $A$ 发生频率 $\dfrac{n_A}{n}\xrightarrow{P}$ <span class="fb">$p=P(A)$</span>（用频率估计概率的依据）。</li>
+          <li><b>Chebyshev</b>：$X_i$ 两两不相关、方差有共同上界 $\Rightarrow \dfrac1n\sum X_i-\dfrac1n\sum\mu_i\xrightarrow{P}0$。</li>
+          <li><b>Khintchine（辛钦）</b>：$X_i$ 独立同分布、期望 $\mu$ 存在 $\Rightarrow \dfrac1n\sum_{i=1}^n X_i\xrightarrow{P}$ <span class="fb">$\mu$</span>。</li>
+        </ul>
+        <p class="note">推论：样本 $k$ 阶矩 $\frac1n\sum X_i^k\xrightarrow{P}E(X^k)$ —— 矩估计相合性的理论基础。</p>
+      </div>
+    </div>
+
+    <div class="block exam">
+      <div class="bh"><span class="kick exam">高频考点</span><h4>证明依概率收敛 / 相合性</h4></div>
+      <div class="bb"><p>典型：配对数 $S_n$ 证明 $\frac{S_n}{n}\xrightarrow{P}0$ 或 $P(|S_n-1|\ge n\varepsilon)\to0$（用 Chebyshev 不等式 + 已求 $E,D$）；以及 $\frac1n\sum g(X_i)\xrightarrow{P}E[g(X)]$ 型（辛钦大数定律）。</p></div>
+    </div>
+  </div>
+
+  <!-- 5.2 -->
+  <div class="topic" id="c5-2">
+    <h3><span class="h3n">5.2</span> 中心极限定理</h3>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick thm">定理</span><h4>独立同分布中心极限定理（Lindeberg–Lévy）</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <p>$X_1,X_2,\dots$ 独立同分布，$E(X_i)=\mu,\ D(X_i)=\sigma^2$，则对任意实数 $x$：</p>
+        <div class="fml">$\lim_{n\to\infty}P\!\left(\frac{\sum_{i=1}^n X_i-n\mu}{\sqrt{n}\,\sigma}\le x\right)=\Phi(x)$</div>
+        <p>即 <b>大量独立随机因素叠加近似正态</b>：</p>
+        <div class="fml">$\sum_{i=1}^n X_i\ \approx\ N\big(n\mu,\ n\sigma^2\big),\qquad \bar X\approx N\!\Big(\mu,\ \tfrac{\sigma^2}{n}\Big)$</div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick thm">定理</span><h4>棣莫弗–拉普拉斯定理（二项的正态近似）</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <p>$X\sim B(n,p)$，当 $n$ 大时 $X\approx$ <span class="fb">$N\big(np,\ np(1-p)\big)$</span>，即 $\dfrac{X-np}{\sqrt{np(1-p)}}\xrightarrow{d}N(0,1)$。</p>
+      </div>
+    </div>
+
+    <div class="block exam">
+      <div class="bh"><span class="kick exam">高频考点</span><h4>Chebyshev 估计 vs CLT 计算（每卷必有）</h4></div>
+      <div class="bb">
+        <p>同一题常分两问：① 用 <b>Chebyshev 不等式</b><span class="fb">估计下界</span>；② 用 <b>中心极限定理</b><span class="fb">近似计算</span>具体概率（查 $\Phi$ 表）。</p>
+        <ul>
+          <li>“营业额/总时间/产品数落在某区间”的概率；</li>
+          <li><b>反求容量</b>：设座位数/外线数/箱数/周数为未知，令 $\Phi(\cdot)\ge$ 给定置信度，解出最小值；</li>
+          <li>稀有事件用<b>泊松近似</b>（$np=\lambda$）再算 $P(X\ge2)=1-e^{-\lambda}-\lambda e^{-\lambda}$。</li>
+        </ul>
+        <p class="note">解题三步：求 $E\big(\sum X_i\big)=n\mu$、$D\big(\sum X_i\big)=n\sigma^2$ → 标准化 → 查表。</p>
+      </div>
+    </div>
+
+    <div class="block pitfall">
+      <div class="bh"><span class="kick pitfall">易错</span><h4>标准化别错</h4></div>
+      <div class="bb"><p>对 $\sum X_i$ 标准化是<b>减 $n\mu$、除 $\sqrt n\,\sigma$</b>（不是除 $\sigma$）；对 $\bar X$ 标准化是减 $\mu$、除 $\sigma/\sqrt n$。两者结果一致，别混用。</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="chapter" id="c6">
+  <div class="ch-head">
+    <div class="cn">第 6 章</div>
+    <h2>数理统计的基本概念</h2>
+    <div class="cd">总体与样本 · 统计量 · 三大抽样分布（$\chi^2$ / $t$ / $F$）· 正态总体的抽样分布</div>
+  </div>
+  <div class="ch-rule"></div>
+
+  <!-- 6.1 -->
+  <div class="topic" id="c6-1">
+    <h3><span class="h3n">6.1</span> 总体 · 样本 · 统计量</h3>
+
+    <div class="block">
+      <div class="bh"><span class="kick def">定义</span><h4>基本概念</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <ul>
+          <li><b>总体</b>：研究对象某数量指标的全体，视为随机变量 $X\sim F(x)$；<b>个体</b>：每个元素。</li>
+          <li><b>简单随机样本</b> $X_1,\dots,X_n$：① 与总体同分布；② 相互独立（i.i.d.）。</li>
+          <li>样本联合密度 $f(x_1,\dots,x_n)=\prod_{i=1}^n f(x_i)$。</li>
+          <li><b>统计量</b>：样本的函数 $g(X_1,\dots,X_n)$，<mark>不含未知参数</mark>。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick formula">公式</span><h4>常用统计量</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <div class="fml">$\bar X=\frac1n\sum_{i=1}^n X_i,\qquad S^2=\frac{1}{n-1}\sum_{i=1}^n (X_i-\bar X)^2$</div>
+        <p>样本 $k$ 阶原点矩 $M_k=\frac1n\sum X_i^k$；二阶中心矩 $CM_2=\frac1n\sum(X_i-\bar X)^2$；顺序统计量 $X_{(1)}\le\cdots\le X_{(n)}$，极差 $D_n=X_{(n)}-X_{(1)}$。</p>
+        <p class="note"><mark>注意分母</mark>：样本方差 $S^2$ 除以 $n-1$；二阶中心矩 $CM_2$ 除以 $n$。$E(\bar X)=\mu,\ D(\bar X)=\sigma^2/n$。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6.2 -->
+  <div class="topic" id="c6-2">
+    <h3><span class="h3n">6.2</span> 三大抽样分布 $\chi^2,\,t,\,F$</h3>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick def">定义</span><h4>$\chi^2$ / $t$ / $F$ 的构造（务必记牢）</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <ul>
+          <li><b>$\chi^2(n)$</b>：$X_1,\dots,X_n$ i.i.d. $N(0,1)$，则 $\sum_{i=1}^n X_i^2\sim\chi^2(n)$。</li>
+          <li><b>$t(n)$</b>：$X\sim N(0,1),\ Y\sim\chi^2(n)$ 且独立，则 $T=$ <span class="fb">$\dfrac{X}{\sqrt{Y/n}}\sim t(n)$</span>。</li>
+          <li><b>$F(m,n)$</b>：$X\sim\chi^2(m),\ Y\sim\chi^2(n)$ 且独立，则 $F=$ <span class="fb">$\dfrac{X/m}{Y/n}\sim F(m,n)$</span>。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick formula">性质</span><h4>分布性质与关系</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <ul>
+          <li>$\chi^2$ 可加性：独立 $\chi^2(n_1)+\chi^2(n_2)=\chi^2(n_1+n_2)$；$X\sim\chi^2(n)\Rightarrow E(X)=$ <span class="fb">$n$</span>，$D(X)=$ <span class="fb">$2n$</span>。</li>
+          <li>$t$ 分布密度为偶函数（关于 0 对称），$n\to\infty$ 时 $\to N(0,1)$。</li>
+          <li>$T\sim t(n)\Rightarrow T^2\sim$ <span class="fb">$F(1,n)$</span>；$F\sim F(m,n)\Rightarrow \dfrac1F\sim F(n,m)$。</li>
+          <li>分位数关系：$F_{1-\alpha}(m,n)=\dfrac{1}{F_\alpha(n,m)}$。</li>
+        </ul>
+      </div>
+    </div>
+
+    
+    <div class="block">
+      <div class="bh"><span class="kick formula">密度函数</span><h4>三大分布的密度（了解公式形式）</h4><span class="imp imp-basic ml">了解即可</span></div>
+      <div class="bb">
+        <p>其中 $\Gamma(x)=\int_0^{+\infty}t^{x-1}e^{-t}\,dt$（Gamma 函数）。</p>
+        <div class="fml">$\chi^2(n):\ f(x)=\frac{1}{2^{n/2}\,\Gamma(n/2)}\,x^{n/2-1}e^{-x/2},\quad x&gt;0$</div>
+        <div class="fml">$t(n):\ f(t)=\frac{\Gamma\!\big(\frac{n+1}{2}\big)}{\sqrt{n\pi}\,\Gamma\!\big(\frac{n}{2}\big)}\Big(1+\frac{t^2}{n}\Big)^{-\frac{n+1}{2}}$</div>
+        <div class="fml">$F(m,n):\ f(x)=\frac{\Gamma\!\big(\frac{m+n}{2}\big)}{\Gamma\!\big(\frac{m}{2}\big)\Gamma\!\big(\frac{n}{2}\big)}\Big(\frac{m}{n}\Big)^{m/2}x^{m/2-1}\Big(1+\frac{m}{n}x\Big)^{-(m+n)/2},\ x&gt;0$</div>
+      </div>
+    </div>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick concl">重要结论</span><h4>特殊性质（课件重点标注）</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <ul>
+          <li><b>$\chi^2(2)$ 就是<span class="fb">参数为 $1/2$ 的指数分布 $E(1/2)$</span></b>（代入密度即得 $f=\frac12 e^{-x/2}$）。</li>
+          <li>当 $n$ 很大时，$\chi^2(n)$ 近似服从<span class="fb">正态分布 $N(n,\,2n)$</span>。<br>
+            <span class="note">应用：大自由度 $\chi^2$ 分位点用正态近似，如 $\chi^2_\alpha(n)\approx n+z_\alpha\sqrt{2n}$。</span></li>
+          <li>$t$ 分布密度为<span class="fb">偶函数</span>（关于 $0$ 对称）；$n\to\infty$ 时 $f_n(x)\to$ <span class="fb">$\varphi(x)$（标准正态密度）</span>。</li>
+          <li>$F(m,m)$ 的密度关于 $1$ 对称 $\Rightarrow P(F&gt;1)=$ <span class="fb">$1/2$</span>（真题选择）。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="block exam">
+      <div class="bh"><span class="kick exam">高频考点</span><h4>“构造统计量 / 求常数 + 自由度”（每卷必出）</h4></div>
+      <div class="bb">
+        <p>给若干 $N(0,\sigma^2)$ 样本，问 $a(\cdot)^2+b(\cdot)^2$ 取何 $a,b$ 服从 $\chi^2$、自由度几；或判断 $\dfrac{\bar X}{S/\sqrt n}$、$\dfrac{S_1^2}{S_2^2}$ 等服从 $t/F/\chi^2$ 哪种、自由度多少。<b>口诀</b>：先把每部分标准化成 $N(0,1)$ 或 $\chi^2$，再套 $t,F$ 的构造式，数清独立的平方个数即自由度。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6.3 -->
+  <div class="topic" id="c6-3">
+    <h3><span class="h3n">6.3</span> 正态总体的抽样分布</h3>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick thm">定理</span><h4>单个正态总体 $N(\mu,\sigma^2)$（核心定理）</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <div class="fml">$\bar X\sim N\!\Big(\mu,\tfrac{\sigma^2}{n}\Big),\qquad \frac{\bar X-\mu}{\sigma/\sqrt n}\sim N(0,1)$</div>
+        <div class="fml">$\frac{(n-1)S^2}{\sigma^2}\sim\chi^2(n-1),\qquad \sum_{i=1}^n\Big(\frac{X_i-\mu}{\sigma}\Big)^2\sim\chi^2(n)$</div>
+        <p><b>$\bar X$ 与 $S^2$ 相互独立</b>（正态总体特有），由此得最重要的 $t$ 统计量：</p>
+        <div class="fml">$\frac{\bar X-\mu}{S/\sqrt n}\sim t(n-1)$</div>
+        <p class="note"><mark>自由度区别</mark>：含 $\bar X$（用样本估计了 $\mu$）的平方和自由度为 $n-1$；含真值 $\mu$ 的为 $n$。</p>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick thm">定理</span><h4>两个正态总体</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <p>$X\sim N(\mu_1,\sigma_1^2)$（容量 $n$），$Y\sim N(\mu_2,\sigma_2^2)$（容量 $m$），独立。</p>
+        <div class="fml">$\frac{\bar X-\bar Y-(\mu_1-\mu_2)}{\sigma\sqrt{\tfrac1n+\tfrac1m}}\sim N(0,1)\quad(\sigma_1=\sigma_2=\sigma)$</div>
+        <div class="fml">$\frac{\bar X-\bar Y-(\mu_1-\mu_2)}{S_w\sqrt{\tfrac1n+\tfrac1m}}\sim t(n+m-2),\quad S_w^2=\frac{(n-1)S_1^2+(m-1)S_2^2}{n+m-2}$</div>
+        <div class="fml">$\frac{S_1^2/\sigma_1^2}{S_2^2/\sigma_2^2}\sim F(n-1,\,m-1)$</div>
+      </div>
+    </div>
+
+    <div class="block exam">
+      <div class="bh"><span class="kick exam">高频考点</span><h4>$E(S^2),D(S^2)$ 与 $F$ 统计量构造</h4></div>
+      <div class="bb">
+        <ul>
+          <li>利用 $\frac{(n-1)S^2}{\sigma^2}\sim\chi^2(n-1)$ 求 $E(S^2)=\sigma^2$、$D(S^2)=\dfrac{2\sigma^4}{n-1}$。</li>
+          <li>构造 $\dfrac{c(\bar X-\mu_0)^2}{\sum(X_i-\bar X)^2}\sim F(1,n-1)$ 求常数 $c$。</li>
+          <li>$F\sim F(m,m)\Rightarrow P(F&gt;1)=\tfrac12$（对称性，真题选择）。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="chapter" id="c7">
+  <div class="ch-head">
+    <div class="cn">第 7 章</div>
+    <h2>参数估计</h2>
+    <div class="cd">矩估计 · 极大似然估计（MLE）· 无偏性 · 有效性 · 一致性（相合性）· Cramér-Rao 下界</div>
+  </div>
+  <div class="ch-rule"></div>
+
+  <!-- 7.1 -->
+  <div class="topic" id="c7-1">
+    <h3><span class="h3n">7.1</span> 点估计：矩估计与极大似然估计</h3>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick formula">方法一</span><h4>矩估计法</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <p>用<b>样本矩 = 总体矩</b>列方程求解：$\dfrac1n\sum X_i^k\ \approx\ E(X^k)=\mu_k(\theta_1,\dots,\theta_k)$，有几个参数列几个方程。</p>
+        <p>一般结论（任何分布）：$\hat\mu_{\text{矩}}=\bar X$，$\widehat{\sigma^2}_{\text{矩}}=$ <span class="fb">$CM_2=\dfrac1n\sum(X_i-\bar X)^2$</span>。</p>
+      </div>
+    </div>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick formula">方法二</span><h4>极大似然估计 MLE</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <p>构造<span class="term">似然函数</span>（样本出现的“概率/密度”）：</p>
+        <div class="fml">$L(\theta)=\prod_{i=1}^n p(x_i;\theta)\ \text{（离散）}\quad\big/\quad \prod_{i=1}^n f(x_i;\theta)\ \text{（连续）}$</div>
+        <p>取对数后解<span class="term">似然方程</span> $\dfrac{\partial \ln L}{\partial\theta_r}=0$，使 $L$ 最大的 $\hat\theta$ 即 MLE。</p>
+        <p><b>不变性原理</b>：若 $\hat\theta$ 是 $\theta$ 的 MLE，则 $u(\hat\theta)$ 是 $u(\theta)$ 的 MLE（如由 $\hat\mu,\widehat{\sigma^2}$ 求 $P(X&gt;c)$ 的 MLE）。</p>
+      </div>
+    </div>
+
+    <div class="block pitfall">
+      <div class="bh"><span class="kick pitfall">易错</span><h4>似然方程无解 → 取边界</h4></div>
+      <div class="bb">
+        <p>当 $L(\theta)$ 关于 $\theta$ 单调（求导无驻点）时，MLE 在<b>可行域端点</b>取得：</p>
+        <ul>
+          <li>$U(0,\theta)$：$\hat\theta_{\text{MLE}}=$ <span class="fb">$\max\{X_1,\dots,X_n\}=X_{(n)}$</span>。</li>
+          <li>平移指数 $f=\lambda e^{-\lambda(x-\theta)},x\ge\theta$：$\hat\theta_{\text{MLE}}=\min\{X_i\}=X_{(1)}$。</li>
+        </ul>
+        <p class="note">MLE <mark>不一定唯一、不一定无偏</mark>（如 $U(0,\theta)$ 的 $X_{(n)}$ 有偏）。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7.2 -->
+  <div class="topic" id="c7-2">
+    <h3><span class="h3n">7.2</span> 估计量的评价标准</h3>
+
+    <div class="block boxed">
+      <div class="bh"><span class="kick def">标准一</span><h4>无偏性</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <p>$\hat\theta$ 为 $\theta$ 的<span class="term">无偏估计</span> $\iff E(\hat\theta)=\theta$（对一切 $\theta$）。常用结论：</p>
+        <ul>
+          <li>$\bar X$ 是 $\mu$ 的无偏估计；$M_k=\frac1n\sum X_i^k$ 是 $E(X^k)$ 的无偏估计。</li>
+          <li>$S^2=\frac{1}{n-1}\sum(X_i-\bar X)^2$ 是 $\sigma^2$ 的<span class="fb">无偏</span>估计。</li>
+          <li>$CM_2=\frac1n\sum(X_i-\bar X)^2$ <mark>有偏</mark>：$E(CM_2)=\dfrac{n-1}{n}\sigma^2$，修正为无偏即 $\dfrac{n}{n-1}CM_2=S^2$。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick def">标准二</span><h4>有效性 · Cramér-Rao 下界</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <p>设 $\hat\theta_1,\hat\theta_2$ 都是 $\theta$ 的<b>无偏</b>估计量，若</p>
+        <div class="fml">$D(\hat\theta_1) &lt; D(\hat\theta_2)$</div>
+        <p>则称 $\hat\theta_1$ 比 $\hat\theta_2$ <span class="term">有效</span>（无偏估计中比方差，越小越有效）。理论下界：</p>
+        <div class="fml">$D(\hat\theta)\ \ge\ \frac{1}{n\,E\!\big[\big(\tfrac{\partial}{\partial\theta}\ln p(X;\theta)\big)^2\big]}\quad(\text{Cramér-Rao})$</div>
+        <p class="note">达到下界的无偏估计称<span class="term">有效估计量</span>。</p>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="bh"><span class="kick def">标准三</span><h4>一致性（相合性）</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <p>$\hat\theta_n=\hat\theta(X_1,\dots,X_n)$ <span class="term">依概率收敛</span>于 $\theta$，即对任意 $\theta\in\Theta$ 与任意 $\varepsilon&gt;0$：</p>
+        <div class="fml">$\lim_{n\to\infty}P\big(|\hat\theta_n-\theta|&lt;\varepsilon\big)=1$</div>
+        <p>则称 $\hat\theta_n$ 为 $\theta$ 的<span class="term">一致（相合）估计</span>。由大数定律，<b>矩估计一般都是相合的</b>；$S^2$ 是 $\sigma^2$ 的相合估计。</p>
+      </div>
+    </div>
+
+    <div class="block exam">
+      <div class="bh"><span class="kick exam">高频考点</span><h4>无偏修正 + 有效性比较（必出大题）</h4></div>
+      <div class="bb">
+        <ul>
+          <li>判断 $S_1^2=\frac1n\sum X_i^2$、$S_2^2=CM_2$、$S_3^2=\bar X^2$ 是否无偏，不无偏则修正，并按方差从小到大排有效性。</li>
+          <li>线性组合 $\hat\mu=c\bar X+(1-c)\bar Y$ 求使方差最小的 $c$（对 $c$ 求导）。</li>
+          <li>比较 $\bar X$ 与 $n\min\{X_i\}$ 对指数分布参数的有效性（都无偏，比方差）。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="chapter" id="appendix">
+  <div class="ch-head">
+    <div class="cn">附 录</div>
+    <h2>考点速查与补充</h2>
+    <div class="cd">分布数字特征速查表 · 区间估计 · 假设检验（后两节为真题高频大题，依标准课程内容整理）</div>
+  </div>
+  <div class="ch-rule"></div>
+
+  <!-- A1 -->
+  <div class="topic" id="ap-1">
+    <h3><span class="h3n">A1</span> 常见分布的期望与方差速查表</h3>
+    <div class="block">
+      <div class="bh"><span class="kick formula">速查</span><h4>离散型</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <table class="tbl">
+          <thead><tr><th>分布</th><th>分布律</th><th>$E(X)$</th><th>$D(X)$</th></tr></thead>
+          <tbody>
+            <tr><td>0-1 分布 $B(1,p)$</td><td>$p^k(1-p)^{1-k}$</td><td>$p$</td><td>$p(1-p)$</td></tr>
+            <tr><td>二项 $B(n,p)$</td><td>$C_n^k p^k(1-p)^{n-k}$</td><td>$np$</td><td>$np(1-p)$</td></tr>
+            <tr><td>泊松 $P(\lambda)$</td><td>$\dfrac{\lambda^k}{k!}e^{-\lambda}$</td><td>$\lambda$</td><td>$\lambda$</td></tr>
+            <tr><td>几何（首次成功）</td><td>$(1-p)^{k-1}p$</td><td>$\dfrac1p$</td><td>$\dfrac{1-p}{p^2}$</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="block">
+      <div class="bh"><span class="kick formula">速查</span><h4>连续型</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <table class="tbl">
+          <thead><tr><th>分布</th><th>密度 / 参数</th><th>$E(X)$</th><th>$D(X)$</th></tr></thead>
+          <tbody>
+            <tr><td>均匀 $U(a,b)$</td><td>$\dfrac{1}{b-a}$</td><td>$\dfrac{a+b}{2}$</td><td>$\dfrac{(b-a)^2}{12}$</td></tr>
+            <tr><td>指数 $E(\lambda)$</td><td>$\lambda e^{-\lambda x}$</td><td>$\dfrac1\lambda$</td><td>$\dfrac{1}{\lambda^2}$</td></tr>
+            <tr><td>正态 $N(\mu,\sigma^2)$</td><td>$\frac{1}{\sqrt{2\pi}\sigma}e^{-(x-\mu)^2/2\sigma^2}$</td><td>$\mu$</td><td>$\sigma^2$</td></tr>
+            <tr><td>卡方 $\chi^2(n)$</td><td>—</td><td>$n$</td><td>$2n$</td></tr>
+            <tr><td>$t(n)$</td><td>偶函数对称</td><td>$0\ (n&gt;1)$</td><td>$\dfrac{n}{n-2}\ (n&gt;2)$</td></tr>
+          </tbody>
+        </table>
+        <p class="note">填空自测：指数分布 $E(X)=$ <span class="fb">$1/\lambda$</span>，$D(X)=$ <span class="fb">$1/\lambda^2$</span>；均匀 $D=$ <span class="fb">$(b-a)^2/12$</span>。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- A2 区间估计 -->
+  <div class="topic" id="ap-2">
+    <h3><span class="h3n">A2</span> 区间估计（置信区间）</h3>
+    <div class="block boxed">
+      <div class="bh"><span class="kick formula">公式</span><h4>单个正态总体 $N(\mu,\sigma^2)$，置信度 $1-\alpha$</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <ul>
+          <li><b>估 $\mu$，$\sigma^2$ 已知</b>（用 $Z$）：$\Big(\bar X\pm z_{\alpha/2}\dfrac{\sigma}{\sqrt n}\Big)$。</li>
+          <li><b>估 $\mu$，$\sigma^2$ 未知</b>（用 $t$）：$\Big(\bar X\pm t_{\alpha/2}(n-1)\dfrac{S}{\sqrt n}\Big)$。</li>
+        </ul>
+        <div class="fml">$\textbf{估 }\sigma^2:\quad \left(\frac{(n-1)S^2}{\chi^2_{\alpha/2}(n-1)},\ \frac{(n-1)S^2}{\chi^2_{1-\alpha/2}(n-1)}\right)$</div>
+        <p class="note">枢轴量来自第 6 章正态抽样分布：$\frac{\bar X-\mu}{S/\sqrt n}\sim t(n-1)$、$\frac{(n-1)S^2}{\sigma^2}\sim\chi^2(n-1)$。</p>
+      </div>
+    </div>
+    <div class="block exam">
+      <div class="bh"><span class="kick exam">高频考点</span><h4>反求置信度 / 样本容量</h4></div>
+      <div class="bb"><p>给定区间半径求置信度；或要求“估计精度（半宽）$\le d$”反解最小样本容量 $n\ge\big(\frac{z_{\alpha/2}\sigma}{d}\big)^2$（真题选择常见）。</p></div>
+    </div>
+  </div>
+
+  <!-- A3 假设检验 -->
+  <div class="topic" id="ap-3">
+    <h3><span class="h3n">A3</span> 假设检验</h3>
+    <div class="block">
+      <div class="bh"><span class="kick def">框架</span><h4>基本概念</h4><span class="imp imp-imp ml">重要</span></div>
+      <div class="bb">
+        <ul>
+          <li>原假设 $H_0$ / 备择假设 $H_1$；显著性水平 $\alpha$（控制<span class="term">弃真错误</span>=第一类错误的概率）。</li>
+          <li>构造检验统计量 → 定拒绝域 → 由样本值判断是否落入拒绝域。</li>
+          <li><b>$p$ 值法</b>：$p&lt;\alpha$ 时<span class="fb">拒绝 $H_0$</span>，否则不拒绝。$p$ 越小，拒绝越有把握。</li>
+          <li>两类错误：弃真（第一类，$\alpha$）、取伪（第二类，$\beta$）。</li>
+        </ul>
+      </div>
+    </div>
+    <div class="block boxed">
+      <div class="bh"><span class="kick formula">公式</span><h4>正态总体常用检验统计量</h4><span class="imp imp-core ml">核心必考</span></div>
+      <div class="bb">
+        <table class="tbl">
+          <thead><tr><th>检验对象</th><th>条件</th><th>统计量（$H_0$ 下分布）</th></tr></thead>
+          <tbody>
+            <tr><td class="lft">均值 $\mu=\mu_0$</td><td>$\sigma^2$ 已知</td><td>$Z=\dfrac{\bar X-\mu_0}{\sigma/\sqrt n}\sim N(0,1)$</td></tr>
+            <tr><td class="lft">均值 $\mu=\mu_0$</td><td>$\sigma^2$ 未知</td><td>$T=\dfrac{\bar X-\mu_0}{S/\sqrt n}\sim t(n-1)$</td></tr>
+            <tr><td class="lft">方差 $\sigma^2=\sigma_0^2$</td><td>$\mu$ 未知</td><td>$\chi^2=\dfrac{(n-1)S^2}{\sigma_0^2}\sim\chi^2(n-1)$</td></tr>
+            <tr><td class="lft">两均值之差</td><td>$\sigma_1=\sigma_2$ 未知</td><td>$T=\dfrac{\bar X-\bar Y}{S_w\sqrt{1/n+1/m}}\sim t(n+m-2)$</td></tr>
+            <tr><td class="lft">两方差之比</td><td>—</td><td>$F=\dfrac{S_1^2}{S_2^2}\sim F(n-1,m-1)$</td></tr>
+          </tbody>
+        </table>
+        <p class="note">单侧/双侧由 $H_1$ 决定拒绝域方向；查 $\Phi$、$t$、$\chi^2$、$F$ 表临界值。</p>
+      </div>
+    </div>
+    <div class="block exam">
+      <div class="bh"><span class="kick exam">高频考点</span><h4>假设检验大题（每卷必出）</h4></div>
+      <div class="bb">
+        <p>真题原型：钢索断裂强度是否提高、中毒者脉搏均值/方差是否异常、火腿肠亚硝酸钠含量、车轴直径均值与精度、炼钢得率。<b>答题步骤</b>：①写 $H_0,H_1$ → ②选统计量 → ③定拒绝域或算 $p$ 值 → ④代数据 → ⑤下结论（务必回到实际语境）。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="block" style="margin-top:40px; padding-top:20px; border-top:1px solid var(--line-2);">
+    <div class="bb note" style="font-size:13px;">
+      <p>本手册依据熊德文老师《概率论与数理统计》课件（第 1 章–7.2 节）整理，并结合 5 套（参考）试卷标注高频考点。其中 <b>A2 区间估计、A3 假设检验</b> 在试卷中为高频大题，但对应课件未在上传范围内，故依标准课程内容补充整理，供复习参考。</p>
+    </div>
+  </div>
+</section>
+
+
+    </div>
+  </div>
+</div>
+<button class="backtop" id="backtop" title="回到顶部">↑</button>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+  // KaTeX render
+  function renderMath(){
+    if(window.renderMathInElement){
+      renderMathInElement(document.body,{
+        delimiters:[
+          {left:"$$",right:"$$",display:true},
+          {left:"\\[",right:"\\]",display:true},
+          {left:"$",right:"$",display:false},
+          {left:"\\(",right:"\\)",display:false}
+        ],
+        throwOnError:false
+      });
+      buildNav();
+    } else { setTimeout(renderMath,60); }
+  }
+  renderMath();
+
+  // ---- toggle answers ----
+  var toggle=document.getElementById('toggle');
+  var label=document.getElementById('toggleLabel');
+  function syncLabel(){ label.textContent = document.body.classList.contains('reveal-all') ? '答案：全部显示' : '答案：自测（点击填空）'; }
+  toggle.addEventListener('click',function(){
+    document.body.classList.toggle('reveal-all');
+    if(!document.body.classList.contains('reveal-all')){
+      document.querySelectorAll('.fb.on,.fb-b.on').forEach(function(e){e.classList.remove('on');});
+    }
+    syncLabel();
+  });
+  syncLabel();
+  document.body.addEventListener('click',function(e){
+    var t=e.target.closest('.fb,.fb-b');
+    if(t && !document.body.classList.contains('reveal-all')){ t.classList.toggle('on'); }
+  });
+
+  // ---- build nav ----
+  function buildNav(){
+    var nav=document.getElementById('nav'); if(!nav||nav.dataset.done) return; nav.dataset.done=1;
+    document.querySelectorAll('section.chapter').forEach(function(ch){
+      var h2=ch.querySelector('.ch-head h2');
+      var cn=ch.querySelector('.ch-head .cn');
+      var d=document.createElement('div'); d.className='sb-ch';
+      d.innerHTML='<span class="n">'+(cn?cn.textContent.replace(/[^0-9]/g,''):'')+'</span>'+(h2?h2.textContent:'');
+      d.onclick=function(){ch.scrollIntoView();};
+      d.style.cursor='pointer';
+      nav.appendChild(d);
+      ch.querySelectorAll('.topic').forEach(function(tp){
+        var h3=tp.querySelector('h3'); if(!h3) return;
+        var a=document.createElement('a'); a.className='sb-sub'; a.href='#'+tp.id;
+        a.textContent=(h3.innerText||h3.textContent).replace(/^\s*[\d.]+\s*/,'');
+        nav.appendChild(a);
+      });
+    });
+    // scroll spy
+    var subs=[].slice.call(document.querySelectorAll('.sb-sub'));
+    var io=new IntersectionObserver(function(es){
+      es.forEach(function(en){
+        if(en.isIntersecting){
+          subs.forEach(function(s){s.classList.toggle('active', s.getAttribute('href')==='#'+en.target.id);});
+        }
+      });
+    },{rootMargin:'-20% 0px -70% 0px'});
+    document.querySelectorAll('.topic').forEach(function(t){io.observe(t);});
+  }
+
+  // back to top
+  var bt=document.getElementById('backtop');
+  window.addEventListener('scroll',function(){ bt.classList.toggle('show', window.scrollY>600); });
+  bt.onclick=function(){ window.scrollTo({top:0,behavior:'smooth'}); };
+});
+</script>
+</body>
+</html>

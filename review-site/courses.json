@@ -1,26 +1,29 @@
 [
   {
-    "file": "ml-final.html",
-    "title": "机器学习期末复习",
-    "subject": "ML",
-    "description": "CNN、SVM、PCA、决策树、ResNet 等",
-    "color": "#7B6BF1",
-    "tags": ["ml", "深度学习", "ResNet"]
+    "file": "python.html",
+    "title": "Python 程序设计",
+    "subject": "Python",
+    "description": "知识点系统归纳 · 期末复习提纲",
+    "icon": "🐍",
+    "color": "#4B8BBE",
+    "tags": ["python", "程序设计", "期末"]
   },
   {
-    "file": "math-final.html",
-    "title": "高等数学期末复习",
-    "subject": "数学",
-    "description": "拉格朗日乘子、多元积分、PDE",
-    "color": "#F1916B",
-    "tags": ["数学", "积分", "PDE"]
+    "file": "probability.html",
+    "title": "概率论与数理统计",
+    "subject": "概率统计",
+    "description": "公式 · 考点 · 期末复习手册",
+    "icon": "🎲",
+    "color": "#8B5CF6",
+    "tags": ["概率", "统计", "期末"]
   },
   {
-    "file": "physics-final.html",
-    "title": "大学物理期末复习",
-    "subject": "物理",
-    "description": "杨氏模量、不确定度传递",
-    "color": "#6BC0F1",
-    "tags": ["物理", "实验"]
+    "file": "physics.pdf",
+    "title": "大学物理（A类）",
+    "subject": "大学物理",
+    "description": "期末复习大纲（PDF）",
+    "icon": "⚛️",
+    "color": "#0EA5E9",
+    "tags": ["物理", "大纲", "期末"]
   }
 ]

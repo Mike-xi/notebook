@@ -1,7 +1,9 @@
-// 阅读器：iframe 同源 -> 直接拿 contentWindow/contentDocument
+// 阅读器：全屏 iframe + 悬浮工具栏。HTML 笔记走同源进度/书签；PDF 仅全屏展示。
 const params = new URLSearchParams(location.search);
 const file = params.get('file');
 if (!file) { location.href = '/'; throw new Error('no file'); }
+
+const isPDF = /\.pdf$/i.test(file);
 
 const iframe = document.getElementById('content');
 const docTitleEl = document.getElementById('doc-title');
@@ -12,8 +14,17 @@ const bookmarksToggle = document.getElementById('bookmarks-toggle');
 const bookmarksPanel = document.getElementById('bookmarks-panel');
 const bookmarksList = document.getElementById('bookmarks-list');
 const bookmarksEmpty = document.getElementById('bookmarks-empty');
+const bar = document.getElementById('reader-bar');
+const hotzone = document.getElementById('reader-hotzone');
 
-// 课程元数据（用于显示标题、学科）
+// PDF：进度/书签无法读取滚动，隐藏相关控件，保持工具栏常驻
+if (isPDF) {
+  bookmarkBtn.hidden = true;
+  bookmarksToggle.hidden = true;
+  progressEl.hidden = true;
+}
+
+// 课程元数据（显示标题、学科）
 let courseMeta = null;
 fetch('/courses.json')
   .then((r) => r.json())
@@ -26,9 +37,10 @@ fetch('/courses.json')
     } else {
       docTitleEl.textContent = file;
     }
-  });
+  })
+  .catch(() => { docTitleEl.textContent = file; });
 
-iframe.src = `/notes/${file}`;
+iframe.src = `/notes/${encodeURIComponent(file)}`;
 
 let currentPct = 0;
 let saveTimer = null;
@@ -40,17 +52,16 @@ iframe.addEventListener('load', () => {
 });
 
 async function initIframe() {
+  if (isPDF) { showBar(); return; }
   const win = iframe.contentWindow;
   const doc = iframe.contentDocument;
-  if (!win || !doc) return;
+  if (!win || !doc) { showBar(); return; }
 
   // 恢复上次进度
   try {
     const res = await fetch(`/api/progress?file=${encodeURIComponent(file)}`);
     const data = await res.json();
-    if (data.scroll_pct > 0) {
-      restoreScroll(data.scroll_pct);
-    }
+    if (data.scroll_pct > 0) restoreScroll(data.scroll_pct);
   } catch (e) {
     console.warn('[reader] failed to load progress', e);
   }
@@ -58,10 +69,17 @@ async function initIframe() {
   // 绑定 scroll 监听（只绑定一次）
   if (!scrollAttached) {
     win.addEventListener('scroll', onScroll, { passive: true });
+    // iframe 内鼠标移到顶部 -> 唤出工具栏
+    doc.addEventListener('mousemove', (e) => {
+      if (e.clientY < 64) showBar();
+    }, { passive: true });
     scrollAttached = true;
   }
 
   updateProgressDisplay();
+  // 进入后短暂展示工具栏，随后自动隐藏，营造全屏感
+  showBar();
+  scheduleHide();
 }
 
 function restoreScroll(pct) {
@@ -71,8 +89,10 @@ function restoreScroll(pct) {
   const max = doc.documentElement.scrollHeight - win.innerHeight;
   if (max > 0) win.scrollTo(0, max * pct);
   currentPct = pct;
+  lastScrollY = win.scrollY;
 }
 
+let lastScrollY = 0;
 function onScroll() {
   const win = iframe.contentWindow;
   const doc = iframe.contentDocument;
@@ -80,6 +100,15 @@ function onScroll() {
   const max = doc.documentElement.scrollHeight - win.innerHeight;
   currentPct = max > 0 ? Math.max(0, Math.min(1, win.scrollY / max)) : 0;
   updateProgressDisplay();
+
+  // 工具栏：下滑隐藏、上滑显示
+  const y = win.scrollY;
+  if (y > lastScrollY + 6 && y > 120) {
+    hideBar();
+  } else if (y < lastScrollY - 6) {
+    showBar();
+  }
+  lastScrollY = y;
 
   clearTimeout(saveTimer);
   saveTimer = setTimeout(saveProgress, 1500);
@@ -103,7 +132,7 @@ async function saveProgress() {
 
 // 关闭页面时用 sendBeacon 兜底保存
 window.addEventListener('beforeunload', () => {
-  if (currentPct > 0) {
+  if (!isPDF && currentPct > 0) {
     const blob = new Blob(
       [JSON.stringify({ file, scroll_pct: currentPct })],
       { type: 'application/json' }
@@ -112,17 +141,42 @@ window.addEventListener('beforeunload', () => {
   }
 });
 
+// ========== 工具栏显隐 ==========
+let hideTimer = null;
+let barHovered = false;
+
+function showBar() {
+  clearTimeout(hideTimer);
+  bar.classList.remove('hidden');
+}
+function hideBar() {
+  if (isPDF || barHovered) return;
+  if (!bookmarksPanel.hidden) return;
+  bar.classList.add('hidden');
+}
+function scheduleHide() {
+  if (isPDF) return;
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(hideBar, 2500);
+}
+
+bar.addEventListener('mouseenter', () => { barHovered = true; showBar(); });
+bar.addEventListener('mouseleave', () => { barHovered = false; scheduleHide(); });
+hotzone.addEventListener('mouseenter', showBar);
+// 父页面鼠标移动（工具栏区域之外的边缘）也能唤出
+document.addEventListener('mousemove', (e) => {
+  if (e.clientY < 64) showBar();
+}, { passive: true });
+
 // ========== 书签 ==========
-bookmarkBtn.addEventListener('click', () => {
-  showBookmarkPrompt();
-});
+bookmarkBtn.addEventListener('click', () => { showBookmarkPrompt(); });
 
 bookmarksToggle.addEventListener('click', () => {
-  const open = !bookmarksPanel.hidden;
-  if (open) {
+  if (!bookmarksPanel.hidden) {
     bookmarksPanel.hidden = true;
   } else {
     bookmarksPanel.hidden = false;
+    showBar();
     loadBookmarks();
   }
 });
@@ -166,6 +220,7 @@ bookmarksList.addEventListener('click', async (e) => {
     const pct = parseFloat(jumpBtn.dataset.pct);
     const win = iframe.contentWindow;
     const doc = iframe.contentDocument;
+    if (!win || !doc) return;
     const max = doc.documentElement.scrollHeight - win.innerHeight;
     if (max > 0) win.scrollTo({ top: max * pct, behavior: 'smooth' });
     return;
@@ -185,7 +240,7 @@ bookmarksList.addEventListener('click', async (e) => {
   }
 });
 
-// 自定义 prompt 弹框（比浏览器原生好看）
+// 自定义 prompt 弹框
 function showBookmarkPrompt() {
   const defaultTitle = `位置 ${Math.round(currentPct * 100)}%`;
   const overlay = document.createElement('div');
@@ -214,7 +269,6 @@ function showBookmarkPrompt() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ file, title, scroll_pct: currentPct }),
     });
-    // 如果面板开着，刷新
     if (!bookmarksPanel.hidden) loadBookmarks();
   };
 
@@ -227,10 +281,10 @@ function showBookmarkPrompt() {
   });
 }
 
-// 关闭书签面板的全局快捷键
+// 快捷键：Esc 关书签面板 / 返回
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !bookmarksPanel.hidden) {
-    bookmarksPanel.hidden = true;
+  if (e.key === 'Escape') {
+    if (!bookmarksPanel.hidden) { bookmarksPanel.hidden = true; return; }
   }
 });
 

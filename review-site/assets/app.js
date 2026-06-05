@@ -1,12 +1,18 @@
-// 首页：加载课程列表 + 进度，渲染卡片
+// 首页：加载课程列表 + 进度，渲染 NotebookLM 风格卡片
 (async function () {
-  const [coursesRes, progressRes] = await Promise.all([
-    fetch('/courses.json'),
-    fetch('/api/progress'),
-  ]);
+  let courses = [];
+  let progress = [];
 
-  const courses = await coursesRes.json();
-  const progress = await progressRes.json();
+  try {
+    const [coursesRes, progressRes] = await Promise.all([
+      fetch('/courses.json'),
+      fetch('/api/progress'),
+    ]);
+    courses = await coursesRes.json();
+    progress = progressRes.ok ? await progressRes.json() : [];
+  } catch (e) {
+    console.warn('[home] load failed', e);
+  }
 
   // file -> progress 映射
   const progressMap = {};
@@ -26,15 +32,20 @@
   }
 
   // 全部课程
-  document.getElementById('courses').innerHTML = courses
-    .map((c) => cardHTML({ ...c, ...progressMap[c.file] }))
-    .join('');
+  const grid = document.getElementById('courses');
+  if (courses.length === 0) {
+    document.getElementById('empty-hint').hidden = false;
+  } else {
+    grid.innerHTML = courses
+      .map((c) => cardHTML({ ...c, ...progressMap[c.file] }))
+      .join('');
+  }
 
   // 搜索
   const search = document.getElementById('search');
   search.addEventListener('input', (e) => {
     const q = e.target.value.trim().toLowerCase();
-    document.querySelectorAll('.course-card').forEach((card) => {
+    document.querySelectorAll('#courses .nb-card').forEach((card) => {
       const text = card.dataset.search;
       card.style.display = !q || text.includes(q) ? '' : 'none';
     });
@@ -43,7 +54,7 @@
   // 登出
   document.getElementById('logout-btn').addEventListener('click', async () => {
     if (!confirm('退出登录？')) return;
-    await fetch('/api/logout', { method: 'POST' });
+    try { await fetch('/api/logout', { method: 'POST' }); } catch {}
     location.href = '/login.html';
   });
 })();
@@ -55,16 +66,23 @@ function cardHTML(c) {
     .join(' ')
     .toLowerCase();
 
+  const progressBlock = pct > 0
+    ? `<div class="nb-progress">
+         <div class="nb-progress-bar"><i style="width:${pct}%"></i></div>
+         <span>已读 ${pct}%</span>
+       </div>`
+    : '';
+
   return `
-    <a class="course-card" href="/reader.html?file=${encodeURIComponent(c.file)}"
-       style="--accent: ${c.color || 'var(--primary)'}"
+    <a class="nb-card" href="/reader.html?file=${encodeURIComponent(c.file)}"
+       style="--accent: ${c.color || '#6750A4'}"
        data-search="${escapeAttr(searchText)}">
-      <span class="course-tag">${escapeHTML(c.subject || '笔记')}</span>
-      <h3>${escapeHTML(c.title)}</h3>
-      <p class="course-desc">${escapeHTML(c.description || '')}</p>
-      <div class="progress-info">
-        <div class="progress-bar"><div style="width: ${pct}%"></div></div>
-        <span>${pct > 0 ? `已读 ${pct}%` : '未开始'}</span>
+      <span class="nb-card-icon">${escapeHTML(c.icon || '📄')}</span>
+      <div class="nb-card-body">
+        <span class="nb-card-subject">${escapeHTML(c.subject || '笔记')}</span>
+        <h3 class="nb-card-title">${escapeHTML(c.title)}</h3>
+        <p class="nb-card-meta">${escapeHTML(c.description || '')}</p>
+        ${progressBlock}
       </div>
     </a>
   `;

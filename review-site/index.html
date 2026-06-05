@@ -8,26 +8,29 @@
 </head>
 <body class="home">
   <header class="topbar">
-    <div class="title-block">
-      <span class="eyebrow">个人复习</span>
-      <h1>笔记库</h1>
+    <div class="brand">
+      <span class="brand-mark">📓</span>
+      <span class="brand-name">复习笔记</span>
     </div>
-    <div class="search-wrap">
-      <span class="search-icon">⌕</span>
-      <input type="search" id="search" placeholder="搜索课程、标签...">
+    <div class="topbar-right">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input type="search" id="search" placeholder="搜索课程、学科…" autocomplete="off">
+      </div>
+      <button class="ghost-btn" id="logout-btn" title="退出登录">退出</button>
     </div>
-    <button class="icon-btn" id="logout-btn" title="退出登录">⎋</button>
   </header>
 
   <main>
     <section id="recent-section" hidden>
       <h2 class="section-title">最近阅读</h2>
-      <div id="recent" class="card-row"></div>
+      <div id="recent" class="card-grid"></div>
     </section>
 
     <section>
-      <h2 class="section-title">全部课程</h2>
+      <h2 class="section-title">我的笔记</h2>
       <div id="courses" class="card-grid"></div>
+      <p id="empty-hint" class="empty-state" hidden>还没有课程笔记</p>
     </section>
   </main>
 
