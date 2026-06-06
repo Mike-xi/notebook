@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>复习笔记</title>
-  <link rel="stylesheet" href="/assets/style.css?v=20260605b">
+  <link rel="stylesheet" href="/assets/style.css?v=20260607a">
 </head>
 <body class="home">
   <header class="topbar">
@@ -28,12 +28,49 @@
     </section>
 
     <section>
-      <h2 class="section-title">我的笔记</h2>
+      <div class="section-head">
+        <h2 class="section-title">我的笔记</h2>
+        <button class="create-btn" id="create-btn">＋ 创建课程</button>
+      </div>
       <div id="courses" class="card-grid"></div>
-      <p id="empty-hint" class="empty-state" hidden>还没有课程笔记</p>
+      <p id="empty-hint" class="empty-state" hidden>还没有课程笔记，点「创建课程」上传一个 HTML 试试</p>
     </section>
   </main>
 
-  <script src="/assets/app.js?v=20260605b"></script>
+  <!-- 创建课程弹窗 -->
+  <div class="modal-overlay" id="create-modal" hidden>
+    <div class="modal">
+      <h3>创建新课程</h3>
+      <label class="field">
+        <span>课程名称 <em>*</em></span>
+        <input type="text" id="nc-title" placeholder="例如：电磁学复习" maxlength="80" autocomplete="off">
+      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>学科（可选）</span>
+          <input type="text" id="nc-subject" placeholder="例如：大学物理" maxlength="40" autocomplete="off">
+        </label>
+        <label class="field icon-field">
+          <span>图标</span>
+          <input type="text" id="nc-icon" value="📘" maxlength="4">
+        </label>
+      </div>
+      <label class="field">
+        <span>简介（可选）</span>
+        <input type="text" id="nc-desc" placeholder="一句话描述" maxlength="120" autocomplete="off">
+      </label>
+      <label class="field">
+        <span>HTML 文件 <em>*</em></span>
+        <input type="file" id="nc-file" accept=".html,.htm,text/html">
+      </label>
+      <p class="modal-hint" id="nc-hint">上传单个 HTML 文件（建议自包含、1.5 MB 以内）。</p>
+      <div class="btn-row">
+        <button class="btn-cancel" id="nc-cancel" type="button">取消</button>
+        <button class="btn-confirm" id="nc-submit" type="button">创建</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/app.js?v=20260607a"></script>
 </body>
 </html>

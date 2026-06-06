@@ -16,3 +16,17 @@ CREATE TABLE IF NOT EXISTS bookmarks (
 
 CREATE INDEX IF NOT EXISTS idx_bookmarks_file ON bookmarks(file);
 CREATE INDEX IF NOT EXISTS idx_progress_updated ON progress(updated_at DESC);
+
+-- 用户在线创建的课程（HTML 正文直接存库；file 以 "u-" 前缀标识为动态课程）
+-- 注：functions/api/courses.js 会用 CREATE TABLE IF NOT EXISTS 懒创建，无需手动迁移
+CREATE TABLE IF NOT EXISTS courses (
+  file        TEXT PRIMARY KEY,
+  title       TEXT NOT NULL,
+  subject     TEXT,
+  description TEXT,
+  icon        TEXT,
+  color       TEXT,
+  tags        TEXT,
+  html        TEXT NOT NULL,
+  created_at  INTEGER NOT NULL
+);

@@ -1,20 +1,25 @@
-// 首页：加载课程列表 + 进度，渲染 NotebookLM 风格卡片
-(async function () {
-  let courses = [];
-  let progress = [];
+// 首页：加载课程（静态 courses.json + 用户创建的 /api/courses）+ 进度，渲染卡片
+// 并提供「创建课程」（上传 HTML 存入 D1）与删除动态课程的能力。
 
+const MAX_HTML_BYTES = 1_500_000;
+
+async function loadAndRender() {
+  let staticCourses = [], dynamic = [], progress = [];
   try {
-    const [coursesRes, progressRes] = await Promise.all([
-      fetch('/courses.json'),
-      fetch('/api/progress'),
+    const [c1, c2, pr] = await Promise.all([
+      fetch('/courses.json').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/courses').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/progress').then((r) => (r.ok ? r.json() : [])),
     ]);
-    courses = await coursesRes.json();
-    progress = progressRes.ok ? await progressRes.json() : [];
+    staticCourses = c1 || [];
+    dynamic = c2 || [];
+    progress = pr || [];
   } catch (e) {
     console.warn('[home] load failed', e);
   }
 
-  // file -> progress 映射
+  const courses = [...staticCourses, ...dynamic];
+
   const progressMap = {};
   for (const p of progress) progressMap[p.file] = p;
 
@@ -26,40 +31,123 @@
     .map((p) => ({ ...courses.find((c) => c.file === p.file), ...p }))
     .filter((c) => c.title);
 
+  const recentSection = document.getElementById('recent-section');
   if (recent.length > 0) {
-    document.getElementById('recent-section').hidden = false;
-    document.getElementById('recent').innerHTML = recent.map(cardHTML).join('');
+    recentSection.hidden = false;
+    document.getElementById('recent').innerHTML = recent.map((c) => cardHTML(c)).join('');
+  } else {
+    recentSection.hidden = true;
   }
 
   // 全部课程
   const grid = document.getElementById('courses');
-  if (courses.length === 0) {
-    document.getElementById('empty-hint').hidden = false;
-  } else {
-    grid.innerHTML = courses
-      .map((c) => cardHTML({ ...c, ...progressMap[c.file] }))
-      .join('');
+  document.getElementById('empty-hint').hidden = courses.length > 0;
+  grid.innerHTML = courses
+    .map((c) => cardHTML({ ...c, ...progressMap[c.file] }, true))
+    .join('');
+}
+
+// ========== 搜索 ==========
+document.getElementById('search').addEventListener('input', (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  document.querySelectorAll('#courses .nb-card').forEach((card) => {
+    const text = card.dataset.search;
+    card.style.display = !q || text.includes(q) ? '' : 'none';
+  });
+});
+
+// ========== 登出 ==========
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  if (!confirm('退出登录？')) return;
+  try { await fetch('/api/logout', { method: 'POST' }); } catch {}
+  location.href = '/login.html';
+});
+
+// ========== 删除动态课程（事件委托） ==========
+document.getElementById('courses').addEventListener('click', async (e) => {
+  const del = e.target.closest('.nb-del');
+  if (!del) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (!confirm('删除这个课程？将一并清除它的阅读进度与书签，且不可恢复。')) return;
+  try {
+    const res = await fetch('/api/courses', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file: del.dataset.file }),
+    });
+    if (!res.ok) throw new Error();
+    await loadAndRender();
+  } catch {
+    alert('删除失败，请重试');
+  }
+});
+
+// ========== 创建课程弹窗 ==========
+const modal = document.getElementById('create-modal');
+const hint = document.getElementById('nc-hint');
+const submitBtn = document.getElementById('nc-submit');
+
+function openModal() {
+  resetForm();
+  modal.hidden = false;
+  document.getElementById('nc-title').focus();
+}
+function closeModal() { modal.hidden = true; }
+function resetForm() {
+  ['nc-title', 'nc-subject', 'nc-desc'].forEach((id) => (document.getElementById(id).value = ''));
+  document.getElementById('nc-icon').value = '📘';
+  document.getElementById('nc-file').value = '';
+  hint.textContent = '上传单个 HTML 文件（建议自包含、1.5 MB 以内）。';
+  hint.classList.remove('err');
+}
+function setHint(msg, isErr) { hint.textContent = msg; hint.classList.toggle('err', !!isErr); }
+
+document.getElementById('create-btn').addEventListener('click', openModal);
+document.getElementById('nc-cancel').addEventListener('click', closeModal);
+modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !modal.hidden) closeModal();
+});
+
+submitBtn.addEventListener('click', async () => {
+  const title = document.getElementById('nc-title').value.trim();
+  const f = document.getElementById('nc-file').files[0];
+  if (!title) return setHint('请填写课程名称', true);
+  if (!f) return setHint('请选择一个 HTML 文件', true);
+  if (f.size > MAX_HTML_BYTES) {
+    return setHint(`文件太大（${(f.size / 1e6).toFixed(2)} MB），请控制在 1.5 MB 以内`, true);
   }
 
-  // 搜索
-  const search = document.getElementById('search');
-  search.addEventListener('input', (e) => {
-    const q = e.target.value.trim().toLowerCase();
-    document.querySelectorAll('#courses .nb-card').forEach((card) => {
-      const text = card.dataset.search;
-      card.style.display = !q || text.includes(q) ? '' : 'none';
+  submitBtn.disabled = true;
+  submitBtn.textContent = '创建中…';
+  try {
+    const html = await f.text();
+    const res = await fetch('/api/courses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title,
+        subject: document.getElementById('nc-subject').value.trim(),
+        description: document.getElementById('nc-desc').value.trim(),
+        icon: document.getElementById('nc-icon').value.trim(),
+        html,
+      }),
     });
-  });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || '创建失败');
+    closeModal();
+    await loadAndRender();
+  } catch (e) {
+    setHint(e.message || '创建失败，请重试', true);
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = '创建';
+  }
+});
 
-  // 登出
-  document.getElementById('logout-btn').addEventListener('click', async () => {
-    if (!confirm('退出登录？')) return;
-    try { await fetch('/api/logout', { method: 'POST' }); } catch {}
-    location.href = '/login.html';
-  });
-})();
-
-function cardHTML(c) {
+// ========== 卡片模板 ==========
+function cardHTML(c, deletable = false) {
   const pct = c.scroll_pct ? Math.round(c.scroll_pct * 100) : 0;
   const searchText = [c.title, c.subject, c.description, ...(c.tags || [])]
     .filter(Boolean)
@@ -73,10 +161,15 @@ function cardHTML(c) {
        </div>`
     : '';
 
+  const delBtn = (deletable && c.dynamic)
+    ? `<button class="nb-del" data-file="${escapeAttr(c.file)}" title="删除课程" aria-label="删除课程">✕</button>`
+    : '';
+
   return `
     <a class="nb-card" href="/reader.html?file=${encodeURIComponent(c.file)}"
        style="--accent: ${c.color || '#6750A4'}"
        data-search="${escapeAttr(searchText)}">
+      ${delBtn}
       <span class="nb-card-icon">${escapeHTML(c.icon || '📄')}</span>
       <div class="nb-card-body">
         <span class="nb-card-subject">${escapeHTML(c.subject || '笔记')}</span>
@@ -96,3 +189,6 @@ function escapeHTML(s) {
 function escapeAttr(s) {
   return escapeHTML(s).replace(/`/g, '&#96;');
 }
+
+// 启动
+loadAndRender();

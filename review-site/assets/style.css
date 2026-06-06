@@ -307,6 +307,128 @@ main {
   font-size: 14px;
 }
 
+/* 区段标题行（标题 + 创建按钮） */
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 28px 4px 18px;
+}
+.section-head .section-title { margin: 0; }
+
+.create-btn {
+  flex-shrink: 0;
+  padding: 9px 18px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--primary-container);
+  color: var(--on-primary-container);
+  font-size: 14px;
+  font-weight: 600;
+  transition: filter var(--transition), box-shadow var(--transition);
+}
+.create-btn:hover { filter: brightness(0.97); box-shadow: var(--shadow-sm); }
+
+/* 卡片上的删除按钮（仅动态课程，hover 显示） */
+.nb-del {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--on-surface) 9%, transparent);
+  color: var(--on-surface-variant);
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  z-index: 2;
+  transition: opacity var(--transition), background-color var(--transition), color var(--transition);
+}
+.nb-card:hover .nb-del { opacity: 1; }
+.nb-del:hover { background: var(--error); color: var(--on-error); }
+
+/* 创建课程弹窗 */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+  animation: fadeIn 150ms ease-out;
+}
+.modal {
+  background: var(--surface-container-high);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  width: 440px;
+  max-width: 100%;
+  box-shadow: var(--shadow-lg);
+}
+.modal h3 { font-size: 18px; margin-bottom: 18px; }
+
+.field { display: block; margin-bottom: 14px; }
+.field > span {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--on-surface-variant);
+  margin-bottom: 6px;
+}
+.field > span em { color: var(--error); font-style: normal; }
+.field input[type="text"] {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--outline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-container-lowest);
+  color: var(--on-surface);
+  font-size: 14px;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.field input[type="text"]:focus { border-color: var(--primary); }
+.field input[type="file"] { width: 100%; font-size: 13px; color: var(--on-surface-variant); }
+.field input[type="file"]::file-selector-button {
+  margin-right: 10px;
+  padding: 8px 14px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-full);
+  background: var(--surface-container);
+  color: var(--on-surface);
+  font-size: 13px;
+  cursor: pointer;
+}
+.field-row { display: flex; gap: 12px; }
+.field-row .field { flex: 1; }
+.icon-field { flex: 0 0 84px; }
+.icon-field input { text-align: center; font-size: 18px; }
+
+.modal-hint { font-size: 12px; color: var(--on-surface-variant); margin: 4px 0 18px; }
+.modal-hint.err { color: var(--error); }
+
+.modal .btn-row { display: flex; gap: 8px; justify-content: flex-end; }
+.modal .btn-row button {
+  padding: 9px 22px;
+  border: none;
+  border-radius: var(--radius-full);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color var(--transition), filter var(--transition);
+}
+.modal .btn-cancel { background: transparent; color: var(--on-surface); }
+.modal .btn-cancel:hover { background: var(--surface-container-highest); }
+.modal .btn-confirm { background: var(--primary); color: var(--on-primary); }
+.modal .btn-confirm:hover:not(:disabled) { filter: brightness(1.05); }
+.modal .btn-confirm:disabled { opacity: 0.6; cursor: not-allowed; }
+
 /* ========================================
    阅读器（全屏 + 悬浮工具栏）
    ======================================== */

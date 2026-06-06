@@ -4,6 +4,7 @@ const file = params.get('file');
 if (!file) { location.href = '/'; throw new Error('no file'); }
 
 const isPDF = /\.pdf$/i.test(file);
+const isDynamic = file.startsWith('u-'); // 用户在线创建的课程，正文存 D1
 
 const iframe = document.getElementById('content');
 const docTitleEl = document.getElementById('doc-title');
@@ -24,11 +25,14 @@ if (isPDF) {
   progressEl.hidden = true;
 }
 
-// 课程元数据（显示标题、学科）
+// 课程元数据（显示标题、学科）：合并静态 courses.json 与用户创建的 /api/courses
 let courseMeta = null;
-fetch('/courses.json')
-  .then((r) => r.json())
-  .then((courses) => {
+Promise.all([
+  fetch('/courses.json').then((r) => (r.ok ? r.json() : [])),
+  fetch('/api/courses').then((r) => (r.ok ? r.json() : [])),
+])
+  .then(([staticCourses, dynamic]) => {
+    const courses = [...(staticCourses || []), ...(dynamic || [])];
     courseMeta = courses.find((c) => c.file === file);
     if (courseMeta) {
       docTitleEl.textContent = courseMeta.title;
@@ -40,7 +44,10 @@ fetch('/courses.json')
   })
   .catch(() => { docTitleEl.textContent = file; });
 
-iframe.src = `/notes/${encodeURIComponent(file)}`;
+// 动态课程的 HTML 正文由 Function 从 D1 返回；静态课程直接读 /notes/
+iframe.src = isDynamic
+  ? `/api/course-html?file=${encodeURIComponent(file)}`
+  : `/notes/${encodeURIComponent(file)}`;
 
 let currentPct = 0;
 let saveTimer = null;
