@@ -1,7 +1,16 @@
 // 首页：加载课程（静态 courses.json + 用户创建的 /api/courses）+ 进度，渲染卡片
 // 并提供「创建课程」（上传 HTML 存入 D1）与删除动态课程的能力。
 
-const MAX_HTML_BYTES = 1_500_000;
+const MAX_TEXT_BYTES = 1_500_000;   // html / md 存 D1
+const MAX_PDF_BYTES = 20_000_000;   // pdf 存 R2
+const KIND_ICON = { html: '📘', md: '📝', pdf: '📕' };
+
+function detectKind(name) {
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  if (ext === 'pdf') return 'pdf';
+  if (ext === 'md' || ext === 'markdown') return 'md';
+  return 'html';
+}
 
 async function loadAndRender() {
   let staticCourses = [], dynamic = [], progress = [];
@@ -98,7 +107,7 @@ function resetForm() {
   ['nc-title', 'nc-subject', 'nc-desc'].forEach((id) => (document.getElementById(id).value = ''));
   document.getElementById('nc-icon').value = '📘';
   document.getElementById('nc-file').value = '';
-  hint.textContent = '上传单个 HTML 文件（建议自包含、1.5 MB 以内）。';
+  hint.textContent = '支持 HTML / Markdown（≤1.5 MB）或 PDF（≤20 MB）。';
   hint.classList.remove('err');
 }
 function setHint(msg, isErr) { hint.textContent = msg; hint.classList.toggle('err', !!isErr); }
@@ -110,30 +119,40 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !modal.hidden) closeModal();
 });
 
+// 选文件后：按类型提示大小上限，并自动配一个默认图标（若用户没改过）
+document.getElementById('nc-file').addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const kind = detectKind(f.name);
+  const max = kind === 'pdf' ? MAX_PDF_BYTES : MAX_TEXT_BYTES;
+  const label = { html: 'HTML', md: 'Markdown', pdf: 'PDF' }[kind];
+  setHint(`已选 ${label}（${(f.size / 1e6).toFixed(2)} MB / 上限 ${(max / 1e6).toFixed(1)} MB）`, f.size > max);
+  const iconEl = document.getElementById('nc-icon');
+  if (!iconEl.value || ['📘', '📝', '📕'].includes(iconEl.value)) iconEl.value = KIND_ICON[kind];
+});
+
 submitBtn.addEventListener('click', async () => {
   const title = document.getElementById('nc-title').value.trim();
   const f = document.getElementById('nc-file').files[0];
   if (!title) return setHint('请填写课程名称', true);
-  if (!f) return setHint('请选择一个 HTML 文件', true);
-  if (f.size > MAX_HTML_BYTES) {
-    return setHint(`文件太大（${(f.size / 1e6).toFixed(2)} MB），请控制在 1.5 MB 以内`, true);
+  if (!f) return setHint('请选择一个文件', true);
+  const kind = detectKind(f.name);
+  const max = kind === 'pdf' ? MAX_PDF_BYTES : MAX_TEXT_BYTES;
+  if (f.size > max) {
+    return setHint(`文件太大（${(f.size / 1e6).toFixed(2)} MB），上限 ${(max / 1e6).toFixed(1)} MB`, true);
   }
 
   submitBtn.disabled = true;
   submitBtn.textContent = '创建中…';
   try {
-    const html = await f.text();
-    const res = await fetch('/api/courses', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title,
-        subject: document.getElementById('nc-subject').value.trim(),
-        description: document.getElementById('nc-desc').value.trim(),
-        icon: document.getElementById('nc-icon').value.trim(),
-        html,
-      }),
-    });
+    const fd = new FormData();
+    fd.append('title', title);
+    fd.append('subject', document.getElementById('nc-subject').value.trim());
+    fd.append('description', document.getElementById('nc-desc').value.trim());
+    fd.append('icon', document.getElementById('nc-icon').value.trim());
+    fd.append('kind', kind);
+    fd.append('file', f, f.name);
+    const res = await fetch('/api/courses', { method: 'POST', body: fd });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || '创建失败');
     closeModal();

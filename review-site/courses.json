@@ -6,6 +6,7 @@
     "description": "知识点系统归纳 · 期末复习提纲",
     "icon": "🐍",
     "color": "#4B8BBE",
+    "kind": "html",
     "tags": ["python", "程序设计", "期末"]
   },
   {
@@ -15,6 +16,7 @@
     "description": "公式 · 考点 · 期末复习手册",
     "icon": "🎲",
     "color": "#8B5CF6",
+    "kind": "html",
     "tags": ["概率", "统计", "期末"]
   },
   {
@@ -24,6 +26,7 @@
     "description": "期末复习大纲（PDF）",
     "icon": "⚛️",
     "color": "#0EA5E9",
+    "kind": "pdf",
     "tags": ["物理", "大纲", "期末"]
   }
 ]

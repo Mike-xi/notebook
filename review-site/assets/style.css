@@ -41,8 +41,9 @@
   --transition: 200ms cubic-bezier(0.2, 0, 0, 1);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
+/* 暗色由 theme.js 把偏好(auto/light/dark)解析成 <html data-theme="dark|light">，
+   故这里只需定义 dark 覆盖；auto 跟随系统的逻辑在 JS 里 matchMedia 处理。 */
+:root[data-theme="dark"] {
     --primary: #D0BCFF;
     --on-primary: #381E72;
     --primary-container: #4F378B;
@@ -69,7 +70,6 @@
     --shadow-sm: 0 1px 2px rgba(0,0,0,0.2), 0 1px 3px rgba(0,0,0,0.3);
     --shadow-md: 0 2px 4px rgba(0,0,0,0.25), 0 4px 12px rgba(0,0,0,0.35);
     --shadow-lg: 0 4px 8px rgba(0,0,0,0.3), 0 12px 24px rgba(0,0,0,0.4);
-  }
 }
 
 /* ========================================
@@ -198,6 +198,24 @@ body.home {
   transition: background-color var(--transition), border-color var(--transition);
 }
 .ghost-btn:hover { background: var(--surface-container-high); }
+
+/* 主题切换按钮（首页 topbar：圆形图标按钮） */
+.theme-toggle {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--on-surface);
+  font-size: 18px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--transition), border-color var(--transition);
+}
+.theme-toggle:hover { background: var(--surface-container-high); }
 
 main {
   max-width: 1360px;
@@ -610,6 +628,119 @@ body.reader {
   margin: 0;
 }
 
+/* ========================================
+   目录 TOC 面板（左侧，镜像书签面板）
+   ======================================== */
+#toc-panel {
+  position: fixed;
+  top: 64px;
+  left: 16px;
+  width: 300px;
+  max-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 12;
+  overflow: hidden;
+}
+#toc-list { list-style: none; padding: 8px; margin: 0; overflow-y: auto; flex: 1; }
+#toc-list li { margin: 0; }
+.toc-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 12px;
+  border: none;
+  background: transparent;
+  color: var(--on-surface);
+  font-size: 13px;
+  line-height: 1.4;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background-color var(--transition);
+}
+.toc-item:hover { background: var(--surface-container-high); }
+.toc-item:disabled { opacity: .5; cursor: default; }
+.toc-item.lvl-0 { font-weight: 600; }
+.toc-item.lvl-1 { padding-left: 26px; }
+.toc-item.lvl-2 { padding-left: 40px; color: var(--on-surface-variant); }
+
+/* ========================================
+   高亮：选区浮条 + 批注弹层（建在父页）
+   ======================================== */
+.nb-hl-toolbar {
+  position: fixed;
+  z-index: 50;
+  transform: translate(-50%, -100%);
+  display: none;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--surface-container-high);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-lg);
+}
+.nb-hl-toolbar[data-below="1"] { transform: translate(-50%, 0); }
+.nb-hl-toolbar.show { display: flex; }
+.nb-hl-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, .15);
+  cursor: pointer;
+  padding: 0;
+  transition: transform var(--transition);
+}
+.nb-hl-swatch:hover { transform: scale(1.14); }
+
+.nb-hl-popover {
+  position: fixed;
+  z-index: 50;
+  width: 240px;
+  transform: translateY(-100%);
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--surface-container-high);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+.nb-hl-popover[data-below="1"] { transform: translateY(0); }
+.nb-hl-popover.show { display: flex; }
+.nb-hl-colors { display: flex; gap: 8px; }
+.nb-hl-note {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--outline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-container-lowest);
+  color: var(--on-surface);
+  font: inherit;
+  font-size: 13px;
+  padding: 8px;
+  outline: none;
+}
+.nb-hl-note:focus { border-color: var(--primary); }
+.nb-hl-actions { display: flex; justify-content: space-between; }
+.nb-hl-actions button {
+  padding: 6px 14px;
+  border: none;
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  cursor: pointer;
+}
+.nb-hl-del { background: transparent; color: var(--error); }
+.nb-hl-del:hover { background: color-mix(in srgb, var(--error) 16%, transparent); }
+.nb-hl-done { background: var(--primary); color: var(--on-primary); }
+
 /* 加书签弹框 */
 .bm-prompt-overlay {
   position: fixed;
@@ -734,6 +865,7 @@ body.login {
   .nb-card { min-height: 160px; padding: 16px; }
   .rb-title { max-width: 44vw; }
   #bookmarks-panel { right: 8px; left: 8px; width: auto; }
+  #toc-panel { left: 8px; right: 8px; width: auto; }
 }
 @media (max-width: 400px) {
   .card-grid { grid-template-columns: 1fr; }

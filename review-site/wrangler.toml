@@ -9,6 +9,14 @@ binding = "DB"
 database_name = "review-db"
 database_id = "f3c5143b-9d1d-4820-b254-a220b34e1fe1"
 
+# R2 对象存储绑定（存放上传的 PDF 等大文件，D1 单值仅 2MB 装不下）
+# 桶 cloudflare 已存在。Pages 通过原生绑定访问，无需 S3 access key。
+# 还需在 Pages 后台 Settings → Bindings → R2 加：变量名 FILES → 桶 cloudflare。
+# 本地 wrangler pages dev 用 --r2 FILES 即可（miniflare 本地模拟，无需联网）。
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "cloudflare"
+
 # 环境变量（敏感值不写在这里，用 wrangler secret 或 Dashboard 配置）
 # 需要在 Pages 项目设置里配置：
 #   SITE_PASSWORD  - 你的访问密码

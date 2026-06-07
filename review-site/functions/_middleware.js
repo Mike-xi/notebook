@@ -12,6 +12,9 @@ export async function onRequest(context) {
   const path = url.pathname;
 
   if (PUBLIC_PATHS.has(path)) return next();
+  // 静态资源（样式/脚本）放行，否则未登录的登录页会因 CSS/JS 被拦而裸样式。
+  // 注意：笔记正文 /notes/* 与 /courses.json 不在此列，仍需登录。
+  if (path.startsWith('/assets/') || path === '/favicon.ico') return next();
 
   if (await isAuthenticated(request, env)) return next();
 

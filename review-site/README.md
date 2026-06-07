@@ -1,14 +1,18 @@
 # 复习笔记网站
 
-一个跑在 Cloudflare Pages 上的个人复习笔记管理站。把课程 HTML 丢到 `notes/` 目录、`git push`，就能用了。
+一个跑在 Cloudflare Pages 上的个人复习笔记管理站。支持 HTML / Markdown / PDF 三种笔记，`git push` 或站内上传即可用。
 
 ## 功能
 
-- 📚 课程卡片首页（按学科分色）
-- 📍 自动记录上次阅读位置（跨设备同步）
-- ⭐ 任意位置加书签 + 命名 + 跳转
+- 📚 课程卡片首页（按学科分色）+ 最近阅读
+- 📄 **多格式**：HTML / Markdown（KaTeX 公式 + 代码高亮）/ PDF（自定义 PDF.js 阅读器，连续滚动 + 缩放 + 大纲）
+- ⬆️ **站内上传**：HTML/Markdown 存 D1，PDF 存 R2
+- 📍 自动记录上次阅读位置（PDF/MD 同样支持，跨设备同步）
+- 🔖 任意位置加书签 + 命名 + 跳转
+- 📑 **目录 TOC**：自动从标题/PDF 大纲生成，点击跳转
+- 🖍️ **高亮 + 批注**（HTML/Markdown）：选词 4 色高亮、加批注，重开还原
 - 🔍 课程列表搜索
-- 🌙 自动深浅色（跟系统）
+- 🌙 **深浅色切换**：手动 跟随系统 / 浅 / 深 三态
 - 🔐 密码保护（HMAC 签名 cookie）
 
 ## 快速部署
@@ -42,6 +46,17 @@ wrangler d1 create review-db
 wrangler d1 execute review-db --remote --file=schema.sql
 ```
 
+### 2.5 创建 R2 存储桶（PDF 上传需要）
+
+PDF 体积大、是二进制，存不进 D1，改用 R2 对象存储。**不开 R2 也能用**——只是站内上传 PDF 会失败，HTML/Markdown 不受影响。
+
+```bash
+# 首次需在 Dashboard → R2 里点一次「开通」（免费额度 10GB，可能要确认一次账单信息）
+wrangler r2 bucket create cloudflare
+```
+
+桶名必须是 `cloudflare`（与 `wrangler.toml` 里的 `bucket_name` 一致）。
+
 ### 3. 在 Cloudflare Pages 创建项目
 
 1. 打开 [Cloudflare Dashboard](https://dash.cloudflare.com) → Workers & Pages → Create → Pages → Connect to Git
@@ -55,6 +70,10 @@ wrangler d1 execute review-db --remote --file=schema.sql
 - Variable name: `DB`
 - D1 database: `review-db`
 
+再在 **Settings → Bindings → R2** 添加（PDF 上传需要；`wrangler.toml` 里也声明了，多数情况会自动装配，手动加一遍更稳）：
+- Variable name: `FILES`
+- R2 bucket: `cloudflare`
+
 在 **Settings → Environment variables** 添加两个 secret（**生产环境**记得勾 Encrypt）：
 - `SITE_PASSWORD` = 你想要的访问密码
 - `AUTH_SECRET` = 一段随机长字符串（用来签名 cookie，越长越好；可以用 `openssl rand -hex 32` 生成）
@@ -67,8 +86,12 @@ wrangler d1 execute review-db --remote --file=schema.sql
 
 ## 添加新课程
 
-1. 把 HTML 文件丢到 `notes/` 目录，比如 `notes/dl-final.html`
-2. 在 `courses.json` 里加一条：
+**方式一：站内上传**（最简单）—— 首页点「创建课程」，选 HTML / Markdown / PDF 文件即可，存数据库/R2。
+
+**方式二：静态文件**（随仓库走、永久内置）：
+
+1. 把文件丢到 `notes/` 目录（ASCII 文件名），比如 `notes/dl-final.html` / `dl.md` / `dl.pdf`
+2. 在 `courses.json` 里加一条（`kind` = `html` | `md` | `pdf`）：
    ```json
    {
      "file": "dl-final.html",
@@ -76,6 +99,7 @@ wrangler d1 execute review-db --remote --file=schema.sql
      "subject": "DL",
      "description": "Transformer、注意力机制",
      "color": "#34A853",
+     "kind": "html",
      "tags": ["dl", "transformer"]
    }
    ```
@@ -88,48 +112,66 @@ wrangler d1 execute review-db --remote --file=schema.sql
 cp .dev.vars.example .dev.vars
 # 编辑 .dev.vars 设置本地密码
 
-# 启动本地 dev server（自带 D1 本地模拟）
-wrangler pages dev . --d1=DB=review-db
+# 启动本地 dev server（自带 D1 + R2 本地模拟，无需联网/登录 CF）
+wrangler pages dev . --port 8788 --d1 DB --r2 FILES --compatibility-date 2024-09-01
 ```
 
 默认在 `http://localhost:8788` 打开。
+
+> ⚠️ 本地 D1 建表坑：`pages dev --d1 DB`（按 binding 名键的 sqlite）和 `wrangler d1 execute review-db --local`（按库名键）用的是**不同文件**。若 dev server 报 `no such table`，直接对 `pages dev` 实际用的 `.wrangler/state/v3/d1/.../<hash>.sqlite` 跑一遍 `schema.sql` 即可（progress/bookmarks/highlights 等非懒建表才需要）。
 
 ## 目录结构
 
 ```
 review-site/
 ├── functions/
-│   ├── _middleware.js       # 所有请求都过这里检查认证
-│   ├── _lib/auth.js         # HMAC cookie 签名/验证
+│   ├── _middleware.js       # 所有请求都过这里检查认证（/assets/* 放行）
+│   ├── _lib/
+│   │   ├── auth.js          # HMAC cookie 签名/验证
+│   │   └── db.js            # courses/highlights 表懒建+迁移
 │   └── api/
 │       ├── login.js         # POST: 验证密码、下发 cookie
 │       ├── logout.js        # POST: 清除 cookie
 │       ├── progress.js      # GET/POST: 阅读进度
-│       └── bookmarks.js     # GET/POST/DELETE: 书签
-├── notes/                   # 你的课程 HTML 都丢这里
-│   ├── ml-final.html
-│   ├── math-final.html
-│   └── physics-final.html
+│       ├── bookmarks.js     # GET/POST/DELETE: 书签
+│       ├── courses.js       # GET/POST(multipart)/DELETE: 站内课程（html/md→D1, pdf→R2）
+│       ├── course-html.js   # GET: 取 D1 里的 html/md 正文
+│       ├── file.js          # GET: 从 R2 流式返回 pdf（支持 Range）
+│       └── highlights.js    # GET/POST/PUT/DELETE: 高亮+批注
+├── notes/                   # 静态课程文件（html/md/pdf）
 ├── assets/
-│   ├── style.css            # Material You 主题
-│   ├── app.js               # 首页逻辑
-│   └── reader.js            # 阅读器逻辑（进度/书签）
-├── index.html               # 首页（课程卡片）
-├── reader.html              # 阅读器（iframe + 工具栏）
+│   ├── style.css            # Material You 主题（data-theme 驱动深浅色）
+│   ├── theme.js             # 深浅色三态切换
+│   ├── app.js               # 首页逻辑 + 上传
+│   ├── reader.js            # 阅读器外壳（进度/书签/TOC/主题分流）
+│   ├── pdf-viewer.js        # PDF.js 连续滚动阅读器
+│   ├── md-viewer.js         # Markdown 渲染（markdown-it+KaTeX+hljs）
+│   └── highlights.js        # 高亮+批注引擎
+├── index.html               # 首页（课程卡片 + 上传弹窗）
+├── reader.html              # 阅读器（iframe + 悬浮工具栏 + TOC/书签面板）
+├── viewer-pdf.html          # PDF 阅读器外壳（reader iframe 内）
+├── viewer-md.html           # Markdown 阅读器外壳（reader iframe 内）
 ├── login.html               # 登录页
-├── courses.json             # 课程元数据
+├── courses.json             # 静态课程元数据（含 kind）
 ├── schema.sql               # D1 表结构
-└── wrangler.toml            # Cloudflare 配置
+├── _headers                 # 静态资源缓存策略
+└── wrangler.toml            # Cloudflare 配置（D1 + R2 绑定）
 ```
 
 ## 数据模型
 
 ```sql
--- 每个文件的阅读进度（scroll_pct 是 0~1 的小数）
+-- 阅读进度（scroll_pct 是 0~1 的小数；PDF/MD 也用滚动比例）
 progress(file PK, scroll_pct, updated_at)
 
 -- 书签（多对一文件）
 bookmarks(id PK, file, title, scroll_pct, created_at)
+
+-- 站内上传的课程（kind=html|md|pdf；html/md 正文存 html 列，pdf 正文在 R2）
+courses(file PK, title, subject, description, icon, color, tags, html, kind, created_at)
+
+-- 高亮+批注（按正文字符偏移定位，内容静态故可还原）
+highlights(id PK, file, start_off, end_off, text, color, note, created_at)
 ```
 
 ## 安全说明
@@ -143,8 +185,9 @@ bookmarks(id PK, file, title, scroll_pct, created_at)
 
 代码里留了扩展点，比较容易加：
 
-- **高亮 + 批注**：阅读器里加 selection 监听，存 `{file, range, color, note}` 到新表
-- **学习时长统计**：reader.js 里加 visibility 监听，累计活跃时间
+- **学习时长统计 / 热力图**：reader.js 里加 visibility 监听，累计活跃时间
 - **PWA 离线**：加 `manifest.json` + Service Worker
 - **标签筛选**：首页加标签筛选条，按 `courses.json` 里的 tags 过滤
+- **抽认卡 / 间隔重复（SRS）**：把高亮/批注转成复习卡
 - **AI 问答**：选中段落 → 调用你的 SJTU AI 网关
+- **PDF 文字层**：当前 PDF 阅读器是 canvas 渲染（不可选词）；可加 pdf.js text layer 支持选中/搜索

@@ -3,8 +3,10 @@ const params = new URLSearchParams(location.search);
 const file = params.get('file');
 if (!file) { location.href = '/'; throw new Error('no file'); }
 
-const isPDF = /\.pdf$/i.test(file);
-const isDynamic = file.startsWith('u-'); // 用户在线创建的课程，正文存 D1
+const ext = (file.split('.').pop() || '').toLowerCase();
+const kind = ext === 'pdf' ? 'pdf' : (ext === 'md' || ext === 'markdown') ? 'md' : 'html';
+const isDynamic = file.startsWith('u-'); // 用户在线创建的课程，正文存 D1/R2
+const usesViewer = kind === 'pdf' || kind === 'md'; // 我们自己的 viewer（iframe 内可滚动 + postMessage 联动）
 
 const iframe = document.getElementById('content');
 const docTitleEl = document.getElementById('doc-title');
@@ -17,13 +19,6 @@ const bookmarksList = document.getElementById('bookmarks-list');
 const bookmarksEmpty = document.getElementById('bookmarks-empty');
 const bar = document.getElementById('reader-bar');
 const hotzone = document.getElementById('reader-hotzone');
-
-// PDF：进度/书签无法读取滚动，隐藏相关控件，保持工具栏常驻
-if (isPDF) {
-  bookmarkBtn.hidden = true;
-  bookmarksToggle.hidden = true;
-  progressEl.hidden = true;
-}
 
 // 课程元数据（显示标题、学科）：合并静态 courses.json 与用户创建的 /api/courses
 let courseMeta = null;
@@ -44,22 +39,42 @@ Promise.all([
   })
   .catch(() => { docTitleEl.textContent = file; });
 
-// 动态课程的 HTML 正文由 Function 从 D1 返回；静态课程直接读 /notes/
-iframe.src = isDynamic
-  ? `/api/course-html?file=${encodeURIComponent(file)}`
+// 正文来源 URL：动态课程走 Function（html/md 取 D1、pdf 取 R2），静态课程读 /notes/
+const sourceURL = isDynamic
+  ? (kind === 'pdf' ? `/api/file?file=${encodeURIComponent(file)}` : `/api/course-html?file=${encodeURIComponent(file)}`)
   : `/notes/${encodeURIComponent(file)}`;
+
+// html 直接喂 iframe；pdf/md 走我们自己的 viewer（用 ?src= 指向正文）
+iframe.src = usesViewer
+  ? `/viewer-${kind}.html?src=${encodeURIComponent(sourceURL)}`
+  : sourceURL;
 
 let currentPct = 0;
 let saveTimer = null;
 let scrollAttached = false;
 
+let inited = false;
+function initOnce() { if (inited) return; inited = true; initIframe(); }
+
 iframe.addEventListener('load', () => {
-  // 给页面里的图片/数学公式一点时间布局
-  setTimeout(initIframe, 150);
+  if (usesViewer) {
+    // pdf/md：等 viewer 排好版发来 nb-ready 再初始化；兜底超时防消息丢失
+    syncViewerTheme();
+    setTimeout(initOnce, 4000);
+  } else {
+    // html：给图片/公式一点布局时间
+    setTimeout(initOnce, 150);
+  }
+});
+
+// 接收子 viewer 的消息：排版就绪、PDF 大纲
+window.addEventListener('message', (e) => {
+  const d = e.data || {};
+  if (d.type === 'nb-ready') initOnce();
+  else if (d.type === 'nb-outline') { window.__nbOutline = d.items || []; window.dispatchEvent(new CustomEvent('nb-outline-ready')); }
 });
 
 async function initIframe() {
-  if (isPDF) { showBar(); return; }
   const win = iframe.contentWindow;
   const doc = iframe.contentDocument;
   if (!win || !doc) { showBar(); return; }
@@ -84,10 +99,53 @@ async function initIframe() {
   }
 
   updateProgressDisplay();
+  applyContentTheme();
+  setupContentFeatures();
   // 进入后短暂展示工具栏，随后自动隐藏，营造全屏感
   showBar();
   scheduleHide();
 }
+
+// 内容就绪后：构建目录 + 启用高亮（html/md）
+function setupContentFeatures() {
+  buildTOC();
+  if (kind !== 'pdf' && window.NBHighlights) {
+    const win = iframe.contentWindow, doc = iframe.contentDocument;
+    const root = kind === 'md' ? doc.getElementById('md-content') : (doc && doc.body);
+    if (win && doc && root) NBHighlights.init({ doc, win, root, file });
+  }
+}
+
+// ========== 笔记正文暗色 ==========
+// 用户上传的 HTML 笔记自带浅色配色，深色模式下用「整体反相 + 媒体二次反相」
+// 这一经典手法把任意页面渲染成可读的暗色（图片/视频/canvas 不被反相）。
+const DARK_CONTENT_CSS = `
+  html.nb-dark-invert { filter: invert(0.92) hue-rotate(180deg); background:#111418 !important; }
+  html.nb-dark-invert img, html.nb-dark-invert video, html.nb-dark-invert picture,
+  html.nb-dark-invert canvas, html.nb-dark-invert svg image,
+  html.nb-dark-invert [data-no-invert] { filter: invert(1) hue-rotate(180deg); }
+`;
+function applyContentTheme() {
+  if (usesViewer) { syncViewerTheme(); return; } // md/pdf 由各自 viewer 处理
+  const doc = iframe.contentDocument;
+  if (!doc || !doc.documentElement) return;
+  let style = doc.getElementById('nb-dark-style');
+  if (!style) {
+    style = doc.createElement('style');
+    style.id = 'nb-dark-style';
+    style.textContent = DARK_CONTENT_CSS;
+    (doc.head || doc.documentElement).appendChild(style);
+  }
+  const dark = window.NBTheme && window.NBTheme.effective === 'dark';
+  doc.documentElement.classList.toggle('nb-dark-invert', !!dark);
+}
+function syncViewerTheme() {
+  const win = iframe.contentWindow;
+  if (!win) return;
+  const eff = window.NBTheme ? window.NBTheme.effective : 'light';
+  try { win.postMessage({ type: 'nb-theme', effective: eff }, location.origin); } catch {}
+}
+window.addEventListener('nb-theme-change', applyContentTheme);
 
 function restoreScroll(pct) {
   const win = iframe.contentWindow;
@@ -139,7 +197,7 @@ async function saveProgress() {
 
 // 关闭页面时用 sendBeacon 兜底保存
 window.addEventListener('beforeunload', () => {
-  if (!isPDF && currentPct > 0) {
+  if (currentPct > 0) {
     const blob = new Blob(
       [JSON.stringify({ file, scroll_pct: currentPct })],
       { type: 'application/json' }
@@ -157,12 +215,11 @@ function showBar() {
   bar.classList.remove('hidden');
 }
 function hideBar() {
-  if (isPDF || barHovered) return;
+  if (barHovered) return;
   if (!bookmarksPanel.hidden) return;
   bar.classList.add('hidden');
 }
 function scheduleHide() {
-  if (isPDF) return;
   clearTimeout(hideTimer);
   hideTimer = setTimeout(hideBar, 2500);
 }
@@ -182,6 +239,7 @@ bookmarksToggle.addEventListener('click', () => {
   if (!bookmarksPanel.hidden) {
     bookmarksPanel.hidden = true;
   } else {
+    document.getElementById('toc-panel').hidden = true; // 互斥：开书签即收目录
     bookmarksPanel.hidden = false;
     showBar();
     loadBookmarks();
@@ -288,9 +346,78 @@ function showBookmarkPrompt() {
   });
 }
 
-// 快捷键：Esc 关书签面板 / 返回
+// ========== 目录 TOC ==========
+const tocToggle = document.getElementById('toc-toggle');
+const tocPanel = document.getElementById('toc-panel');
+const tocList = document.getElementById('toc-list');
+const tocEmpty = document.getElementById('toc-empty');
+let tocItems = [];
+
+function buildTOC() {
+  tocItems = [];
+  if (usesViewer) {
+    // pdf/md：用 viewer 经 postMessage 上报的大纲
+    (window.__nbOutline || []).forEach((it) => {
+      tocItems.push({
+        title: it.title, level: it.level || 0,
+        disabled: kind === 'pdf' ? !it.page : !it.id,
+        jump: kind === 'pdf'
+          ? () => postToViewer({ type: 'nb-goto-page', page: it.page })
+          : () => postToViewer({ type: 'nb-goto-id', id: it.id }),
+      });
+    });
+  } else {
+    // html：从笔记 DOM 抽取 h1-h3
+    const doc = iframe.contentDocument;
+    if (doc) {
+      doc.querySelectorAll('h1, h2, h3').forEach((h) => {
+        const title = (h.textContent || '').trim();
+        if (!title) return;
+        tocItems.push({
+          title, level: parseInt(h.tagName[1], 10) - 1,
+          jump: () => { try { h.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch { h.scrollIntoView(); } },
+        });
+      });
+    }
+  }
+  renderTOC();
+}
+
+function renderTOC() {
+  const usable = tocItems.filter((t) => !t.disabled).length;
+  tocToggle.hidden = usable === 0;
+  if (!tocItems.length) { tocList.innerHTML = ''; tocEmpty.hidden = false; return; }
+  tocEmpty.hidden = true;
+  tocList.innerHTML = tocItems.map((t, i) =>
+    `<li><button class="toc-item lvl-${t.level}" data-i="${i}"${t.disabled ? ' disabled' : ''}>${escapeHTML(t.title)}</button></li>`
+  ).join('');
+}
+
+tocList.addEventListener('click', (e) => {
+  const btn = e.target.closest('.toc-item');
+  if (!btn || btn.disabled) return;
+  const it = tocItems[parseInt(btn.dataset.i, 10)];
+  if (it && it.jump) it.jump();
+  if (window.innerWidth < 640) tocPanel.hidden = true;
+});
+
+tocToggle.addEventListener('click', () => {
+  if (!tocPanel.hidden) { tocPanel.hidden = true; return; }
+  bookmarksPanel.hidden = true;
+  tocPanel.hidden = false;
+  showBar();
+});
+document.getElementById('toc-close').addEventListener('click', () => { tocPanel.hidden = true; });
+
+function postToViewer(msg) {
+  const win = iframe.contentWindow;
+  if (win) { try { win.postMessage(msg, location.origin); } catch {} }
+}
+
+// 快捷键：Esc 关面板 / 返回
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    if (!tocPanel.hidden) { tocPanel.hidden = true; return; }
     if (!bookmarksPanel.hidden) { bookmarksPanel.hidden = true; return; }
   }
 });

@@ -1,3 +1,9 @@
 # 让浏览器每次加载静态资源都向服务器校验，避免改完样式后被旧缓存卡住
 /assets/*
   Cache-Control: public, max-age=0, must-revalidate
+
+# 阅读器 viewer 外壳同理（pdf/md），避免更新后被旧缓存卡住
+/viewer-pdf.html
+  Cache-Control: public, max-age=0, must-revalidate
+/viewer-md.html
+  Cache-Control: public, max-age=0, must-revalidate

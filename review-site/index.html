@@ -4,7 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>复习笔记</title>
-  <link rel="stylesheet" href="/assets/style.css?v=20260607a">
+  <script>
+    // 首屏前定主题，避免浅/深闪烁；完整逻辑在 theme.js
+    (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
+  </script>
+  <link rel="stylesheet" href="/assets/style.css?v=20260607b">
 </head>
 <body class="home">
   <header class="topbar">
@@ -17,6 +21,7 @@
         <span class="search-icon">⌕</span>
         <input type="search" id="search" placeholder="搜索课程、学科…" autocomplete="off">
       </div>
+      <button class="theme-toggle" data-theme-toggle title="切换主题">🌗</button>
       <button class="ghost-btn" id="logout-btn" title="退出登录">退出</button>
     </div>
   </header>
@@ -60,10 +65,10 @@
         <input type="text" id="nc-desc" placeholder="一句话描述" maxlength="120" autocomplete="off">
       </label>
       <label class="field">
-        <span>HTML 文件 <em>*</em></span>
-        <input type="file" id="nc-file" accept=".html,.htm,text/html">
+        <span>笔记文件 <em>*</em></span>
+        <input type="file" id="nc-file" accept=".html,.htm,.md,.markdown,.pdf,text/html,text/markdown,application/pdf">
       </label>
-      <p class="modal-hint" id="nc-hint">上传单个 HTML 文件（建议自包含、1.5 MB 以内）。</p>
+      <p class="modal-hint" id="nc-hint">支持 HTML / Markdown（≤1.5 MB）或 PDF（≤20 MB）。</p>
       <div class="btn-row">
         <button class="btn-cancel" id="nc-cancel" type="button">取消</button>
         <button class="btn-confirm" id="nc-submit" type="button">创建</button>
@@ -71,6 +76,7 @@
     </div>
   </div>
 
-  <script src="/assets/app.js?v=20260607a"></script>
+  <script src="/assets/theme.js?v=20260607b"></script>
+  <script src="/assets/app.js?v=20260607b"></script>
 </body>
 </html>
