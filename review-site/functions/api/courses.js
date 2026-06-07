@@ -70,6 +70,7 @@ export async function onRequestPost({ request, env }) {
       description: str(form.get('description')),
       icon: str(form.get('icon')),
       color: str(form.get('color')),
+      tags: form.get('tags'),
     };
 
     if (kind === 'pdf') {
@@ -94,7 +95,7 @@ export async function onRequestPost({ request, env }) {
     contentText = body.html;
     const bytes = new TextEncoder().encode(contentText).length;
     if (bytes > MAX_TEXT_BYTES) return errSize(bytes, MAX_TEXT_BYTES, 'HTML');
-    meta = { subject: str(body.subject), description: str(body.description), icon: str(body.icon), color: str(body.color) };
+    meta = { subject: str(body.subject), description: str(body.description), icon: str(body.icon), color: str(body.color), tags: body.tags };
   }
 
   const ext = kind === 'pdf' ? 'pdf' : kind === 'md' ? 'md' : 'html';
@@ -113,11 +114,12 @@ export async function onRequestPost({ request, env }) {
   const finalColor = /^#[0-9a-fA-F]{6}$/.test(meta.color) ? meta.color : PALETTE[Math.floor(Math.random() * PALETTE.length)];
   const finalSubject = meta.subject.slice(0, 40) || '我的笔记';
   const finalDesc = meta.description.slice(0, 120) || DEFAULT_DESC[kind];
+  const finalTags = JSON.stringify(parseTags(meta.tags));
 
   await env.DB.prepare(
     `INSERT INTO courses (file, title, subject, description, icon, color, tags, html, kind, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(file, title.slice(0, 80), finalSubject, finalDesc, finalIcon, finalColor, '[]', contentText, kind, Date.now()).run();
+  ).bind(file, title.slice(0, 80), finalSubject, finalDesc, finalIcon, finalColor, finalTags, contentText, kind, Date.now()).run();
 
   return Response.json({ ok: true, file, kind });
 }
@@ -147,4 +149,19 @@ export async function onRequestDelete({ request, env }) {
 function safeTags(s) {
   try { const t = JSON.parse(s || '[]'); return Array.isArray(t) ? t : []; }
   catch { return []; }
+}
+
+// 接收前端传来的 tags（JSON 数组字符串、真数组或逗号分隔串），清洗为 ≤6 个、每个 ≤16 字
+function parseTags(v) {
+  let arr = [];
+  if (Array.isArray(v)) arr = v;
+  else if (typeof v === 'string' && v.trim()) {
+    try { const p = JSON.parse(v); if (Array.isArray(p)) arr = p; else arr = v.split(/[,，]/); }
+    catch { arr = v.split(/[,，]/); }
+  }
+  return arr
+    .map((x) => (typeof x === 'string' ? x : String(x || '')).trim())
+    .filter(Boolean)
+    .map((x) => x.slice(0, 16))
+    .slice(0, 6);
 }

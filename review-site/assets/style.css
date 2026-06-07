@@ -426,8 +426,58 @@ main {
 }
 .field-row { display: flex; gap: 12px; }
 .field-row .field { flex: 1; }
-.icon-field { flex: 0 0 84px; }
-.icon-field input { text-align: center; font-size: 18px; }
+/* 上传弹窗：AI 智能填充按钮 + 标签 chips + 图标点选网格 */
+.ai-fill-row { display: flex; align-items: center; gap: 10px; margin: -4px 0 16px; }
+.ai-fill-btn {
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  background: transparent;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  white-space: nowrap;
+}
+.ai-fill-btn:hover:not(:disabled) { background: var(--primary); color: var(--on-primary); }
+.ai-fill-btn:disabled { opacity: .55; cursor: progress; }
+.ai-fill-status { font-size: 12px; color: var(--on-surface-variant); }
+.ai-fill-status.err { color: var(--error); }
+
+.tag-chips { display: flex; flex-wrap: wrap; gap: 6px; min-height: 28px; align-items: center; }
+.tag-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--surface-container-highest);
+  color: var(--on-surface);
+  border-radius: 999px;
+  padding: 3px 6px 3px 10px;
+  font-size: 12px;
+}
+.tag-chip button { border: 0; background: none; color: var(--on-surface-variant); cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
+.tag-chip button:hover { color: var(--error); }
+.tag-empty { font-size: 12px; color: var(--on-surface-variant); }
+
+.icon-picker {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  max-height: 124px; overflow-y: auto;
+  padding: 8px;
+  border: 1px solid var(--outline, rgba(0,0,0,.12));
+  border-radius: 12px;
+  background: var(--surface-container, rgba(0,0,0,.02));
+}
+.icon-opt {
+  width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 19px; line-height: 1;
+  border: 1.5px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+.icon-opt:hover { background: var(--surface-container-highest); }
+.icon-opt.selected { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 14%, transparent); }
 
 .modal-hint { font-size: 12px; color: var(--on-surface-variant); margin: 4px 0 18px; }
 .modal-hint.err { color: var(--error); }

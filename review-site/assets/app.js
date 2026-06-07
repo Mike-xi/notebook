@@ -105,9 +105,11 @@ function openModal() {
 function closeModal() { modal.hidden = true; }
 function resetForm() {
   ['nc-title', 'nc-subject', 'nc-desc'].forEach((id) => (document.getElementById(id).value = ''));
-  document.getElementById('nc-icon').value = '📘';
   document.getElementById('nc-file').value = '';
-  hint.textContent = '支持 HTML / Markdown（≤1.5 MB）或 PDF（≤20 MB）。';
+  setTags([]);
+  selectIcon('📘');
+  setAIStatus('');
+  hint.textContent = '支持 HTML / Markdown（≤1.5 MB）或 PDF（≤20 MB）。选好文件后可让 AI 自动填充。';
   hint.classList.remove('err');
 }
 function setHint(msg, isErr) { hint.textContent = msg; hint.classList.toggle('err', !!isErr); }
@@ -119,16 +121,16 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !modal.hidden) closeModal();
 });
 
-// 选文件后：按类型提示大小上限，并自动配一个默认图标（若用户没改过）
-document.getElementById('nc-file').addEventListener('change', (e) => {
+// 选文件后：按类型提示大小上限，先给个默认类型图标，再自动触发 AI 填充
+document.getElementById('nc-file').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   if (!f) return;
   const kind = detectKind(f.name);
   const max = kind === 'pdf' ? MAX_PDF_BYTES : MAX_TEXT_BYTES;
   const label = { html: 'HTML', md: 'Markdown', pdf: 'PDF' }[kind];
   setHint(`已选 ${label}（${(f.size / 1e6).toFixed(2)} MB / 上限 ${(max / 1e6).toFixed(1)} MB）`, f.size > max);
-  const iconEl = document.getElementById('nc-icon');
-  if (!iconEl.value || ['📘', '📝', '📕'].includes(iconEl.value)) iconEl.value = KIND_ICON[kind];
+  if (['📘', '📝', '📕'].includes(iconInput.value)) selectIcon(KIND_ICON[kind]);
+  if (f.size <= max) runAIFill(false);
 });
 
 submitBtn.addEventListener('click', async () => {
@@ -150,6 +152,7 @@ submitBtn.addEventListener('click', async () => {
     fd.append('subject', document.getElementById('nc-subject').value.trim());
     fd.append('description', document.getElementById('nc-desc').value.trim());
     fd.append('icon', document.getElementById('nc-icon').value.trim());
+    fd.append('tags', JSON.stringify(ncTags));
     fd.append('kind', kind);
     fd.append('file', f, f.name);
     const res = await fetch('/api/courses', { method: 'POST', body: fd });
@@ -164,6 +167,115 @@ submitBtn.addEventListener('click', async () => {
     submitBtn.textContent = '创建';
   }
 });
+
+// ========== 图标点选 + 标签 + AI 智能填充 ==========
+// ICONS 必须与后端 functions/api/analyze.js 的 ICONS 一致
+const ICONS = [
+  '📘', '📗', '📙', '📕', '📓', '📝', '📐', '📊', '📈', '🧮', '🔢', '⚛️',
+  '🔬', '🧲', '⚡', '🌊', '🔭', '🧪', '⚗️', '🧬', '💻', '🐍', '🌐', '🤖',
+  '🧠', '⚙️', '🏗️', '🚢', '🚀', '🛰️', '🎲', '🗺️', '🌍', '💡', '🎯', '📡',
+];
+let ncTags = [];
+
+const iconPicker = document.getElementById('nc-icon-picker');
+const iconInput = document.getElementById('nc-icon');
+const tagsBox = document.getElementById('nc-tags');
+const aiBtn = document.getElementById('nc-ai');
+const aiStatus = document.getElementById('nc-ai-status');
+
+function renderIconPicker() {
+  iconPicker.innerHTML = ICONS
+    .map((e) => `<button type="button" class="icon-opt" data-icon="${e}">${e}</button>`)
+    .join('');
+}
+function selectIcon(emoji) {
+  if (!emoji) return;
+  iconInput.value = emoji;
+  iconPicker.querySelectorAll('.icon-opt').forEach((b) => {
+    b.classList.toggle('selected', b.dataset.icon === emoji);
+  });
+}
+iconPicker.addEventListener('click', (e) => {
+  const b = e.target.closest('.icon-opt');
+  if (b) selectIcon(b.dataset.icon);
+});
+
+function renderTags() {
+  if (!ncTags.length) {
+    tagsBox.innerHTML = '<span class="tag-empty">选文件后由 AI 生成，或留空</span>';
+    return;
+  }
+  tagsBox.innerHTML = ncTags
+    .map((t, i) => `<span class="tag-chip">${escapeHTML(t)}<button type="button" data-i="${i}" aria-label="移除">×</button></span>`)
+    .join('');
+}
+function setTags(arr) {
+  ncTags = (arr || []).map((x) => String(x || '').trim()).filter(Boolean).slice(0, 6);
+  renderTags();
+}
+tagsBox.addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-i]');
+  if (!b) return;
+  ncTags.splice(Number(b.dataset.i), 1);
+  renderTags();
+});
+
+function setAIStatus(msg, isErr) {
+  aiStatus.textContent = msg || '';
+  aiStatus.classList.toggle('err', !!isErr);
+}
+
+// 抽取正文纯文本（html 去标签，md 原样），交给 AI 分析
+function extractText(raw, kind) {
+  if (kind === 'html') {
+    try {
+      const doc = new DOMParser().parseFromString(raw, 'text/html');
+      doc.querySelectorAll('script,style,noscript').forEach((el) => el.remove());
+      return (doc.body?.textContent || '').replace(/\s+/g, ' ').trim();
+    } catch {
+      return raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+  }
+  return String(raw).replace(/\s+/g, ' ').trim();
+}
+
+// 调 /api/analyze 让 AI 填学科/简介/标签/图标。force=true 时覆盖已填内容（重新填充按钮）
+async function runAIFill(force = false) {
+  const f = document.getElementById('nc-file').files[0];
+  const title = document.getElementById('nc-title').value.trim();
+  if (!f && !title) { setAIStatus('先填课程名或选个文件', true); return; }
+  const kind = f ? detectKind(f.name) : 'html';
+
+  let excerpt = '';
+  if (f && kind !== 'pdf') {
+    try { excerpt = extractText(await f.text(), kind).slice(0, 4000); } catch {}
+  }
+
+  aiBtn.disabled = true;
+  setAIStatus('AI 分析中…');
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: title || (f ? f.name.replace(/\.[^.]+$/, '') : ''), kind, excerpt }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || '分析失败');
+
+    const subjEl = document.getElementById('nc-subject');
+    const descEl = document.getElementById('nc-desc');
+    if (d.subject && (force || !subjEl.value.trim())) subjEl.value = d.subject;
+    if (d.description && (force || !descEl.value.trim())) descEl.value = d.description;
+    if (Array.isArray(d.tags) && d.tags.length) setTags(d.tags);
+    if (d.icon) selectIcon(d.icon);
+    setAIStatus(kind === 'pdf' ? '✓ 已按课程名填充（PDF 暂不读正文）' : '✓ 已填充，可手动调整');
+  } catch (e) {
+    setAIStatus(e.message || '分析失败，可手动填写', true);
+  } finally {
+    aiBtn.disabled = false;
+  }
+}
+aiBtn.addEventListener('click', () => runAIFill(true));
 
 // ========== 卡片模板 ==========
 function cardHTML(c, deletable = false) {
@@ -210,4 +322,6 @@ function escapeAttr(s) {
 }
 
 // 启动
+renderIconPicker();
+selectIcon('📘');
 loadAndRender();

@@ -8,7 +8,8 @@
     // 首屏前定主题，避免浅/深闪烁；完整逻辑在 theme.js
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
   </script>
-  <link rel="stylesheet" href="/assets/style.css?v=20260607b">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=20260607c">
+  <link rel="stylesheet" href="/assets/style.css?v=20260607c">
 </head>
 <body class="home">
   <header class="topbar">
@@ -50,25 +51,38 @@
         <span>课程名称 <em>*</em></span>
         <input type="text" id="nc-title" placeholder="例如：电磁学复习" maxlength="80" autocomplete="off">
       </label>
+      <label class="field">
+        <span>笔记文件 <em>*</em></span>
+        <input type="file" id="nc-file" accept=".html,.htm,.md,.markdown,.pdf,text/html,text/markdown,application/pdf">
+      </label>
+      <p class="modal-hint" id="nc-hint">支持 HTML / Markdown（≤1.5 MB）或 PDF（≤20 MB）。选好文件后可让 AI 自动填充。</p>
+
+      <div class="ai-fill-row">
+        <button class="ai-fill-btn" id="nc-ai" type="button">✨ AI 智能填充</button>
+        <span class="ai-fill-status" id="nc-ai-status"></span>
+      </div>
+
       <div class="field-row">
         <label class="field">
           <span>学科（可选）</span>
           <input type="text" id="nc-subject" placeholder="例如：大学物理" maxlength="40" autocomplete="off">
         </label>
-        <label class="field icon-field">
-          <span>图标</span>
-          <input type="text" id="nc-icon" value="📘" maxlength="4">
+        <label class="field">
+          <span>简介（可选）</span>
+          <input type="text" id="nc-desc" placeholder="一句话描述" maxlength="120" autocomplete="off">
         </label>
       </div>
-      <label class="field">
-        <span>简介（可选）</span>
-        <input type="text" id="nc-desc" placeholder="一句话描述" maxlength="120" autocomplete="off">
-      </label>
-      <label class="field">
-        <span>笔记文件 <em>*</em></span>
-        <input type="file" id="nc-file" accept=".html,.htm,.md,.markdown,.pdf,text/html,text/markdown,application/pdf">
-      </label>
-      <p class="modal-hint" id="nc-hint">支持 HTML / Markdown（≤1.5 MB）或 PDF（≤20 MB）。</p>
+
+      <div class="field">
+        <span>标签</span>
+        <div class="tag-chips" id="nc-tags"><span class="tag-empty">选文件后由 AI 生成，或留空</span></div>
+      </div>
+
+      <div class="field">
+        <span>图标（点选一个）</span>
+        <div class="icon-picker" id="nc-icon-picker"></div>
+        <input type="hidden" id="nc-icon" value="📘">
+      </div>
       <div class="btn-row">
         <button class="btn-cancel" id="nc-cancel" type="button">取消</button>
         <button class="btn-confirm" id="nc-submit" type="button">创建</button>
@@ -77,6 +91,6 @@
   </div>
 
   <script src="/assets/theme.js?v=20260607b"></script>
-  <script src="/assets/app.js?v=20260607b"></script>
+  <script src="/assets/app.js?v=20260607c"></script>
 </body>
 </html>

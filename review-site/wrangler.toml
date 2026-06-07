@@ -17,6 +17,12 @@ database_id = "f3c5143b-9d1d-4820-b254-a220b34e1fe1"
 binding = "FILES"
 bucket_name = "cloudflare"
 
+# Workers AI 绑定（上传课程时自动生成摘要/标签/图标）。
+# 生产环境还需在 Pages 后台 Settings → Bindings 加：变量名 AI（类型 Workers AI）。
+# 本地 wrangler pages dev 用 --ai AI（走真实账号，需已设 CLOUDFLARE_API_TOKEN）。
+[ai]
+binding = "AI"
+
 # 环境变量（敏感值不写在这里，用 wrangler secret 或 Dashboard 配置）
 # 需要在 Pages 项目设置里配置：
 #   SITE_PASSWORD  - 你的访问密码
