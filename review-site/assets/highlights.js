@@ -12,6 +12,7 @@ window.NBHighlights = (function () {
   const ORDER = ['yellow', 'green', 'blue', 'pink'];
 
   let doc, win, root, file;
+  let onAskAI = null;          // 划词「问 AI」回调（reader 注入）
   let currentRange = null;
   let toolbar, popover;
   const records = new Map(); // id -> {id,start_off,end_off,text,color,note}
@@ -21,6 +22,7 @@ window.NBHighlights = (function () {
     if (started) return;
     started = true;
     doc = opts.doc; win = opts.win; root = opts.root; file = opts.file;
+    onAskAI = typeof opts.onAskAI === 'function' ? opts.onAskAI : null;
     if (!doc || !win || !root) return;
     injectStyle();
     buildParentUI();
@@ -174,11 +176,19 @@ window.NBHighlights = (function () {
   function buildParentUI() {
     toolbar = document.createElement('div');
     toolbar.className = 'nb-hl-toolbar';
-    toolbar.innerHTML = ORDER.map((c) => `<button class="nb-hl-swatch" data-c="${c}" style="background:${COLORS[c]}" title="高亮"></button>`).join('');
+    toolbar.innerHTML = ORDER.map((c) => `<button class="nb-hl-swatch" data-c="${c}" style="background:${COLORS[c]}" title="高亮"></button>`).join('')
+      + (onAskAI ? '<span class="nb-hl-sep"></span><button class="nb-hl-ask" title="问 AI">💬</button>' : '');
     toolbar.addEventListener('mousedown', (e) => e.preventDefault()); // 别让按下清掉选区
     toolbar.addEventListener('click', (e) => {
       const sw = e.target.closest('.nb-hl-swatch');
-      if (sw) createHighlight(sw.dataset.c);
+      if (sw) { createHighlight(sw.dataset.c); return; }
+      const ask = e.target.closest('.nb-hl-ask');
+      if (ask) {
+        const text = currentRange ? currentRange.toString() : '';
+        hideToolbar();
+        try { win.getSelection().removeAllRanges(); } catch {}
+        if (text && onAskAI) onAskAI(text);
+      }
     });
     document.body.appendChild(toolbar);
 

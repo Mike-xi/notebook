@@ -19,6 +19,8 @@ const bookmarksList = document.getElementById('bookmarks-list');
 const bookmarksEmpty = document.getElementById('bookmarks-empty');
 const bar = document.getElementById('reader-bar');
 const hotzone = document.getElementById('reader-hotzone');
+const chatToggle = document.getElementById('chat-toggle');
+const chatPanel = document.getElementById('chat-panel');
 
 // 课程元数据（显示标题、学科）：合并静态 courses.json 与用户创建的 /api/courses
 let courseMeta = null;
@@ -112,7 +114,7 @@ function setupContentFeatures() {
   if (kind !== 'pdf' && window.NBHighlights) {
     const win = iframe.contentWindow, doc = iframe.contentDocument;
     const root = kind === 'md' ? doc.getElementById('md-content') : (doc && doc.body);
-    if (win && doc && root) NBHighlights.init({ doc, win, root, file });
+    if (win && doc && root) NBHighlights.init({ doc, win, root, file, onAskAI: askFromSelection });
   }
 }
 
@@ -217,6 +219,7 @@ function showBar() {
 function hideBar() {
   if (barHovered) return;
   if (!bookmarksPanel.hidden) return;
+  if (chatPanel && !chatPanel.hidden) return;
   bar.classList.add('hidden');
 }
 function scheduleHide() {
@@ -240,6 +243,7 @@ bookmarksToggle.addEventListener('click', () => {
     bookmarksPanel.hidden = true;
   } else {
     document.getElementById('toc-panel').hidden = true; // 互斥：开书签即收目录
+    chatPanel.hidden = true;
     bookmarksPanel.hidden = false;
     showBar();
     loadBookmarks();
@@ -404,6 +408,7 @@ tocList.addEventListener('click', (e) => {
 tocToggle.addEventListener('click', () => {
   if (!tocPanel.hidden) { tocPanel.hidden = true; return; }
   bookmarksPanel.hidden = true;
+  chatPanel.hidden = true;
   tocPanel.hidden = false;
   showBar();
 });
@@ -417,10 +422,199 @@ function postToViewer(msg) {
 // 快捷键：Esc 关面板 / 返回
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    if (!chatPanel.hidden) { chatPanel.hidden = true; return; }
     if (!tocPanel.hidden) { tocPanel.hidden = true; return; }
     if (!bookmarksPanel.hidden) { bookmarksPanel.hidden = true; return; }
   }
 });
+
+// ========== AI 对话（RAG） ==========
+const chatMsgs = document.getElementById('chat-msgs');
+const chatInput = document.getElementById('chat-input');
+const chatForm = document.getElementById('chat-form');
+const chatStatus = document.getElementById('chat-status');
+const chatQuoteBox = document.getElementById('chat-quote');
+
+let ragTriggered = false;     // 是否已尝试建索引（首次开聊时触发）
+let ragSupported = true;      // pdf / 无 Vectorize 时为 false
+let currentQuote = '';        // 划选带入的上下文
+let chatBusy = false;
+
+function setChatStatus(msg) { if (chatStatus) chatStatus.textContent = msg || ''; }
+
+function openChat() {
+  tocPanel.hidden = true;
+  bookmarksPanel.hidden = true;
+  chatPanel.hidden = false;
+  showBar();
+  if (!ragTriggered) { ragTriggered = true; ensureIndexed(); }
+  setTimeout(() => chatInput && chatInput.focus(), 30);
+}
+
+chatToggle.addEventListener('click', () => {
+  if (!chatPanel.hidden) chatPanel.hidden = true; else openChat();
+});
+document.getElementById('chat-close').addEventListener('click', () => { chatPanel.hidden = true; });
+
+// 划词 -> 问 AI：打开面板并带入选中文本
+function askFromSelection(text) {
+  const t = (text || '').trim();
+  if (!t) return;
+  openChat();
+  currentQuote = t;
+  chatQuoteBox.hidden = false;
+  chatQuoteBox.innerHTML = `<span class="cq-label">划选</span><span class="cq-text">${escapeHTML(t.slice(0, 140))}${t.length > 140 ? '…' : ''}</span><button class="cq-clear" title="取消">✕</button>`;
+}
+chatQuoteBox.addEventListener('click', (e) => { if (e.target.closest('.cq-clear')) clearQuote(); });
+function clearQuote() { currentQuote = ''; chatQuoteBox.hidden = true; chatQuoteBox.innerHTML = ''; }
+
+// 输入框：自适应高度 + 回车发送（Shift+Enter 换行）
+function autoGrow() { chatInput.style.height = 'auto'; chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px'; }
+chatInput.addEventListener('input', autoGrow);
+chatInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+chatForm.addEventListener('submit', (e) => { e.preventDefault(); sendMessage(); });
+
+async function sendMessage() {
+  const q = chatInput.value.trim();
+  if (!q || chatBusy) return;
+  const quote = currentQuote;
+  appendMsg('user', q + (quote ? '　🔖（针对划选内容）' : ''));
+  chatInput.value = ''; autoGrow(); clearQuote();
+  chatBusy = true;
+  const thinking = appendMsg('ai', '思考中…', null, true);
+  try {
+    const res = await fetch('/api/rag/chat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file, question: q, quote }),
+    });
+    const d = await res.json().catch(() => ({}));
+    thinking.remove();
+    if (!res.ok) throw new Error(d.error || '请求失败');
+    appendMsg('ai', d.answer || '(没有得到回答)', d.sources || []);
+  } catch (e) {
+    thinking.remove();
+    appendMsg('ai', '⚠️ ' + (e.message || '请求失败'));
+  } finally {
+    chatBusy = false;
+  }
+}
+
+function appendMsg(role, text, sources, thinking) {
+  const hintEl = document.getElementById('chat-hint');
+  if (hintEl) hintEl.remove();
+  const wrap = document.createElement('div');
+  wrap.className = 'chat-msg ' + role + (thinking ? ' thinking' : '');
+  const bubble = document.createElement('div');
+  bubble.className = 'chat-bubble';
+  bubble.textContent = text;
+  wrap.appendChild(bubble);
+  if (sources && sources.length) {
+    const src = document.createElement('div');
+    src.className = 'chat-sources';
+    src.innerHTML = '<span class="cs-label">📍 相关位置</span>'
+      + sources.map((h) => `<button class="cs-chip" data-h="${escapeAttr(h)}">${escapeHTML(h)}</button>`).join('');
+    wrap.appendChild(src);
+  }
+  chatMsgs.appendChild(wrap);
+  chatMsgs.scrollTop = chatMsgs.scrollHeight;
+  return wrap;
+}
+
+// 点「相关位置」标题 -> 复用 TOC 跳转定位
+chatMsgs.addEventListener('click', (e) => {
+  const chip = e.target.closest('.cs-chip');
+  if (chip) jumpToHeading(chip.dataset.h);
+});
+function jumpToHeading(title) {
+  if (!title || !tocItems.length) return;
+  let it = tocItems.find((t) => t.title === title);
+  if (!it) it = tocItems.find((t) => t.title && (t.title.includes(title) || title.includes(t.title)));
+  if (it && it.jump) { it.jump(); showBar(); }
+}
+
+// ===== 建立 / 校验索引 =====
+async function ensureIndexed() {
+  if (kind === 'pdf') { ragSupported = false; setChatStatus('PDF 暂不支持全文检索，可基于高亮/书签问答'); return; }
+  let sections = [];
+  try { sections = kind === 'md' ? await extractSectionsMd() : extractSectionsFromDoc(iframe.contentDocument); } catch {}
+  const joined = sections.map((s) => s.text).join('\n').trim();
+  if (!joined) { setChatStatus(''); return; }
+  const hash = hashText(joined);
+  try {
+    const st = await fetch(`/api/rag/status?file=${encodeURIComponent(file)}`).then((r) => r.json());
+    if (st.hasVectorize === false) { ragSupported = false; setChatStatus('未启用向量检索'); return; }
+    if (st.indexed && st.hash === hash) { setChatStatus(st.chunks ? `已索引 ${st.chunks} 段` : ''); return; }
+  } catch {}
+  setChatStatus('正在建立索引…');
+  try {
+    const res = await fetch('/api/rag/ingest', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file, hash, sections }),
+    });
+    const d = await res.json().catch(() => ({}));
+    setChatStatus(res.ok ? (d.chunks ? `已索引 ${d.chunks} 段` : '') : '索引失败（仍可直接提问）');
+  } catch { setChatStatus('索引失败（仍可直接提问）'); }
+}
+
+// html：用 Range 取每个 h1-h3 标题到下一个标题之间的纯文本，保留小节结构
+function extractSectionsFromDoc(doc) {
+  const body = doc && doc.body;
+  if (!body) return [];
+  const heads = [...body.querySelectorAll('h1, h2, h3')];
+  if (!heads.length) {
+    const t = (body.innerText || body.textContent || '').replace(/\s+/g, ' ').trim();
+    return t ? [{ heading: '全文', level: 0, text: t.slice(0, 4000) }] : [];
+  }
+  const sections = [];
+  try {
+    const r0 = doc.createRange(); r0.setStart(body, 0); r0.setEndBefore(heads[0]);
+    const lead = r0.toString().replace(/\s+/g, ' ').trim();
+    if (lead) sections.push({ heading: '(开头)', level: 0, text: lead.slice(0, 4000) });
+  } catch {}
+  heads.forEach((h, i) => {
+    const title = (h.textContent || '').trim();
+    if (!title) return;
+    let text = '';
+    try {
+      const r = doc.createRange();
+      r.setStartAfter(h);
+      if (i + 1 < heads.length) r.setEndBefore(heads[i + 1]); else r.setEndAfter(body.lastChild || body);
+      text = r.toString().replace(/\s+/g, ' ').trim();
+    } catch {}
+    sections.push({ heading: title, level: +h.tagName[1], text: (title + '。' + text).slice(0, 4000) });
+  });
+  return sections;
+}
+
+async function extractSectionsMd() {
+  let raw = '';
+  try { raw = await fetch(sourceURL).then((r) => r.text()); } catch { return []; }
+  const lines = String(raw).split(/\r?\n/);
+  const out = [];
+  let cur = { heading: '(开头)', level: 0, lines: [] };
+  for (const ln of lines) {
+    const m = /^(#{1,3})\s+(.*)/.exec(ln);
+    if (m) {
+      if (cur.lines.join('').trim() || cur.heading !== '(开头)') out.push(cur);
+      cur = { heading: m[2].trim(), level: m[1].length, lines: [] };
+    } else cur.lines.push(ln);
+  }
+  if (cur.lines.join('').trim() || !out.length) out.push(cur);
+  return out
+    .map((s) => ({
+      heading: s.heading, level: s.level,
+      text: (s.heading + '。' + s.lines.join(' ')).replace(/[#*`>_]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 4000),
+    }))
+    .filter((s) => s.text);
+}
+
+function hashText(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
 
 function escapeHTML(s) {
   return String(s || '').replace(/[&<>"']/g, (c) => ({

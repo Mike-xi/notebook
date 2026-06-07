@@ -23,6 +23,13 @@ bucket_name = "cloudflare"
 [ai]
 binding = "AI"
 
+# Vectorize 向量库（课程笔记 RAG 检索）。索引 notebook-notes（1024 维 / cosine）。
+# 生产由 wrangler.toml 自动应用（本项目绑定已托管给 wrangler.toml）。
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "notebook-notes"
+remote = true   # 本地 wrangler dev 直连远程索引（生产无副作用，部署时绑定本就是远程）
+
 # 环境变量（敏感值不写在这里，用 wrangler secret 或 Dashboard 配置）
 # 需要在 Pages 项目设置里配置：
 #   SITE_PASSWORD  - 你的访问密码

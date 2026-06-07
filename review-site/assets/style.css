@@ -722,6 +722,124 @@ body.reader {
 .toc-item.lvl-2 { padding-left: 40px; color: var(--on-surface-variant); }
 
 /* ========================================
+   AI 对话面板（RAG）
+   ======================================== */
+#chat-panel {
+  position: fixed;
+  top: 64px;
+  right: 16px;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 13;
+  overflow: hidden;
+}
+.chat-status { font-size: 11px; font-weight: 400; color: var(--on-surface-variant); margin-left: 6px; }
+.chat-msgs {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.chat-hint { font-size: 12.5px; line-height: 1.6; color: var(--on-surface-variant); margin: 4px 2px; }
+.chat-msg { display: flex; flex-direction: column; gap: 6px; max-width: 100%; }
+.chat-msg.user { align-items: flex-end; }
+.chat-msg.ai { align-items: flex-start; }
+.chat-bubble {
+  padding: 9px 12px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  line-height: 1.62;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 90%;
+}
+.chat-msg.user .chat-bubble { background: var(--primary); color: var(--on-primary); border-bottom-right-radius: 4px; }
+.chat-msg.ai .chat-bubble { background: var(--surface-container-high); color: var(--on-surface); border-bottom-left-radius: 4px; }
+.chat-msg.thinking .chat-bubble { color: var(--on-surface-variant); animation: chat-pulse 1.1s ease-in-out infinite; }
+@keyframes chat-pulse { 0%,100% { opacity: .5; } 50% { opacity: 1; } }
+.chat-sources { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-left: 2px; }
+.cs-label { font-size: 11px; color: var(--on-surface-variant); }
+.cs-chip {
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container-high);
+  color: var(--primary);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11.5px;
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background-color var(--transition);
+}
+.cs-chip:hover { background: var(--surface-container-highest); }
+.chat-quote {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 12px;
+  padding: 7px 10px;
+  background: var(--surface-container-high);
+  border-left: 3px solid var(--primary);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.cq-label { color: var(--primary); font-weight: 600; flex: none; }
+.cq-text { color: var(--on-surface-variant); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.cq-clear { border: none; background: none; color: var(--on-surface-variant); cursor: pointer; font-size: 13px; flex: none; }
+.cq-clear:hover { color: var(--error); }
+.chat-form {
+  display: flex; align-items: flex-end; gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--outline-variant);
+}
+#chat-input {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  padding: 9px 12px;
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.5;
+  background: var(--surface-container-lowest, var(--surface-container));
+  color: var(--on-surface);
+  max-height: 120px;
+}
+#chat-input:focus { outline: none; border-color: var(--primary); }
+#chat-send {
+  flex: none;
+  width: 38px; height: 38px;
+  border: none;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 17px;
+  cursor: pointer;
+  transition: filter var(--transition);
+}
+#chat-send:hover { filter: brightness(1.06); }
+@media (max-width: 640px) {
+  #chat-panel { right: 8px; left: 8px; width: auto; }
+}
+
+/* 划词浮条里的「问 AI」按钮 */
+.nb-hl-sep { width: 1px; align-self: stretch; margin: 4px 2px; background: rgba(255,255,255,.25); }
+.nb-hl-ask {
+  border: none; background: transparent; cursor: pointer;
+  font-size: 15px; line-height: 1; padding: 0 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+/* ========================================
    高亮：选区浮条 + 批注弹层（建在父页）
    ======================================== */
 .nb-hl-toolbar {
