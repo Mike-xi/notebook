@@ -51,6 +51,13 @@
   <aside id="chat-panel" hidden>
     <div class="panel-header">
       <h3>AI 对话 <span id="chat-status" class="chat-status"></span></h3>
+      <select id="chat-model" class="chat-model-select" title="选择 AI 模型">
+        <option value="@cf/meta/llama-3.3-70b-instruct-fp8-fast">Llama 3.3 70B (均衡)</option>
+        <option value="@cf/qwen/qwen1.5-14b-chat-awq">Qwen 1.5 14B (中文强)</option>
+        <option value="@cf/meta/llama-3-8b-instruct">Llama 3 8B (较快)</option>
+        <option value="@cf/google/gemma-7b-it">Gemma 7B (较新)</option>
+        <option value="@cf/deepseek-ai/deepseek-r1-distill-qwen-32b">DeepSeek R1 (深度思考)</option>
+      </select>
       <button class="icon-btn" id="chat-close">✕</button>
     </div>
     <div id="chat-msgs" class="chat-msgs">
