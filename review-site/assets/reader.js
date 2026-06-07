@@ -438,7 +438,10 @@ const chatModelSelect = document.getElementById('chat-model');
 
 if (chatModelSelect) {
   const savedModel = localStorage.getItem('nb-chat-model');
-  if (savedModel) chatModelSelect.value = savedModel;
+  const validOption = Array.from(chatModelSelect.options).some(opt => opt.value === savedModel);
+  if (savedModel && validOption) {
+    chatModelSelect.value = savedModel;
+  }
   chatModelSelect.addEventListener('change', () => {
     localStorage.setItem('nb-chat-model', chatModelSelect.value);
   });

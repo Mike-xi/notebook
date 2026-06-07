@@ -69,8 +69,10 @@ export async function onRequestPost({ request, env }) {
     const rsp = r && (r.response ?? r.result?.response);
     answer = typeof rsp === 'string' ? rsp : (rsp ? JSON.stringify(rsp) : '');
     
-    // Strip <think>...</think> tags if present
-    answer = answer.replace(/<think>[\s\S]*?<\/think>\n*/g, '');
+    // Strip <think>...</think> tags if present, specifically for deepseek-r1
+    if (model.includes('deepseek-r1')) {
+      answer = answer.replace(/<think>[\s\S]*?<\/think>\n*/g, '');
+    }
   } catch {
     return Response.json({ error: 'AI 调用失败，请稍后再试' }, { status: 502 });
   }
