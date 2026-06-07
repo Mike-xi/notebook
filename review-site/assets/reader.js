@@ -434,6 +434,15 @@ const chatInput = document.getElementById('chat-input');
 const chatForm = document.getElementById('chat-form');
 const chatStatus = document.getElementById('chat-status');
 const chatQuoteBox = document.getElementById('chat-quote');
+const chatModelSelect = document.getElementById('chat-model');
+
+if (chatModelSelect) {
+  const savedModel = localStorage.getItem('nb-chat-model');
+  if (savedModel) chatModelSelect.value = savedModel;
+  chatModelSelect.addEventListener('change', () => {
+    localStorage.setItem('nb-chat-model', chatModelSelect.value);
+  });
+}
 
 let ragTriggered = false;     // 是否已尝试建索引（首次开聊时触发）
 let ragSupported = true;      // pdf / 无 Vectorize 时为 false
@@ -485,9 +494,10 @@ async function sendMessage() {
   chatBusy = true;
   const thinking = appendMsg('ai', '思考中…', null, true);
   try {
+    const model = chatModelSelect ? chatModelSelect.value : undefined;
     const res = await fetch('/api/rag/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ file, question: q, quote }),
+      body: JSON.stringify({ file, question: q, quote, model }),
     });
     const d = await res.json().catch(() => ({}));
     thinking.remove();

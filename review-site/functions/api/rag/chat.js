@@ -16,6 +16,8 @@ export async function onRequestPost({ request, env }) {
   const file = str(b?.file);
   const question = str(b?.question).slice(0, 1000);
   const quote = str(b?.quote).slice(0, 2000);
+  const reqModel = str(b?.model);
+  const model = reqModel || CHAT_MODEL;
   if (!question) return Response.json({ error: '请输入问题' }, { status: 400 });
 
   // 1) 向量检索（按当前课程过滤）
@@ -59,13 +61,16 @@ export async function onRequestPost({ request, env }) {
 
   let answer = '';
   try {
-    const r = await env.AI.run(CHAT_MODEL, {
+    const r = await env.AI.run(model, {
       messages: [{ role: 'system', content: sys }, { role: 'user', content: user }],
       max_tokens: 700,
       temperature: 0.3,
     });
     const rsp = r && (r.response ?? r.result?.response);
     answer = typeof rsp === 'string' ? rsp : (rsp ? JSON.stringify(rsp) : '');
+    
+    // Strip <think>...</think> tags if present
+    answer = answer.replace(/<think>[\s\S]*?<\/think>\n*/g, '');
   } catch {
     return Response.json({ error: 'AI 调用失败，请稍后再试' }, { status: 502 });
   }

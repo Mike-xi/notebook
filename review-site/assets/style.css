@@ -622,6 +622,17 @@ body.reader {
   border-bottom: 1px solid var(--outline-variant);
 }
 .panel-header h3 { font-size: 14px; font-weight: 500; }
+.chat-model-select {
+  font-size: 12px;
+  padding: 2px 4px;
+  background: var(--surface);
+  color: var(--on-surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: 4px;
+  max-width: 130px;
+  margin-right: 8px;
+  margin-left: auto;
+}
 #bookmarks-list {
   list-style: none;
   padding: 8px;
