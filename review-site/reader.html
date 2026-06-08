@@ -8,7 +8,7 @@
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
   </script>
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=20260607c">
-  <link rel="stylesheet" href="/assets/style.css?v=20260608c">
+  <link rel="stylesheet" href="/assets/style.css?v=20260608d">
 </head>
 <body class="reader">
   <iframe id="content" src="" title="复习文档"></iframe>
@@ -50,7 +50,10 @@
   <aside id="chat-panel" hidden>
     <div class="panel-header">
       <h3>AI 对话 <span id="chat-status" class="chat-status"></span></h3>
-      <button class="icon-btn" id="chat-close">✕</button>
+      <div class="ph-actions">
+        <button class="icon-btn" id="chat-clear" title="清空对话历史">🗑</button>
+        <button class="icon-btn" id="chat-close" title="关闭">✕</button>
+      </div>
     </div>
     <div class="chat-model-bar">
       <span class="cmb-icon" aria-hidden="true">🧠</span>
@@ -71,7 +74,8 @@
   </aside>
 
   <script src="/assets/theme.js?v=20260608a"></script>
+  <script src="/assets/md.js?v=20260608d"></script>
   <script src="/assets/highlights.js?v=20260607d"></script>
-  <script src="/assets/reader.js?v=20260608c"></script>
+  <script src="/assets/reader.js?v=20260608d"></script>
 </body>
 </html>

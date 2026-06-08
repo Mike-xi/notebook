@@ -3,8 +3,10 @@
 // 「全能问答」：把用户的全部课程（动态课程含正文摘录 + 静态课程元数据）、阅读进度、
 // 操作日志拼成上下文，交给所选模型作答。鉴权由 _middleware.js 处理。
 // GET /api/omni -> { models, default }（前端下拉用，与课程内对话共用同一份清单）
-import { ensureCoursesSchema, ensureLogsSchema } from '../_lib/db.js';
-import { CHAT_MODELS, CHAT_MODEL, resolveChatModel } from '../_lib/rag.js';
+import { ensureCoursesSchema, ensureLogsSchema, getChatMessages, appendChatMessages } from '../_lib/db.js';
+import { CHAT_MODELS, CHAT_MODEL, resolveChatModel, extractAIText, stripThink } from '../_lib/rag.js';
+
+const OMNI_SCOPE = 'omni';
 
 const str = (v) => (typeof v === 'string' ? v : v == null ? '' : String(v)).trim();
 const stripText = (html) => String(html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -85,21 +87,33 @@ export async function onRequestPost({ request, env }) {
   user += `问题：${question}`;
   user = user.slice(0, 16000);
 
+  // 历史多轮（保留约一个月）
+  const histRows = await getChatMessages(env, OMNI_SCOPE, 40);
+  const history = histRows.slice(-8).map((m) => ({
+    role: m.role === 'assistant' ? 'assistant' : 'user',
+    content: String(m.content).slice(0, 1500),
+  }));
+
   let answer = '';
   try {
     const r = await env.AI.run(model, {
-      messages: [{ role: 'system', content: sys }, { role: 'user', content: user }],
+      messages: [{ role: 'system', content: sys }, ...history, { role: 'user', content: user }],
       max_tokens: 800,
       temperature: 0.3,
     });
-    const rsp = r && (r.response ?? r.result?.response);
-    answer = typeof rsp === 'string' ? rsp : (rsp ? JSON.stringify(rsp) : '');
-    if (model.includes('deepseek-r1')) {
-      answer = answer.replace(/<think>[\s\S]*?<\/think>\n*/g, '');
-    }
-  } catch {
-    return Response.json({ error: 'AI 调用失败，请稍后再试' }, { status: 502 });
+    answer = stripThink(extractAIText(r));
+  } catch (e) {
+    const msg = e && e.message ? String(e.message).slice(0, 140) : '未知错误';
+    return Response.json({ error: 'AI 调用失败：' + msg }, { status: 502 });
+  }
+  if (!answer) {
+    return Response.json({ error: '该模型没有返回内容，换个模型再试试' }, { status: 502 });
   }
 
-  return Response.json({ answer: answer.trim() });
+  await appendChatMessages(env, OMNI_SCOPE, [
+    { role: 'user', content: question },
+    { role: 'assistant', content: answer },
+  ]);
+
+  return Response.json({ answer });
 }

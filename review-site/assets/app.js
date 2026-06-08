@@ -148,8 +148,25 @@ if (omniModel) {
   omniModel.addEventListener('change', () => localStorage.setItem('nb-chat-model', omniModel.value));
 }
 
+let omniHistLoaded = false;
+async function loadOmniHistory() {
+  if (omniHistLoaded) return;
+  omniHistLoaded = true;
+  try {
+    const r = await fetch('/api/chat-history?scope=omni');
+    const d = await r.json().catch(() => ({}));
+    const msgs = (d && d.messages) || [];
+    if (msgs.length) {
+      const hintEl = document.getElementById('omni-hint');
+      if (hintEl) hintEl.remove();
+      for (const m of msgs) omniAppend(m.role === 'assistant' ? 'ai' : 'user', m.content);
+    }
+  } catch {}
+}
+
 function openOmni() {
   loadOmniModels();
+  loadOmniHistory();
   omniPanel.hidden = false;
   setTimeout(() => omniInput && omniInput.focus(), 30);
 }
@@ -157,6 +174,15 @@ document.getElementById('omni-btn').addEventListener('click', () => {
   omniPanel.hidden ? openOmni() : (omniPanel.hidden = true);
 });
 document.getElementById('omni-close').addEventListener('click', () => { omniPanel.hidden = true; });
+
+const omniClearBtn = document.getElementById('omni-clear');
+if (omniClearBtn) {
+  omniClearBtn.addEventListener('click', async () => {
+    if (!confirm('清空全能问答的对话历史？')) return;
+    try { await fetch('/api/chat-history', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scope: 'omni' }) }); } catch {}
+    omniMsgs.innerHTML = '<p class="chat-hint" id="omni-hint">我了解你所有的课程、阅读进度，以及上传 / 登录等操作记录。问我「我都上传过哪些笔记」「最近读到哪了」「把概率和 Python 的重点对比一下」都可以。</p>';
+  });
+}
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !omniPanel.hidden) omniPanel.hidden = true; });
 
 function omniAppend(role, text, thinking) {
@@ -166,7 +192,12 @@ function omniAppend(role, text, thinking) {
   wrap.className = 'chat-msg ' + role + (thinking ? ' thinking' : '');
   const bubble = document.createElement('div');
   bubble.className = 'chat-bubble';
-  bubble.textContent = text;
+  if (role === 'ai' && !thinking && window.renderMarkdown) {
+    bubble.classList.add('md');
+    bubble.innerHTML = window.renderMarkdown(text);
+  } else {
+    bubble.textContent = text;
+  }
   wrap.appendChild(bubble);
   omniMsgs.appendChild(wrap);
   omniMsgs.scrollTop = omniMsgs.scrollHeight;

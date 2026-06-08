@@ -74,6 +74,68 @@ export async function logEvent(env, type, detail = '') {
   } catch {}
 }
 
+// AI 对话历史：scope 区分会话（课程用 file，全能问答用 'omni'），保留约 30 天。
+let chatReady = false;
+export async function ensureChatSchema(env) {
+  if (chatReady) return;
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS chat_history (
+       id         INTEGER PRIMARY KEY AUTOINCREMENT,
+       scope      TEXT NOT NULL,
+       role       TEXT NOT NULL,
+       content    TEXT NOT NULL,
+       created_at INTEGER NOT NULL
+     )`
+  ).run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_chat_scope ON chat_history(scope, created_at)').run();
+  chatReady = true;
+}
+
+const CHAT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;   // 保留约一个月
+
+// 读取某会话近一个月的历史（按时间升序）。失败返回空数组。
+export async function getChatMessages(env, scope, limit = 60) {
+  try {
+    if (!env?.DB || !scope) return [];
+    await ensureChatSchema(env);
+    const r = await env.DB.prepare(
+      'SELECT role, content, created_at FROM chat_history WHERE scope = ? AND created_at >= ? ORDER BY created_at ASC LIMIT ?'
+    ).bind(scope, Date.now() - CHAT_RETENTION_MS, limit).all();
+    return r.results || [];
+  } catch { return []; }
+}
+
+// 追加若干条消息，并以一定概率顺手清理过期历史。任何失败都吞掉，不影响对话主流程。
+export async function appendChatMessages(env, scope, turns) {
+  try {
+    if (!env?.DB || !scope || !Array.isArray(turns) || !turns.length) return;
+    await ensureChatSchema(env);
+    const now = Date.now();
+    const stmt = env.DB.prepare('INSERT INTO chat_history (scope, role, content, created_at) VALUES (?, ?, ?, ?)');
+    const batch = turns
+      .filter((t) => t && t.content)
+      .map((t, i) => stmt.bind(
+        scope,
+        t.role === 'assistant' ? 'assistant' : 'user',
+        String(t.content).slice(0, 8000),
+        now + i,                       // +i 保证同批次插入的先后顺序
+      ));
+    if (batch.length) await env.DB.batch(batch);
+    if (Math.random() < 0.2) {
+      await env.DB.prepare('DELETE FROM chat_history WHERE created_at < ?').bind(now - CHAT_RETENTION_MS).run();
+    }
+  } catch {}
+}
+
+// 清空某会话的历史。
+export async function clearChatMessages(env, scope) {
+  try {
+    if (!env?.DB || !scope) return;
+    await ensureChatSchema(env);
+    await env.DB.prepare('DELETE FROM chat_history WHERE scope = ?').bind(scope).run();
+  } catch {}
+}
+
 let hlReady = false;
 export async function ensureHighlightsSchema(env) {
   if (hlReady) return;

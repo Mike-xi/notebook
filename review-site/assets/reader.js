@@ -471,13 +471,40 @@ function openChat() {
   chatPanel.hidden = false;
   showBar();
   if (!ragTriggered) { ragTriggered = true; ensureIndexed(); }
+  loadChatHistory();
   setTimeout(() => chatInput && chatInput.focus(), 30);
+}
+
+// 载入近一个月的历史对话（仅一次）
+let histLoaded = false;
+async function loadChatHistory() {
+  if (histLoaded || !file) return;
+  histLoaded = true;
+  try {
+    const r = await fetch('/api/chat-history?scope=' + encodeURIComponent(file));
+    const d = await r.json().catch(() => ({}));
+    const msgs = (d && d.messages) || [];
+    if (msgs.length) {
+      const hintEl = document.getElementById('chat-hint');
+      if (hintEl) hintEl.remove();
+      for (const m of msgs) appendMsg(m.role === 'assistant' ? 'ai' : 'user', m.content);
+    }
+  } catch {}
 }
 
 chatToggle.addEventListener('click', () => {
   if (!chatPanel.hidden) chatPanel.hidden = true; else openChat();
 });
 document.getElementById('chat-close').addEventListener('click', () => { chatPanel.hidden = true; });
+
+const chatClearBtn = document.getElementById('chat-clear');
+if (chatClearBtn) {
+  chatClearBtn.addEventListener('click', async () => {
+    if (!confirm('清空这门课程的对话历史？')) return;
+    try { await fetch('/api/chat-history', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scope: file }) }); } catch {}
+    chatMsgs.innerHTML = '<p class="chat-hint" id="chat-hint">问我这篇笔记里的内容——我会带你定位到大致小节，并参考你的高亮和书签。也可以在正文里划选一段文字再「💬 问 AI」。</p>';
+  });
+}
 
 // 划词 -> 问 AI：打开面板并带入选中文本
 function askFromSelection(text) {
@@ -532,7 +559,13 @@ function appendMsg(role, text, sources, thinking) {
   wrap.className = 'chat-msg ' + role + (thinking ? ' thinking' : '');
   const bubble = document.createElement('div');
   bubble.className = 'chat-bubble';
-  bubble.textContent = text;
+  // AI 回答按 Markdown 渲染；用户消息与「思考中…」保持纯文本
+  if (role === 'ai' && !thinking && window.renderMarkdown) {
+    bubble.classList.add('md');
+    bubble.innerHTML = window.renderMarkdown(text);
+  } else {
+    bubble.textContent = text;
+  }
   wrap.appendChild(bubble);
   if (sources && sources.length) {
     const src = document.createElement('div');

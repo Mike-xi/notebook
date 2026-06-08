@@ -2,8 +2,8 @@
 //   -> { answer, sources:[heading], retrieved }
 // 检索 Vectorize（按 file 过滤）+ 取用户高亮/书签 -> 拼 prompt -> llama-3.3-70b 作答。
 // 鉴权由 _middleware.js 处理。
-import { ensureRagSchema, embed, CHAT_MODEL, CHAT_MODELS, resolveChatModel } from '../../_lib/rag.js';
-import { ensureHighlightsSchema } from '../../_lib/db.js';
+import { ensureRagSchema, embed, CHAT_MODEL, CHAT_MODELS, resolveChatModel, extractAIText, stripThink } from '../../_lib/rag.js';
+import { ensureHighlightsSchema, getChatMessages, appendChatMessages } from '../../_lib/db.js';
 
 const str = (v) => (typeof v === 'string' ? v : v == null ? '' : String(v)).trim();
 
@@ -63,22 +63,38 @@ export async function onRequestPost({ request, env }) {
   if (quote) user += `【我正在看的段落】\n${quote}\n\n`;
   user += `问题：${question}`;
 
+  // 历史多轮（保留约一个月，取最近若干条作为上下文；存的是纯问答，不含本轮检索拼接）
+  let history = [];
+  if (file) {
+    const rows = await getChatMessages(env, file, 40);
+    history = rows.slice(-8).map((m) => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: String(m.content).slice(0, 1500),
+    }));
+  }
+
   let answer = '';
   try {
     const r = await env.AI.run(model, {
-      messages: [{ role: 'system', content: sys }, { role: 'user', content: user }],
+      messages: [{ role: 'system', content: sys }, ...history, { role: 'user', content: user }],
       max_tokens: 700,
       temperature: 0.3,
     });
-    const rsp = r && (r.response ?? r.result?.response);
-    answer = typeof rsp === 'string' ? rsp : (rsp ? JSON.stringify(rsp) : '');
-    
-    // Strip <think>...</think> tags if present, specifically for deepseek-r1
-    if (model.includes('deepseek-r1')) {
-      answer = answer.replace(/<think>[\s\S]*?<\/think>\n*/g, '');
-    }
-  } catch {
-    return Response.json({ error: 'AI 调用失败，请稍后再试' }, { status: 502 });
+    answer = stripThink(extractAIText(r));
+  } catch (e) {
+    const msg = e && e.message ? String(e.message).slice(0, 140) : '未知错误';
+    return Response.json({ error: 'AI 调用失败：' + msg }, { status: 502 });
+  }
+  if (!answer) {
+    return Response.json({ error: '该模型没有返回内容，换个模型再试试' }, { status: 502 });
+  }
+
+  // 落库历史（纯问答），失败不影响返回
+  if (file) {
+    await appendChatMessages(env, file, [
+      { role: 'user', content: question },
+      { role: 'assistant', content: answer },
+    ]);
   }
 
   // 4) 来源小节（去重）

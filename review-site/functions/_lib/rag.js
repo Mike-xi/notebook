@@ -2,13 +2,13 @@
 export const EMBED_MODEL = '@cf/baai/bge-m3';                       // 1024 维，多语言（中文友好）
 
 // 对话可选模型：白名单 + 单一数据源（前端下拉与后端校验都用它，避免两处写死跑偏）。
-// 第一个为默认。仅保留 Workers AI 当前在售、未弃用的模型 ID。
+// 第一个为默认。仅保留 Workers AI 当前在售、且用标准 messages 接口稳定可用的模型 ID。
 export const CHAT_MODELS = [
-  { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',    label: 'Llama 3.3 70B', hint: '均衡 · 默认' },
-  { id: '@cf/qwen/qwen1.5-14b-chat-awq',               label: 'Qwen 1.5 14B',  hint: '中文流畅' },
-  { id: '@cf/meta/llama-3.1-8b-instruct',              label: 'Llama 3.1 8B',  hint: '轻快' },
-  { id: '@cf/google/gemma-4-26b-a4b-it',               label: 'Gemma 4 26B',   hint: '较新' },
-  { id: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b', label: 'DeepSeek R1',  hint: '深度思考' },
+  { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',     label: 'Llama 3.3 70B',  hint: '均衡 · 默认' },
+  { id: '@cf/google/gemma-3-12b-it',                    label: 'Gemma 3 12B',    hint: '中文流畅' },
+  { id: '@cf/mistralai/mistral-small-3.1-24b-instruct', label: 'Mistral Small',  hint: '综合较强' },
+  { id: '@cf/meta/llama-3.1-8b-instruct',               label: 'Llama 3.1 8B',   hint: '轻快' },
+  { id: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b', label: 'DeepSeek R1',    hint: '深度思考' },
 ];
 export const CHAT_MODEL = CHAT_MODELS[0].id;
 const CHAT_MODEL_IDS = new Set(CHAT_MODELS.map((m) => m.id));
@@ -16,6 +16,23 @@ const CHAT_MODEL_IDS = new Set(CHAT_MODELS.map((m) => m.id));
 // 把客户端传来的模型 ID 收敛到白名单内，非法/缺省一律回退默认，避免乱调模型。
 export function resolveChatModel(id) {
   return CHAT_MODEL_IDS.has(String(id || '')) ? String(id) : CHAT_MODEL;
+}
+
+// 从 Workers AI 各种返回形态里稳健地取出文本（不同模型字段不一致）。
+export function extractAIText(r) {
+  if (r == null) return '';
+  if (typeof r === 'string') return r;
+  const cand = r.response ?? r.result?.response ?? r.output_text
+    ?? r.result?.output_text ?? r.choices?.[0]?.message?.content ?? r.message?.content;
+  if (typeof cand === 'string') return cand;
+  if (cand != null) return typeof cand === 'object' ? JSON.stringify(cand) : String(cand);
+  if (typeof r.result === 'string') return r.result;
+  return '';
+}
+
+// 去掉「思考型」模型可能输出的 <think>…</think> 段。
+export function stripThink(s) {
+  return String(s || '').replace(/<think>[\s\S]*?<\/think>\s*/gi, '').trim();
 }
 
 const str = (v) => (typeof v === 'string' ? v : v == null ? '' : String(v)).trim();

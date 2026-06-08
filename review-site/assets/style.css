@@ -667,6 +667,7 @@ body.reader {
   border-bottom: 1px solid var(--outline-variant);
 }
 .panel-header h3 { font-size: 14px; font-weight: 500; }
+.ph-actions { display: flex; align-items: center; gap: 2px; }
 
 /* AI 模型切换条：独占一行，custom 样式的下拉 + 圆角胶囊 */
 .chat-model-bar {
@@ -858,6 +859,40 @@ body.reader {
 .chat-msg.ai .chat-bubble { background: var(--surface-container-high); color: var(--on-surface); border-bottom-left-radius: 4px; }
 .chat-msg.thinking .chat-bubble { color: var(--on-surface-variant); animation: chat-pulse 1.1s ease-in-out infinite; }
 @keyframes chat-pulse { 0%,100% { opacity: .5; } 50% { opacity: 1; } }
+
+/* AI 回答的 Markdown 渲染 */
+.chat-bubble.md { white-space: normal; }
+.chat-bubble.md > :first-child { margin-top: 0; }
+.chat-bubble.md > :last-child { margin-bottom: 0; }
+.chat-bubble.md p { margin: 0 0 8px; }
+.chat-bubble.md ul, .chat-bubble.md ol { margin: 4px 0 8px; padding-left: 20px; }
+.chat-bubble.md li { margin: 2px 0; }
+.chat-bubble.md h4 { font-size: 15px; font-weight: 600; margin: 10px 0 6px; }
+.chat-bubble.md h5 { font-size: 13.5px; font-weight: 600; margin: 8px 0 4px; }
+.chat-bubble.md code {
+  background: color-mix(in srgb, var(--on-surface) 12%, transparent);
+  padding: 1px 5px;
+  border-radius: 5px;
+  font-size: .92em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.chat-bubble.md pre {
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: 8px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  margin: 6px 0;
+}
+.chat-bubble.md pre code { background: none; padding: 0; }
+.chat-bubble.md a { color: var(--primary); text-decoration: underline; }
+.chat-bubble.md blockquote {
+  margin: 6px 0;
+  padding: 2px 10px;
+  border-left: 3px solid var(--outline-variant);
+  color: var(--on-surface-variant);
+}
+.chat-bubble.md hr { border: none; border-top: 1px solid var(--outline-variant); margin: 8px 0; }
 .chat-sources { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-left: 2px; }
 .cs-label { font-size: 11px; color: var(--on-surface-variant); }
 .cs-chip {
