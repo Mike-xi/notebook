@@ -28,5 +28,15 @@
     "color": "#0EA5E9",
     "kind": "pdf",
     "tags": ["物理", "大纲", "期末"]
+  },
+  {
+    "file": "osiris.html",
+    "title": "OSIRIS 全球情报大屏",
+    "subject": "OSINT",
+    "description": "实时全球开源情报地图 · 航班/地震/CCTV/新闻直播",
+    "icon": "🛰️",
+    "color": "#00E5FF",
+    "kind": "html",
+    "tags": ["OSINT", "情报", "实时地图"]
   }
 ]
