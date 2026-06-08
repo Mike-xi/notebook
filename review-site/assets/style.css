@@ -622,16 +622,52 @@ body.reader {
   border-bottom: 1px solid var(--outline-variant);
 }
 .panel-header h3 { font-size: 14px; font-weight: 500; }
-.chat-model-select {
+
+/* AI 模型切换条：独占一行，custom 样式的下拉 + 圆角胶囊 */
+.chat-model-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--outline-variant);
+  background: var(--surface-container-low);
+}
+.chat-model-bar .cmb-icon { font-size: 13px; line-height: 1; }
+.chat-model-bar .cmb-label {
   font-size: 12px;
-  padding: 2px 4px;
-  background: var(--surface);
+  color: var(--on-surface-variant);
+  white-space: nowrap;
+}
+.cmb-select { position: relative; flex: 1; min-width: 0; }
+.cmb-select select {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  font-size: 12.5px;
+  line-height: 1.4;
+  padding: 6px 30px 6px 12px;
+  background: var(--surface-container-high);
   color: var(--on-surface);
   border: 1px solid var(--outline-variant);
-  border-radius: 4px;
-  max-width: 130px;
-  margin-right: 8px;
-  margin-left: auto;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  text-overflow: ellipsis;
+  transition: border-color var(--transition), background-color var(--transition), box-shadow var(--transition);
+}
+.cmb-select select:hover { background: var(--surface-container-highest); }
+.cmb-select select:focus-visible {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+.cmb-select .cmb-caret {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-size: 11px;
+  color: var(--on-surface-variant);
 }
 #bookmarks-list {
   list-style: none;

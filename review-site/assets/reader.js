@@ -437,11 +437,16 @@ const chatQuoteBox = document.getElementById('chat-quote');
 const chatModelSelect = document.getElementById('chat-model');
 
 if (chatModelSelect) {
-  const savedModel = localStorage.getItem('nb-chat-model');
-  const validOption = Array.from(chatModelSelect.options).some(opt => opt.value === savedModel);
-  if (savedModel && validOption) {
-    chatModelSelect.value = savedModel;
-  }
+  // 模型清单由后端 /api/rag/chat 提供（单一数据源），避免前后端写两份导致用到已弃用的模型。
+  fetch('/api/rag/chat').then((r) => (r.ok ? r.json() : null)).then((d) => {
+    const models = d && Array.isArray(d.models) ? d.models : [];
+    if (!models.length) { chatModelSelect.closest('.chat-model-bar')?.setAttribute('hidden', ''); return; }
+    chatModelSelect.innerHTML = models.map((m) =>
+      `<option value="${escapeAttr(m.id)}">${escapeHTML(m.label)}${m.hint ? '　·　' + escapeHTML(m.hint) : ''}</option>`
+    ).join('');
+    const saved = localStorage.getItem('nb-chat-model');
+    if (saved && models.some((m) => m.id === saved)) chatModelSelect.value = saved;
+  }).catch(() => {});
   chatModelSelect.addEventListener('change', () => {
     localStorage.setItem('nb-chat-model', chatModelSelect.value);
   });

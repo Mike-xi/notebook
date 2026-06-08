@@ -1,6 +1,22 @@
 // RAG 共享逻辑：模型常量、rag_index 表、分块、嵌入。
 export const EMBED_MODEL = '@cf/baai/bge-m3';                       // 1024 维，多语言（中文友好）
-export const CHAT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+
+// 对话可选模型：白名单 + 单一数据源（前端下拉与后端校验都用它，避免两处写死跑偏）。
+// 第一个为默认。仅保留 Workers AI 当前在售、未弃用的模型 ID。
+export const CHAT_MODELS = [
+  { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',    label: 'Llama 3.3 70B', hint: '均衡 · 默认' },
+  { id: '@cf/qwen/qwen1.5-14b-chat-awq',               label: 'Qwen 1.5 14B',  hint: '中文流畅' },
+  { id: '@cf/meta/llama-3.1-8b-instruct',              label: 'Llama 3.1 8B',  hint: '轻快' },
+  { id: '@cf/google/gemma-4-26b-a4b-it',               label: 'Gemma 4 26B',   hint: '较新' },
+  { id: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b', label: 'DeepSeek R1',  hint: '深度思考' },
+];
+export const CHAT_MODEL = CHAT_MODELS[0].id;
+const CHAT_MODEL_IDS = new Set(CHAT_MODELS.map((m) => m.id));
+
+// 把客户端传来的模型 ID 收敛到白名单内，非法/缺省一律回退默认，避免乱调模型。
+export function resolveChatModel(id) {
+  return CHAT_MODEL_IDS.has(String(id || '')) ? String(id) : CHAT_MODEL;
+}
 
 const str = (v) => (typeof v === 'string' ? v : v == null ? '' : String(v)).trim();
 

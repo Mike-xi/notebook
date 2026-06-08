@@ -2,10 +2,15 @@
 //   -> { answer, sources:[heading], retrieved }
 // 检索 Vectorize（按 file 过滤）+ 取用户高亮/书签 -> 拼 prompt -> llama-3.3-70b 作答。
 // 鉴权由 _middleware.js 处理。
-import { ensureRagSchema, embed, CHAT_MODEL } from '../../_lib/rag.js';
+import { ensureRagSchema, embed, CHAT_MODEL, CHAT_MODELS, resolveChatModel } from '../../_lib/rag.js';
 import { ensureHighlightsSchema } from '../../_lib/db.js';
 
 const str = (v) => (typeof v === 'string' ? v : v == null ? '' : String(v)).trim();
+
+// GET /api/rag/chat -> 可选模型清单（前端下拉据此渲染，单一数据源）。
+export function onRequestGet() {
+  return Response.json({ models: CHAT_MODELS, default: CHAT_MODEL });
+}
 
 export async function onRequestPost({ request, env }) {
   if (!env.AI) return Response.json({ error: 'AI 未绑定' }, { status: 503 });
@@ -16,8 +21,7 @@ export async function onRequestPost({ request, env }) {
   const file = str(b?.file);
   const question = str(b?.question).slice(0, 1000);
   const quote = str(b?.quote).slice(0, 2000);
-  const reqModel = str(b?.model);
-  const model = reqModel || CHAT_MODEL;
+  const model = resolveChatModel(b?.model);
   if (!question) return Response.json({ error: '请输入问题' }, { status: 400 });
 
   // 1) 向量检索（按当前课程过滤）
