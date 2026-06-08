@@ -9,7 +9,7 @@
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
   </script>
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=20260607c">
-  <link rel="stylesheet" href="/assets/style.css?v=20260608b">
+  <link rel="stylesheet" href="/assets/style.css?v=20260608c">
 </head>
 <body class="home">
   <header class="topbar">
@@ -33,6 +33,15 @@
               <button class="seg-btn" data-theme-set="dark" aria-pressed="false">🌙 深色</button>
             </div>
           </div>
+          <div class="sm-section">
+            <span class="sm-label">阅读器工具栏唤出</span>
+            <div class="seg" role="group" aria-label="工具栏唤出灵敏度">
+              <button class="seg-btn" data-bar-reveal="4" aria-pressed="false">灵敏</button>
+              <button class="seg-btn" data-bar-reveal="14" aria-pressed="false">适中</button>
+              <button class="seg-btn" data-bar-reveal="36" aria-pressed="false">迟钝</button>
+            </div>
+            <p class="sm-tip">数值越“迟钝”，需要越快地向上滑动才会唤出顶部工具栏。</p>
+          </div>
           <div class="sm-divider"></div>
           <button class="sm-item" id="about-btn" role="menuitem"><span class="sm-ic">✨</span><span>关于</span></button>
           <button class="sm-item sm-danger" id="logout-btn" role="menuitem"><span class="sm-ic">⏻</span><span>退出登录</span></button>
@@ -50,7 +59,10 @@
     <section>
       <div class="section-head">
         <h2 class="section-title">我的笔记</h2>
-        <button class="create-btn" id="create-btn">＋ 创建课程</button>
+        <div class="sh-actions">
+          <button class="ghost-btn omni-btn" id="omni-btn" title="基于你全部课程与记录的 AI 问答">💡 全能问答</button>
+          <button class="create-btn" id="create-btn">＋ 创建课程</button>
+        </div>
       </div>
       <div id="courses" class="card-grid"></div>
       <p id="empty-hint" class="empty-state" hidden>还没有课程笔记，点「创建课程」上传一个 HTML 试试</p>
@@ -104,6 +116,29 @@
     </div>
   </div>
 
+  <!-- 全能问答（基于全部课程 + 日志的 AI 对话，布局沿用课程内对话） -->
+  <aside id="omni-panel" hidden>
+    <div class="panel-header">
+      <h3>💡 全能问答 <span id="omni-status" class="chat-status"></span></h3>
+      <button class="icon-btn" id="omni-close" title="关闭">✕</button>
+    </div>
+    <div class="chat-model-bar">
+      <span class="cmb-icon" aria-hidden="true">🧠</span>
+      <label class="cmb-label" for="omni-model">模型</label>
+      <div class="cmb-select">
+        <select id="omni-model" title="选择 AI 模型"></select>
+        <span class="cmb-caret" aria-hidden="true">▾</span>
+      </div>
+    </div>
+    <div id="omni-msgs" class="chat-msgs">
+      <p class="chat-hint" id="omni-hint">我了解你所有的课程、阅读进度，以及上传 / 登录等操作记录。问我「我都上传过哪些笔记」「最近读到哪了」「把概率和 Python 的重点对比一下」都可以。</p>
+    </div>
+    <form id="omni-form" class="chat-form">
+      <textarea id="omni-input" rows="1" placeholder="问点关于你整个笔记库的问题…" autocomplete="off"></textarea>
+      <button type="submit" id="omni-send" title="发送">↑</button>
+    </form>
+  </aside>
+
   <!-- 关于 / 学习画像 -->
   <div class="modal-overlay about-overlay" id="about-modal" hidden>
     <div class="about-card" role="dialog" aria-modal="true" aria-label="关于">
@@ -132,6 +167,6 @@
   </div>
 
   <script src="/assets/theme.js?v=20260608a"></script>
-  <script src="/assets/app.js?v=20260608b"></script>
+  <script src="/assets/app.js?v=20260608c"></script>
 </body>
 </html>

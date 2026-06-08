@@ -5,7 +5,8 @@ const MAX_TEXT_BYTES = 1_500_000;   // html / md 存 D1
 const MAX_PDF_BYTES = 20_000_000;   // pdf 存 R2
 const KIND_ICON = { html: '📘', md: '📝', pdf: '📕' };
 
-let studyProfile = null;   // 「关于」弹窗用：基于你自己的课程数据生成的学习画像
+let studyProfile = null;       // 「关于」弹窗用：基于你自己的课程数据生成的学习画像
+let staticCoursesData = [];     // 静态课程元数据，供「全能问答」随请求带给后端
 
 function detectKind(name) {
   const ext = (name.split('.').pop() || '').toLowerCase();
@@ -44,6 +45,7 @@ async function loadAndRender() {
     .map((p) => ({ ...courses.find((c) => c.file === p.file), ...p }))
     .filter((c) => c.title);
 
+  staticCoursesData = staticCourses;
   studyProfile = buildProfile(courses, progress, recent);
 
   const recentSection = document.getElementById('recent-section');
@@ -93,6 +95,25 @@ settingsMenu.addEventListener('click', (e) => e.stopPropagation());
 document.addEventListener('click', () => closeSettings());
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSettings(); });
 
+// 阅读器工具栏唤出灵敏度（存 localStorage，reader.js 读取；数值=上滑触发阈值 px）
+const BAR_REVEAL_KEY = 'nb-bar-reveal';
+const BAR_REVEAL_DEFAULT = 14;
+function syncBarRevealButtons() {
+  const cur = String(parseInt(localStorage.getItem(BAR_REVEAL_KEY), 10) || BAR_REVEAL_DEFAULT);
+  document.querySelectorAll('[data-bar-reveal]').forEach((btn) => {
+    const on = btn.getAttribute('data-bar-reveal') === cur;
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+document.querySelectorAll('[data-bar-reveal]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    localStorage.setItem(BAR_REVEAL_KEY, btn.getAttribute('data-bar-reveal'));
+    syncBarRevealButtons();
+  });
+});
+syncBarRevealButtons();
+
 // ========== 登出 ==========
 document.getElementById('logout-btn').addEventListener('click', async () => {
   closeSettings();
@@ -100,6 +121,88 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
   try { await fetch('/api/logout', { method: 'POST' }); } catch {}
   location.href = '/login.html';
 });
+
+// ========== 全能问答（基于全部课程 + 日志，布局沿用课程内对话） ==========
+const omniPanel = document.getElementById('omni-panel');
+const omniMsgs = document.getElementById('omni-msgs');
+const omniInput = document.getElementById('omni-input');
+const omniForm = document.getElementById('omni-form');
+const omniModel = document.getElementById('omni-model');
+let omniBusy = false;
+let omniModelsLoaded = false;
+
+function loadOmniModels() {
+  if (omniModelsLoaded || !omniModel) return;
+  omniModelsLoaded = true;
+  fetch('/api/omni').then((r) => (r.ok ? r.json() : null)).then((d) => {
+    const models = d && Array.isArray(d.models) ? d.models : [];
+    if (!models.length) { omniModel.closest('.chat-model-bar')?.setAttribute('hidden', ''); return; }
+    omniModel.innerHTML = models.map((m) =>
+      `<option value="${escapeAttr(m.id)}">${escapeHTML(m.label)}${m.hint ? '　·　' + escapeHTML(m.hint) : ''}</option>`
+    ).join('');
+    const saved = localStorage.getItem('nb-chat-model');
+    if (saved && models.some((m) => m.id === saved)) omniModel.value = saved;
+  }).catch(() => {});
+}
+if (omniModel) {
+  omniModel.addEventListener('change', () => localStorage.setItem('nb-chat-model', omniModel.value));
+}
+
+function openOmni() {
+  loadOmniModels();
+  omniPanel.hidden = false;
+  setTimeout(() => omniInput && omniInput.focus(), 30);
+}
+document.getElementById('omni-btn').addEventListener('click', () => {
+  omniPanel.hidden ? openOmni() : (omniPanel.hidden = true);
+});
+document.getElementById('omni-close').addEventListener('click', () => { omniPanel.hidden = true; });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !omniPanel.hidden) omniPanel.hidden = true; });
+
+function omniAppend(role, text, thinking) {
+  const hintEl = document.getElementById('omni-hint');
+  if (hintEl) hintEl.remove();
+  const wrap = document.createElement('div');
+  wrap.className = 'chat-msg ' + role + (thinking ? ' thinking' : '');
+  const bubble = document.createElement('div');
+  bubble.className = 'chat-bubble';
+  bubble.textContent = text;
+  wrap.appendChild(bubble);
+  omniMsgs.appendChild(wrap);
+  omniMsgs.scrollTop = omniMsgs.scrollHeight;
+  return wrap;
+}
+function omniGrow() { omniInput.style.height = 'auto'; omniInput.style.height = Math.min(omniInput.scrollHeight, 120) + 'px'; }
+omniInput.addEventListener('input', omniGrow);
+omniInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); omniSend(); }
+});
+omniForm.addEventListener('submit', (e) => { e.preventDefault(); omniSend(); });
+
+async function omniSend() {
+  const q = omniInput.value.trim();
+  if (!q || omniBusy) return;
+  omniAppend('user', q);
+  omniInput.value = ''; omniGrow();
+  omniBusy = true;
+  const thinking = omniAppend('ai', '思考中…', true);
+  try {
+    const statics = (staticCoursesData || []).map((c) => ({ title: c.title, subject: c.subject, description: c.description }));
+    const res = await fetch('/api/omni', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: q, model: omniModel ? omniModel.value : undefined, staticCourses: statics }),
+    });
+    const d = await res.json().catch(() => ({}));
+    thinking.remove();
+    if (!res.ok) throw new Error(d.error || '请求失败');
+    omniAppend('ai', d.answer || '(没有得到回答)');
+  } catch (e) {
+    thinking.remove();
+    omniAppend('ai', '⚠️ ' + (e.message || '请求失败'));
+  } finally {
+    omniBusy = false;
+  }
+}
 
 // ========== 关于 / 学习画像 ==========
 const aboutModal = document.getElementById('about-modal');

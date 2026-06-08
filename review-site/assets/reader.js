@@ -160,6 +160,11 @@ function restoreScroll(pct) {
 }
 
 let lastScrollY = 0;
+// 上滑唤出工具栏所需的阈值（px）；由首页设置写入 localStorage，4=灵敏 / 14=适中 / 36=迟钝
+function barRevealThreshold() {
+  const v = parseInt(localStorage.getItem('nb-bar-reveal'), 10);
+  return Number.isFinite(v) && v > 0 ? v : 14;
+}
 function onScroll() {
   const win = iframe.contentWindow;
   const doc = iframe.contentDocument;
@@ -168,11 +173,12 @@ function onScroll() {
   currentPct = max > 0 ? Math.max(0, Math.min(1, win.scrollY / max)) : 0;
   updateProgressDisplay();
 
-  // 工具栏：下滑隐藏、上滑显示
+  // 工具栏：下滑隐藏、上滑显示。上滑阈值可在首页设置里调（越大越需快速上滑）
   const y = win.scrollY;
+  const revealT = barRevealThreshold();
   if (y > lastScrollY + 6 && y > 120) {
     hideBar();
-  } else if (y < lastScrollY - 6) {
+  } else if (y < lastScrollY - revealT) {
     showBar();
   }
   lastScrollY = y;

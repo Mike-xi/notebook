@@ -397,10 +397,6 @@ main {
 .nb-card:hover .nb-drag { opacity: 1; }
 .nb-drag:hover { background: var(--surface-container-highest); color: var(--on-surface); }
 .nb-drag:active { cursor: grabbing; }
-/* 触屏设备无 hover：让手柄常显，便于发现 */
-@media (hover: none) {
-  .nb-drag { opacity: .55; }
-}
 
 /* 拖拽中：被拖卡片留下的占位 + 跟随指针的浮层 */
 .nb-card-placeholder {
@@ -897,7 +893,7 @@ body.reader {
   padding: 10px 12px;
   border-top: 1px solid var(--outline-variant);
 }
-#chat-input {
+#chat-input, #omni-input {
   flex: 1;
   resize: none;
   border: 1px solid var(--outline-variant);
@@ -910,8 +906,8 @@ body.reader {
   color: var(--on-surface);
   max-height: 120px;
 }
-#chat-input:focus { outline: none; border-color: var(--primary); }
-#chat-send {
+#chat-input:focus, #omni-input:focus { outline: none; border-color: var(--primary); }
+#chat-send, #omni-send {
   flex: none;
   width: 38px; height: 38px;
   border: none;
@@ -922,9 +918,34 @@ body.reader {
   cursor: pointer;
   transition: filter var(--transition);
 }
-#chat-send:hover { filter: brightness(1.06); }
+#chat-send:hover, #omni-send:hover { filter: brightness(1.06); }
 @media (max-width: 640px) {
   #chat-panel { right: 8px; left: 8px; width: auto; }
+}
+
+/* 首页「全能问答」面板：复用课程内对话的 .chat-* 内部样式，仅定位不同 */
+#omni-panel {
+  position: fixed;
+  top: 84px;
+  right: 24px;
+  width: 400px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 104px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-container);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 90;
+  overflow: hidden;
+  animation: settings-pop 160ms ease-out;
+  transform-origin: top right;
+}
+.sh-actions { display: flex; align-items: center; gap: 10px; }
+.omni-btn { padding: 9px 16px; }
+@media (max-width: 640px) {
+  #omni-panel { right: 8px; left: 8px; width: auto; top: 72px; }
 }
 
 /* 划词浮条里的「问 AI」按钮 */
@@ -1212,6 +1233,12 @@ body.login {
   box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,.2));
 }
 [data-theme="dark"] .seg-btn.active { color: #1c1b1f; }
+.sm-tip {
+  margin: 8px 2px 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--on-surface-variant);
+}
 .sm-divider { height: 1px; background: var(--outline-variant); margin: 6px 4px; }
 .sm-item {
   display: flex;

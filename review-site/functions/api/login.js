@@ -1,4 +1,5 @@
 import { createSessionToken, makeAuthCookie } from '../_lib/auth.js';
+import { logEvent } from '../_lib/db.js';
 
 export async function onRequestPost({ request, env }) {
   if (!env.SITE_PASSWORD || !env.AUTH_SECRET) {
@@ -19,6 +20,8 @@ export async function onRequestPost({ request, env }) {
   }
 
   const token = await createSessionToken(env);
+  // 记录登录日志（仅时间 + 浏览器标识，不存 IP）；失败不影响登录
+  await logEvent(env, 'login', (request.headers.get('User-Agent') || '').slice(0, 120));
   return new Response(JSON.stringify({ ok: true }), {
     headers: {
       'Content-Type': 'application/json',

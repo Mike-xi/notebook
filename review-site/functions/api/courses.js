@@ -4,7 +4,7 @@
 //                                        也兼容旧的 JSON {title, html}（仅 html）
 // DELETE /api/courses  {file}         -> 删除课程，清理其 R2 对象与进度/书签
 // 鉴权由 _middleware.js 统一处理（只有登录用户能访问 /api/*）
-import { ensureCoursesSchema } from '../_lib/db.js';
+import { ensureCoursesSchema, logEvent } from '../_lib/db.js';
 
 const MAX_TEXT_BYTES = 1_500_000;   // html/md 存 D1，单值上限 2MB，留余量
 const MAX_PDF_BYTES = 20_000_000;   // pdf 存 R2，限 20MB
@@ -121,6 +121,7 @@ export async function onRequestPost({ request, env }) {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).bind(file, title.slice(0, 80), finalSubject, finalDesc, finalIcon, finalColor, finalTags, contentText, kind, Date.now()).run();
 
+  await logEvent(env, 'upload', `${kind} · ${title.slice(0, 60)}`);
   return Response.json({ ok: true, file, kind });
 }
 
@@ -143,6 +144,7 @@ export async function onRequestDelete({ request, env }) {
   try { await env.DB.prepare('DELETE FROM progress WHERE file = ?').bind(file).run(); } catch {}
   try { await env.DB.prepare('DELETE FROM bookmarks WHERE file = ?').bind(file).run(); } catch {}
   try { await env.DB.prepare('DELETE FROM highlights WHERE file = ?').bind(file).run(); } catch {}
+  await logEvent(env, 'delete', file);
   return Response.json({ ok: true });
 }
 
