@@ -369,6 +369,55 @@ main {
 }
 .nb-card:hover .nb-del { opacity: 1; }
 .nb-del:hover { background: var(--error); color: var(--on-error); }
+/* 有拖拽手柄时，删除键给手柄让位（手柄占最右上角） */
+.nb-card:has(.nb-drag) .nb-del { right: 46px; }
+
+/* 拖拽排序手柄（主网格卡片右上角） */
+.nb-drag {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--on-surface) 9%, transparent);
+  color: var(--on-surface-variant);
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  opacity: 0;
+  z-index: 2;
+  touch-action: none;          /* 触屏：手柄上不滚动页面，交给拖拽 */
+  transition: opacity var(--transition), background-color var(--transition);
+}
+.nb-card:hover .nb-drag { opacity: 1; }
+.nb-drag:hover { background: var(--surface-container-highest); color: var(--on-surface); }
+.nb-drag:active { cursor: grabbing; }
+/* 触屏设备无 hover：让手柄常显，便于发现 */
+@media (hover: none) {
+  .nb-drag { opacity: .55; }
+}
+
+/* 拖拽中：被拖卡片留下的占位 + 跟随指针的浮层 */
+.nb-card-placeholder {
+  opacity: .28;
+  filter: grayscale(.3);
+}
+.nb-card-ghost {
+  box-shadow: var(--shadow-lg);
+  transform: scale(1.04) rotate(1.5deg);
+  opacity: .96;
+  cursor: grabbing;
+}
+.nb-card-ghost .nb-drag,
+.nb-card-ghost .nb-del { display: none; }
+body.sorting { user-select: none; cursor: grabbing; }
+body.sorting .nb-card { transition: none; }
+body.sorting .nb-card:hover { transform: none; box-shadow: none; }
 
 /* 创建课程弹窗 */
 .modal-overlay {

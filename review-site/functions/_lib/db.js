@@ -25,6 +25,19 @@ export async function ensureCoursesSchema(env) {
   schemaReady = true;
 }
 
+// 通用键值偏好表（单用户）。目前用于存课程显示顺序（key=course_order）。
+let prefsReady = false;
+export async function ensurePrefsSchema(env) {
+  if (prefsReady) return;
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS prefs (
+       key   TEXT PRIMARY KEY,
+       value TEXT NOT NULL DEFAULT ''
+     )`
+  ).run();
+  prefsReady = true;
+}
+
 let hlReady = false;
 export async function ensureHighlightsSchema(env) {
   if (hlReady) return;

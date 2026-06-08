@@ -15,21 +15,23 @@ function detectKind(name) {
 }
 
 async function loadAndRender() {
-  let staticCourses = [], dynamic = [], progress = [];
+  let staticCourses = [], dynamic = [], progress = [], order = [];
   try {
-    const [c1, c2, pr] = await Promise.all([
+    const [c1, c2, pr, od] = await Promise.all([
       fetch('/courses.json').then((r) => (r.ok ? r.json() : [])),
       fetch('/api/courses').then((r) => (r.ok ? r.json() : [])),
       fetch('/api/progress').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/order').then((r) => (r.ok ? r.json() : { order: [] })),
     ]);
     staticCourses = c1 || [];
     dynamic = c2 || [];
     progress = pr || [];
+    order = (od && od.order) || [];
   } catch (e) {
     console.warn('[home] load failed', e);
   }
 
-  const courses = [...staticCourses, ...dynamic];
+  const courses = applyOrder([...staticCourses, ...dynamic], order);
 
   const progressMap = {};
   for (const p of progress) progressMap[p.file] = p;
@@ -203,6 +205,95 @@ document.getElementById('courses').addEventListener('click', async (e) => {
     alert('删除失败，请重试');
   }
 });
+
+// ========== 课程排序（拖拽，鼠标 + 触屏） ==========
+// 顺序按 file 持久化到 /api/order；未在已存顺序中的（如新建课程）排在最前。
+function applyOrder(list, order) {
+  if (!Array.isArray(order) || !order.length) return list;
+  const idx = new Map(order.map((f, i) => [f, i]));
+  // 稳定排序：已知项按存档顺序；未知项（新课程）置顶且保持默认相对次序
+  return list
+    .map((c, i) => ({ c, i, k: idx.has(c.file) ? idx.get(c.file) : -1 }))
+    .sort((a, b) => (a.k - b.k) || (a.i - b.i))
+    .map((x) => x.c);
+}
+
+const coursesGrid = document.getElementById('courses');
+let dragState = null;
+let suppressClickUntil = 0;
+
+function persistOrder() {
+  const order = Array.from(coursesGrid.querySelectorAll('.nb-card'))
+    .map((el) => el.dataset.file)
+    .filter(Boolean);
+  fetch('/api/order', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ order }),
+  }).catch(() => {});
+}
+
+coursesGrid.addEventListener('pointerdown', (e) => {
+  if (e.button != null && e.button > 0) return;          // 仅主键/触摸
+  const handle = e.target.closest('.nb-drag');
+  if (!handle) return;
+  const card = handle.closest('.nb-card');
+  if (!card) return;
+  e.preventDefault();
+
+  const rect = card.getBoundingClientRect();
+  const ghost = card.cloneNode(true);
+  ghost.classList.add('nb-card-ghost');
+  Object.assign(ghost.style, {
+    position: 'fixed', left: rect.left + 'px', top: rect.top + 'px',
+    width: rect.width + 'px', height: rect.height + 'px',
+    margin: '0', pointerEvents: 'none', zIndex: '200',
+  });
+  document.body.appendChild(ghost);
+  card.classList.add('nb-card-placeholder');
+  document.body.classList.add('sorting');
+
+  dragState = { card, ghost, offX: e.clientX - rect.left, offY: e.clientY - rect.top, moved: false };
+  try { handle.setPointerCapture(e.pointerId); } catch {}
+});
+
+window.addEventListener('pointermove', (e) => {
+  if (!dragState) return;
+  const { ghost, card } = dragState;
+  dragState.moved = true;
+  ghost.style.left = (e.clientX - dragState.offX) + 'px';
+  ghost.style.top = (e.clientY - dragState.offY) + 'px';
+
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  const target = under && under.closest('.nb-card');
+  if (target && target !== card && target.parentElement === coursesGrid && target.style.display !== 'none') {
+    const r = target.getBoundingClientRect();
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    // 网格：先按行（Y），同一行内再按列（X）判断插入到目标前/后
+    const after = (e.clientY > cy + 6) || (Math.abs(e.clientY - cy) <= r.height / 2 && e.clientX > cx);
+    coursesGrid.insertBefore(card, after ? target.nextSibling : target);
+  }
+});
+
+function endDrag() {
+  if (!dragState) return;
+  const { ghost, card, moved } = dragState;
+  ghost.remove();
+  card.classList.remove('nb-card-placeholder');
+  document.body.classList.remove('sorting');
+  dragState = null;
+  if (moved) { suppressClickUntil = Date.now() + 350; persistOrder(); }
+}
+window.addEventListener('pointerup', endDrag);
+window.addEventListener('pointercancel', endDrag);
+
+// 拖动手柄/刚拖完时，吞掉卡片的点击导航
+coursesGrid.addEventListener('click', (e) => {
+  if (e.target.closest('.nb-drag') || Date.now() < suppressClickUntil) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+}, true);
 
 // ========== 创建课程弹窗 ==========
 const modal = document.getElementById('create-modal');
@@ -408,11 +499,17 @@ function cardHTML(c, deletable = false) {
     ? `<button class="nb-del" data-file="${escapeAttr(c.file)}" title="删除课程" aria-label="删除课程">✕</button>`
     : '';
 
+  // 主网格（deletable=true）的卡片可拖动排序；「最近阅读」不可
+  const dragHandle = deletable
+    ? `<button type="button" class="nb-drag" title="拖动排序" aria-label="拖动排序">⠿</button>`
+    : '';
+
   return `
     <a class="nb-card" href="/reader.html?file=${encodeURIComponent(c.file)}"
        style="--accent: ${c.color || '#6750A4'}"
+       data-file="${escapeAttr(c.file)}"
        data-search="${escapeAttr(searchText)}">
-      ${delBtn}
+      ${dragHandle}${delBtn}
       <span class="nb-card-icon">${escapeHTML(c.icon || '📄')}</span>
       <div class="nb-card-body">
         <span class="nb-card-subject">${escapeHTML(c.subject || '笔记')}</span>
