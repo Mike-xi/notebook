@@ -5,6 +5,8 @@ const MAX_TEXT_BYTES = 1_500_000;   // html / md 存 D1
 const MAX_PDF_BYTES = 20_000_000;   // pdf 存 R2
 const KIND_ICON = { html: '📘', md: '📝', pdf: '📕' };
 
+let studyProfile = null;   // 「关于」弹窗用：基于你自己的课程数据生成的学习画像
+
 function detectKind(name) {
   const ext = (name.split('.').pop() || '').toLowerCase();
   if (ext === 'pdf') return 'pdf';
@@ -40,6 +42,8 @@ async function loadAndRender() {
     .map((p) => ({ ...courses.find((c) => c.file === p.file), ...p }))
     .filter((c) => c.title);
 
+  studyProfile = buildProfile(courses, progress, recent);
+
   const recentSection = document.getElementById('recent-section');
   if (recent.length > 0) {
     recentSection.hidden = false;
@@ -65,12 +69,120 @@ document.getElementById('search').addEventListener('input', (e) => {
   });
 });
 
+// ========== 设置菜单（⚙️ 下拉：外观 / 关于 / 退出） ==========
+const settingsWrap = document.querySelector('.settings-wrap');
+const settingsBtn = document.getElementById('settings-btn');
+const settingsMenu = document.getElementById('settings-menu');
+
+function openSettings() {
+  settingsMenu.hidden = false;
+  settingsBtn.setAttribute('aria-expanded', 'true');
+}
+function closeSettings() {
+  settingsMenu.hidden = true;
+  settingsBtn.setAttribute('aria-expanded', 'false');
+}
+settingsBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  settingsMenu.hidden ? openSettings() : closeSettings();
+});
+// 点菜单内部不关闭（主题分段控件要连点）；点外部 / Esc 关闭
+settingsMenu.addEventListener('click', (e) => e.stopPropagation());
+document.addEventListener('click', () => closeSettings());
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSettings(); });
+
 // ========== 登出 ==========
 document.getElementById('logout-btn').addEventListener('click', async () => {
+  closeSettings();
   if (!confirm('退出登录？')) return;
   try { await fetch('/api/logout', { method: 'POST' }); } catch {}
   location.href = '/login.html';
 });
+
+// ========== 关于 / 学习画像 ==========
+const aboutModal = document.getElementById('about-modal');
+
+document.getElementById('about-btn').addEventListener('click', () => {
+  closeSettings();
+  renderAbout();
+  aboutModal.hidden = false;
+});
+document.getElementById('about-close').addEventListener('click', () => { aboutModal.hidden = true; });
+aboutModal.addEventListener('click', (e) => { if (e.target === aboutModal) aboutModal.hidden = true; });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !aboutModal.hidden) aboutModal.hidden = true; });
+
+// 从课程数据（你自己创建的，无隐私）提炼一个学习画像
+function buildProfile(courses, progress, recent) {
+  const subjects = {};
+  const tagSet = new Set();
+  for (const c of courses) {
+    const s = (c.subject || '').trim();
+    if (s) subjects[s] = (subjects[s] || 0) + 1;
+    for (const t of (c.tags || [])) { const tt = String(t).trim(); if (tt) tagSet.add(tt); }
+  }
+  const subjectList = Object.entries(subjects).sort((a, b) => b[1] - a[1]).map(([k]) => k);
+  const readCount = (progress || []).filter((p) => (p.scroll_pct || 0) > 0.02).length;
+  const maxPct = (progress || []).reduce((m, p) => Math.max(m, p.scroll_pct || 0), 0);
+  return {
+    courseCount: courses.length,
+    subjectList,
+    subjectCount: subjectList.length,
+    tagCount: tagSet.size,
+    readCount,
+    maxPct: Math.round(maxPct * 100),
+    topSubject: subjectList[0] || '',
+    recentTitle: (recent && recent[0] && recent[0].title) || '',
+  };
+}
+
+function renderAbout() {
+  const p = studyProfile || { courseCount: 0, subjectList: [], subjectCount: 0, tagCount: 0, readCount: 0, maxPct: 0, topSubject: '', recentTitle: '' };
+
+  // 一句话人设（确定性，按数据挑模板，纯鼓励、不涉隐私）
+  let tagline;
+  if (p.courseCount === 0) tagline = '一张空白的星图，正等你点亮第一颗星 ✦';
+  else if (p.subjectCount >= 3) tagline = '横跨多个领域的探索者 — 你的好奇心没有边界 🚀';
+  else if (p.topSubject) tagline = `专注「${p.topSubject}」的深耕者 — 一寸一寸把它啃透 🔬`;
+  else tagline = '稳步推进的笔记收藏家 📚';
+  document.getElementById('about-tagline').textContent = tagline;
+
+  const stats = [
+    { n: p.courseCount, label: '门课程', ic: '📚' },
+    { n: p.subjectCount, label: '个学科', ic: '🧭' },
+    { n: p.tagCount, label: '个标签', ic: '🏷️' },
+    { n: p.readCount, label: '篇在读', ic: '🔖' },
+  ];
+  document.getElementById('about-stats').innerHTML = stats.map((s) => `
+    <div class="about-stat">
+      <span class="as-ic">${s.ic}</span>
+      <span class="as-n">${s.n}</span>
+      <span class="as-label">${s.label}</span>
+    </div>`).join('');
+
+  const block = document.getElementById('about-subjects-block');
+  if (p.subjectList.length) {
+    block.hidden = false;
+    document.getElementById('about-subjects').innerHTML =
+      p.subjectList.slice(0, 12).map((s) => `<span class="about-chip">${escapeHTML(s)}</span>`).join('');
+  } else {
+    block.hidden = true;
+  }
+
+  // 结语：基于真实数据，给点正反馈
+  let note;
+  if (p.courseCount === 0) {
+    note = '点右上角「＋ 创建课程」上传第一份笔记，我就能帮你把它整理成可检索、可对话的复习资料。';
+  } else {
+    const bits = [];
+    bits.push(`你已经在这里收藏了 ${p.courseCount} 门课程`);
+    if (p.recentTitle) bits.push(`最近在翻《${p.recentTitle}》`);
+    else if (p.topSubject) bits.push(`「${p.topSubject}」是你投入最多的方向`);
+    if (p.maxPct >= 80) bits.push('已经有笔记被你读到接近尾声，这份坚持很难得');
+    else if (p.readCount > 0) bits.push('保持这个节奏，知识会一点点沉淀下来');
+    note = bits.join('，') + '。';
+  }
+  document.getElementById('about-note').textContent = note;
+}
 
 // ========== 删除动态课程（事件委托） ==========
 document.getElementById('courses').addEventListener('click', async (e) => {

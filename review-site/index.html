@@ -9,7 +9,7 @@
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
   </script>
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=20260607c">
-  <link rel="stylesheet" href="/assets/style.css?v=20260607c">
+  <link rel="stylesheet" href="/assets/style.css?v=20260608a">
 </head>
 <body class="home">
   <header class="topbar">
@@ -22,8 +22,22 @@
         <span class="search-icon">⌕</span>
         <input type="search" id="search" placeholder="搜索课程、学科…" autocomplete="off">
       </div>
-      <button class="theme-toggle" data-theme-toggle title="切换主题">🌗</button>
-      <button class="ghost-btn" id="logout-btn" title="退出登录">退出</button>
+      <div class="settings-wrap">
+        <button class="settings-btn" id="settings-btn" title="设置" aria-haspopup="true" aria-expanded="false">⚙️</button>
+        <div class="settings-menu" id="settings-menu" hidden role="menu">
+          <div class="sm-section">
+            <span class="sm-label">外观</span>
+            <div class="seg" role="group" aria-label="主题">
+              <button class="seg-btn" data-theme-set="auto" aria-pressed="false">跟随系统</button>
+              <button class="seg-btn" data-theme-set="light" aria-pressed="false">☀️ 浅色</button>
+              <button class="seg-btn" data-theme-set="dark" aria-pressed="false">🌙 深色</button>
+            </div>
+          </div>
+          <div class="sm-divider"></div>
+          <button class="sm-item" id="about-btn" role="menuitem"><span class="sm-ic">✨</span><span>关于</span></button>
+          <button class="sm-item sm-danger" id="logout-btn" role="menuitem"><span class="sm-ic">⏻</span><span>退出登录</span></button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -90,7 +104,34 @@
     </div>
   </div>
 
-  <script src="/assets/theme.js?v=20260607b"></script>
-  <script src="/assets/app.js?v=20260607c"></script>
+  <!-- 关于 / 学习画像 -->
+  <div class="modal-overlay about-overlay" id="about-modal" hidden>
+    <div class="about-card" role="dialog" aria-modal="true" aria-label="关于">
+      <button class="about-close" id="about-close" aria-label="关闭">✕</button>
+      <div class="about-hero">
+        <div class="about-aurora" aria-hidden="true"></div>
+        <div class="about-hero-inner">
+          <span class="about-emoji">🪐</span>
+          <h2 class="about-title">你的学习画像</h2>
+          <p class="about-sub" id="about-tagline">正在读取你的笔记宇宙…</p>
+        </div>
+      </div>
+      <div class="about-body">
+        <div class="about-stats" id="about-stats"></div>
+        <div class="about-block" id="about-subjects-block" hidden>
+          <span class="about-block-label">你正在钻研</span>
+          <div class="about-chips" id="about-subjects"></div>
+        </div>
+        <p class="about-note" id="about-note"></p>
+      </div>
+      <div class="about-foot">
+        <span class="about-foot-brand">📓 复习笔记 · AI 助教</span>
+        <span class="about-foot-dim">本地优先 · 不收集隐私 · 以上小结只由你自己的课程数据生成</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/theme.js?v=20260608a"></script>
+  <script src="/assets/app.js?v=20260608a"></script>
 </body>
 </html>

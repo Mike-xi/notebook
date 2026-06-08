@@ -38,12 +38,25 @@
       btn.title = LABEL[pref];
       btn.setAttribute('aria-label', LABEL[pref]);
     });
+    // 分段控件（设置里的 跟随系统/浅色/深色）：高亮当前项
+    document.querySelectorAll('[data-theme-set]').forEach((btn) => {
+      const on = btn.getAttribute('data-theme-set') === pref;
+      btn.classList.toggle('active', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
   }
 
   function cycle() {
     const next = ORDER[(ORDER.indexOf(getPref()) + 1) % ORDER.length];
     localStorage.setItem(KEY, next);
     apply(next);
+  }
+
+  // 直接设定某个偏好（供分段控件用）
+  function setPref(pref) {
+    if (!ORDER.includes(pref)) return;
+    localStorage.setItem(KEY, pref);
+    apply(pref);
   }
 
   // 系统色变化时，仅在「跟随系统」下重新解析
@@ -56,6 +69,11 @@
       if (btn.__nbWired) return;
       btn.__nbWired = true;
       btn.addEventListener('click', cycle);
+    });
+    document.querySelectorAll('[data-theme-set]').forEach((btn) => {
+      if (btn.__nbWired) return;
+      btn.__nbWired = true;
+      btn.addEventListener('click', () => setPref(btn.getAttribute('data-theme-set')));
     });
     updateButton(getPref());
   }
@@ -71,5 +89,6 @@
     get effective() { return effective(getPref()); },
     get pref() { return getPref(); },
     apply: () => apply(getPref()),
+    set: setPref,
   };
 })();
