@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>写笔记</title>
+  <script>
+    (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
+  </script>
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=20260607c">
+  <link rel="stylesheet" href="/assets/style.css?v=20260610a">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link id="hljs-light" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css">
+  <link id="hljs-dark" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" disabled>
+  <style>
+    /* 预览区排版变量（与 viewer-md 一致），随 data-theme 切换 */
+    :root {
+      --md-bg: var(--surface); --md-fg: var(--on-surface); --md-muted: var(--on-surface-variant);
+      --md-border: var(--outline-variant); --md-code-bg: var(--surface-container);
+      --md-link: #0969da;
+    }
+    :root[data-theme="dark"] { --md-link: #79b8ff; }
+
+    body.editor { height: 100vh; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); }
+
+    .ed-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--outline-variant);
+      background: var(--surface-container-low);
+      flex: none;
+    }
+    .ed-back {
+      width: 38px; height: 38px; flex: none;
+      display: inline-flex; align-items: center; justify-content: center;
+      border-radius: var(--radius-full); font-size: 19px;
+      color: var(--on-surface);
+      transition: background-color var(--transition);
+    }
+    .ed-back:hover { background: var(--surface-container-high); }
+    #ed-title {
+      flex: 1; min-width: 0;
+      border: none; outline: none; background: transparent;
+      color: var(--on-surface);
+      font-size: 17px; font-weight: 600; font-family: inherit;
+      padding: 8px 6px;
+    }
+    #ed-subject {
+      flex: none; width: 140px;
+      border: 1px solid var(--outline-variant); border-radius: var(--radius-full);
+      background: var(--surface-container-lowest);
+      color: var(--on-surface);
+      font-size: 12.5px; font-family: inherit;
+      padding: 7px 14px; outline: none;
+    }
+    #ed-subject:focus { border-color: var(--primary); }
+    .ed-status { flex: none; font-size: 12px; color: var(--on-surface-variant); white-space: nowrap; }
+    .ed-status.dirty { color: var(--primary); }
+    .ed-status.err { color: var(--error); }
+    #ed-preview-toggle { display: none; }
+
+    .ed-main { flex: 1; display: flex; min-height: 0; }
+    #ed-input {
+      flex: 1; min-width: 0;
+      border: none; outline: none; resize: none;
+      padding: 24px 26px 80px;
+      background: var(--surface);
+      color: var(--on-surface);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "PingFang SC", monospace;
+      font-size: 14px; line-height: 1.75;
+      tab-size: 2;
+    }
+    #ed-preview-wrap {
+      flex: 1; min-width: 0;
+      overflow-y: auto;
+      border-left: 1px solid var(--outline-variant);
+      background: var(--surface);
+    }
+    #ed-preview { max-width: 760px; margin: 0 auto; padding: 24px 28px 120px; font-size: 15.5px; line-height: 1.7; color: var(--md-fg); word-wrap: break-word; }
+
+    /* 预览排版（精简自 viewer-md） */
+    #ed-preview h1, #ed-preview h2, #ed-preview h3, #ed-preview h4 { font-weight: 600; line-height: 1.3; margin: 1.5em 0 .55em; }
+    #ed-preview h1 { font-size: 1.8em; padding-bottom: .3em; border-bottom: 1px solid var(--md-border); }
+    #ed-preview h2 { font-size: 1.45em; padding-bottom: .3em; border-bottom: 1px solid var(--md-border); }
+    #ed-preview h3 { font-size: 1.2em; }
+    #ed-preview p { margin: .75em 0; }
+    #ed-preview a { color: var(--md-link); text-decoration: none; }
+    #ed-preview ul, #ed-preview ol { padding-left: 1.6em; margin: .6em 0; }
+    #ed-preview code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .88em; background: var(--md-code-bg); padding: .2em .4em; border-radius: 6px; }
+    #ed-preview pre { margin: 1em 0; border-radius: 10px; overflow: auto; border: 1px solid var(--md-border); }
+    #ed-preview pre code, #ed-preview pre.hljs { display: block; padding: 13px 15px; background: var(--md-code-bg); font-size: .86em; line-height: 1.5; border-radius: 10px; }
+    #ed-preview pre code { padding: 0; background: transparent; border: none; }
+    #ed-preview blockquote { margin: 1em 0; padding: .4em 1em; color: var(--md-muted); border-left: 4px solid var(--md-border); border-radius: 0 8px 8px 0; }
+    #ed-preview table { border-collapse: collapse; margin: 1em 0; display: block; overflow: auto; }
+    #ed-preview th, #ed-preview td { border: 1px solid var(--md-border); padding: 7px 13px; }
+    #ed-preview th { background: var(--md-code-bg); font-weight: 600; }
+    #ed-preview img { max-width: 100%; }
+    #ed-preview hr { border: none; border-top: 1px solid var(--md-border); margin: 1.6em 0; }
+    #ed-preview .katex-display { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+    .ed-preview-empty { color: var(--md-muted); font-size: 13.5px; padding: 24px 0; }
+
+    /* 窄屏：编辑/预览二选一切换 */
+    @media (max-width: 760px) {
+      #ed-subject { display: none; }
+      #ed-preview-toggle { display: inline-flex; padding: 7px 14px; font-size: 12.5px; }
+      .ed-main.show-preview #ed-input { display: none; }
+      .ed-main:not(.show-preview) #ed-preview-wrap { display: none; }
+      #ed-preview-wrap { border-left: none; }
+    }
+  </style>
+</head>
+<body class="editor">
+  <header class="ed-bar">
+    <a class="ed-back" href="/" title="返回笔记库">←</a>
+    <input id="ed-title" placeholder="笔记标题…" maxlength="80" autocomplete="off">
+    <input id="ed-subject" placeholder="学科（可选）" maxlength="40" autocomplete="off">
+    <span class="ed-status" id="ed-status"></span>
+    <button class="ghost-btn" id="ed-preview-toggle" type="button">预览</button>
+    <button class="create-btn" id="ed-save" type="button">保存</button>
+  </header>
+
+  <main class="ed-main" id="ed-main">
+    <textarea id="ed-input" placeholder="# 开始写你的笔记吧…
+
+支持 Markdown 语法、$行内公式$、$$块级公式$$、```代码块```。
+Ctrl/⌘ + S 随时保存，保存后笔记会出现在首页课程列表里。" spellcheck="false"></textarea>
+    <div id="ed-preview-wrap"><article id="ed-preview"></article></div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it-texmath@1.0.0/texmath.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+  <script src="/assets/theme.js?v=20260608a"></script>
+  <script src="/assets/editor.js?v=20260610a"></script>
+</body>
+</html>

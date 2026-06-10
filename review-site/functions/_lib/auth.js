@@ -3,7 +3,7 @@
 const COOKIE_NAME = 'review_auth';
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-async function hmacSign(secret, message) {
+export async function hmacSign(secret, message) {
   const key = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(secret),

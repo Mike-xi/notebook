@@ -21,6 +21,9 @@ const bar = document.getElementById('reader-bar');
 const hotzone = document.getElementById('reader-hotzone');
 const chatToggle = document.getElementById('chat-toggle');
 const chatPanel = document.getElementById('chat-panel');
+const prefsPanel = document.getElementById('prefs-panel');
+const moreMenu = document.getElementById('more-menu');
+const gotoTitle = params.get('goto');   // 搜索结果跳转：按小节标题定位
 
 // 课程元数据（显示标题、学科）：合并静态 courses.json 与用户创建的 /api/courses
 let courseMeta = null;
@@ -75,11 +78,17 @@ window.addEventListener('message', (e) => {
   if (d.type === 'nb-ready') initOnce();
   else if (d.type === 'nb-outline') { window.__nbOutline = d.items || []; window.dispatchEvent(new CustomEvent('nb-outline-ready')); }
 });
+// PDF 的大纲可能晚于 nb-ready 到达（异步解析），到了就重建一次目录
+window.addEventListener('nb-outline-ready', () => { if (inited) { buildTOC(); tryGoto(); } });
 
 async function initIframe() {
   const win = iframe.contentWindow;
   const doc = iframe.contentDocument;
   if (!win || !doc) { showBar(); return; }
+
+  // 先应用阅读偏好（字号/宽度会改变文档高度），再恢复进度，避免恢复位置漂移
+  try { await prefsLoaded; } catch {}
+  applyReadPrefs();
 
   // 恢复上次进度
   try {
@@ -103,6 +112,8 @@ async function initIframe() {
   updateProgressDisplay();
   applyContentTheme();
   setupContentFeatures();
+  // 上次开着分屏对话的话，恢复它（此时正文已就绪，索引/历史可正常加载）
+  if (splitMode && chatPanel.hidden) openChat();
   // 进入后短暂展示工具栏，随后自动隐藏，营造全屏感
   showBar();
   scheduleHide();
@@ -116,6 +127,15 @@ function setupContentFeatures() {
     const root = kind === 'md' ? doc.getElementById('md-content') : (doc && doc.body);
     if (win && doc && root) NBHighlights.init({ doc, win, root, file, onAskAI: askFromSelection });
   }
+  tryGoto();
+}
+
+// 搜索结果带 ?goto=小节标题 进来时，目录就绪后跳转一次
+let gotoDone = false;
+function tryGoto() {
+  if (!gotoTitle || gotoDone || !tocItems.length) return;
+  gotoDone = true;
+  setTimeout(() => jumpToHeading(gotoTitle), 250);   // 等首屏排版/进度恢复稳定
 }
 
 // ========== 笔记正文暗色 ==========
@@ -174,11 +194,12 @@ function onScroll() {
   updateProgressDisplay();
 
   // 工具栏：下滑隐藏、上滑显示。上滑阈值可在首页设置里调（越大越需快速上滑）
+  // 专注模式下滚动不唤出工具栏，只有鼠标移到顶部才显示
   const y = win.scrollY;
   const revealT = barRevealThreshold();
   if (y > lastScrollY + 6 && y > 120) {
     hideBar();
-  } else if (y < lastScrollY - revealT) {
+  } else if (y < lastScrollY - revealT && !focusMode) {
     showBar();
   }
   lastScrollY = y;
@@ -225,7 +246,9 @@ function showBar() {
 function hideBar() {
   if (barHovered) return;
   if (!bookmarksPanel.hidden) return;
-  if (chatPanel && !chatPanel.hidden) return;
+  if (chatPanel && !chatPanel.hidden && !splitMode) return;
+  if (prefsPanel && !prefsPanel.hidden) return;
+  if (moreMenu && !moreMenu.hidden) return;
   bar.classList.add('hidden');
 }
 function scheduleHide() {
@@ -249,7 +272,9 @@ bookmarksToggle.addEventListener('click', () => {
     bookmarksPanel.hidden = true;
   } else {
     document.getElementById('toc-panel').hidden = true; // 互斥：开书签即收目录
-    chatPanel.hidden = true;
+    closeChatPanel();
+    prefsPanel.hidden = true;
+    moreMenu.hidden = true;
     bookmarksPanel.hidden = false;
     showBar();
     loadBookmarks();
@@ -414,7 +439,9 @@ tocList.addEventListener('click', (e) => {
 tocToggle.addEventListener('click', () => {
   if (!tocPanel.hidden) { tocPanel.hidden = true; return; }
   bookmarksPanel.hidden = true;
-  chatPanel.hidden = true;
+  closeChatPanel();
+  prefsPanel.hidden = true;
+  moreMenu.hidden = true;
   tocPanel.hidden = false;
   showBar();
 });
@@ -428,7 +455,9 @@ function postToViewer(msg) {
 // 快捷键：Esc 关面板 / 返回
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    if (!chatPanel.hidden) { chatPanel.hidden = true; return; }
+    if (!moreMenu.hidden) { moreMenu.hidden = true; return; }
+    if (!prefsPanel.hidden) { prefsPanel.hidden = true; return; }
+    if (!chatPanel.hidden) { closeChatPanel(); return; }
     if (!tocPanel.hidden) { tocPanel.hidden = true; return; }
     if (!bookmarksPanel.hidden) { bookmarksPanel.hidden = true; return; }
   }
@@ -468,11 +497,20 @@ function setChatStatus(msg) { if (chatStatus) chatStatus.textContent = msg || ''
 function openChat() {
   tocPanel.hidden = true;
   bookmarksPanel.hidden = true;
+  prefsPanel.hidden = true;
+  moreMenu.hidden = true;
   chatPanel.hidden = false;
   showBar();
   if (!ragTriggered) { ragTriggered = true; ensureIndexed(); }
   loadChatHistory();
   setTimeout(() => chatInput && chatInput.focus(), 30);
+}
+
+// 关闭对话面板；若在分屏模式，一并退出分屏（否则留下一条空白区）
+function closeChatPanel() {
+  if (chatPanel.hidden) return;
+  chatPanel.hidden = true;
+  if (splitMode) setSplit(false);
 }
 
 // 载入近一个月的历史对话（仅一次）
@@ -493,9 +531,9 @@ async function loadChatHistory() {
 }
 
 chatToggle.addEventListener('click', () => {
-  if (!chatPanel.hidden) chatPanel.hidden = true; else openChat();
+  if (!chatPanel.hidden) closeChatPanel(); else openChat();
 });
-document.getElementById('chat-close').addEventListener('click', () => { chatPanel.hidden = true; });
+document.getElementById('chat-close').addEventListener('click', closeChatPanel);
 
 const chatClearBtn = document.getElementById('chat-clear');
 if (chatClearBtn) {
@@ -589,6 +627,229 @@ function jumpToHeading(title) {
   let it = tocItems.find((t) => t.title === title);
   if (!it) it = tocItems.find((t) => t.title && (t.title.includes(title) || title.includes(t.title)));
   if (it && it.jump) { it.jump(); showBar(); }
+}
+
+// ========== 阅读偏好（字号/行距/宽度/色温，按课程存云端 prefs 表） ==========
+const DEFAULT_READ_PREFS = { scale: 100, lh: 0, width: 820, warm: 0 };  // lh=0 表示不覆盖原排版
+let readPrefs = { ...DEFAULT_READ_PREFS };
+const prefsLoaded = (async () => {
+  try {
+    const r = await fetch(`/api/prefs?key=${encodeURIComponent('reader:' + file)}`);
+    const d = await r.json();
+    if (d && d.value) {
+      const p = JSON.parse(d.value);
+      for (const k of Object.keys(DEFAULT_READ_PREFS)) if (p[k] != null) readPrefs[k] = p[k];
+    }
+  } catch {}
+  syncPrefsUI();
+})();
+
+let prefsSaveT = null;
+function saveReadPrefs() {
+  clearTimeout(prefsSaveT);
+  prefsSaveT = setTimeout(() => {
+    fetch('/api/prefs', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'reader:' + file, value: JSON.stringify(readPrefs) }),
+    }).catch(() => {});
+  }, 600);
+}
+
+function applyReadPrefs() {
+  if (usesViewer) { postToViewer({ type: 'nb-read-prefs', prefs: readPrefs }); return; }
+  // html 笔记：字号用 zoom 整体缩放（不破坏自带排版），行距只覆盖正文段落，色温用 sepia 滤镜
+  const doc = iframe.contentDocument;
+  if (!doc || !doc.body) return;
+  doc.body.style.zoom = readPrefs.scale === 100 ? '' : String(readPrefs.scale / 100);
+  let st = doc.getElementById('nb-pref-style');
+  if (!st) { st = doc.createElement('style'); st.id = 'nb-pref-style'; (doc.head || doc.documentElement).appendChild(st); }
+  st.textContent = readPrefs.lh > 0 ? `body p, body li { line-height: ${readPrefs.lh} !important; }` : '';
+  doc.body.style.filter = readPrefs.warm > 0 ? `sepia(${readPrefs.warm})` : '';
+}
+
+const prefsToggle = document.getElementById('prefs-toggle');
+const prefScale = document.getElementById('pref-scale');
+const prefScaleVal = document.getElementById('pref-scale-val');
+
+prefsToggle.addEventListener('click', () => {
+  if (!prefsPanel.hidden) { prefsPanel.hidden = true; return; }
+  tocPanel.hidden = true;
+  bookmarksPanel.hidden = true;
+  moreMenu.hidden = true;
+  prefsPanel.hidden = false;
+  showBar();
+});
+document.getElementById('prefs-close').addEventListener('click', () => { prefsPanel.hidden = true; });
+
+// 按文档类型隐藏不适用的控件：PDF 只支持色温；HTML 页面自带排版，不支持宽度
+if (kind === 'pdf') {
+  document.getElementById('pref-row-scale').hidden = true;
+  document.getElementById('pref-row-lh').hidden = true;
+  document.getElementById('pref-row-width').hidden = true;
+  document.getElementById('prefs-tip').textContent = 'PDF 由原文件排版，这里只支持护眼色温。';
+} else if (kind === 'html') {
+  document.getElementById('pref-row-width').hidden = true;
+}
+
+prefScale.addEventListener('input', () => {
+  readPrefs.scale = parseInt(prefScale.value, 10) || 100;
+  prefScaleVal.textContent = readPrefs.scale + '%';
+  applyReadPrefs();
+  saveReadPrefs();
+});
+prefsPanel.addEventListener('click', (e) => {
+  const lhBtn = e.target.closest('[data-lh]');
+  const wBtn = e.target.closest('[data-width]');
+  const warmBtn = e.target.closest('[data-warm]');
+  if (lhBtn) readPrefs.lh = parseFloat(lhBtn.dataset.lh) || 0;
+  else if (wBtn) readPrefs.width = parseInt(wBtn.dataset.width, 10) || 820;
+  else if (warmBtn) readPrefs.warm = parseFloat(warmBtn.dataset.warm) || 0;
+  else return;
+  syncPrefsUI();
+  applyReadPrefs();
+  saveReadPrefs();
+});
+document.getElementById('pref-reset').addEventListener('click', () => {
+  readPrefs = { ...DEFAULT_READ_PREFS };
+  syncPrefsUI();
+  applyReadPrefs();
+  saveReadPrefs();
+});
+
+function syncPrefsUI() {
+  prefScale.value = String(readPrefs.scale);
+  prefScaleVal.textContent = readPrefs.scale + '%';
+  const mark = (sel, isOn) => prefsPanel.querySelectorAll(sel).forEach((b) => b.classList.toggle('active', isOn(b)));
+  mark('[data-lh]', (b) => parseFloat(b.dataset.lh) === (readPrefs.lh || 0));
+  mark('[data-width]', (b) => parseInt(b.dataset.width, 10) === readPrefs.width);
+  mark('[data-warm]', (b) => parseFloat(b.dataset.warm) === (readPrefs.warm || 0));
+}
+
+// ========== 专注模式 / 分屏对话 ==========
+let focusMode = localStorage.getItem('nb-focus') === '1';
+let splitMode = localStorage.getItem('nb-split') === '1';
+if (splitMode) document.body.classList.add('split-chat');   // 面板在 initIframe 后再开
+
+function setFocus(on) {
+  focusMode = !!on;
+  localStorage.setItem('nb-focus', focusMode ? '1' : '0');
+  if (focusMode) bar.classList.add('hidden');
+  updateMoreStates();
+}
+function setSplit(on) {
+  splitMode = !!on;
+  localStorage.setItem('nb-split', splitMode ? '1' : '0');
+  document.body.classList.toggle('split-chat', splitMode);
+  if (splitMode && chatPanel.hidden) openChat();
+  updateMoreStates();
+}
+
+// ========== 更多菜单（专注/分屏/导出/打印/分享/编辑） ==========
+const moreToggle = document.getElementById('more-toggle');
+moreToggle.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (!moreMenu.hidden) { moreMenu.hidden = true; return; }
+  prefsPanel.hidden = true;
+  updateMoreStates();
+  moreMenu.hidden = false;
+  showBar();
+});
+document.addEventListener('click', (e) => {
+  if (!moreMenu.hidden && !moreMenu.contains(e.target) && !e.target.closest('#more-toggle')) moreMenu.hidden = true;
+});
+function updateMoreStates() {
+  document.getElementById('mm-focus-state').textContent = focusMode ? '✓' : '';
+  document.getElementById('mm-split-state').textContent = splitMode ? '✓' : '';
+}
+document.getElementById('mm-focus').addEventListener('click', () => { setFocus(!focusMode); moreMenu.hidden = true; });
+document.getElementById('mm-split').addEventListener('click', () => { setSplit(!splitMode); moreMenu.hidden = true; });
+document.getElementById('mm-export').addEventListener('click', () => { moreMenu.hidden = true; exportSummary(); });
+document.getElementById('mm-print').addEventListener('click', () => {
+  moreMenu.hidden = true;
+  try { iframe.contentWindow.print(); }
+  catch { toast('当前文档不支持打印'); }
+});
+document.getElementById('mm-share').addEventListener('click', () => { moreMenu.hidden = true; shareCourse(); });
+const mmEdit = document.getElementById('mm-edit');
+if (isDynamic && kind === 'md') {
+  mmEdit.hidden = false;
+  mmEdit.addEventListener('click', () => { location.href = `/editor.html?file=${encodeURIComponent(file)}`; });
+}
+
+// ========== 导出复习摘要（.md：元信息 + 高亮批注 + 书签，md 课程附全文） ==========
+async function exportSummary() {
+  const meta = courseMeta || { title: file, subject: '' };
+  let hls = [], bms = [];
+  try { hls = (await fetch(`/api/highlights?file=${encodeURIComponent(file)}`).then((r) => r.json())) || []; } catch {}
+  try { bms = (await fetch(`/api/bookmarks?file=${encodeURIComponent(file)}`).then((r) => r.json())) || []; } catch {}
+  const lines = [
+    `# ${meta.title} · 复习摘要`, '',
+    `> 学科：${meta.subject || '—'} · 导出于 ${new Date().toLocaleString()} · 阅读进度 ${Math.round(currentPct * 100)}%`, '',
+  ];
+  if (hls.length) {
+    lines.push('## 我的高亮与批注', '');
+    for (const h of hls) {
+      lines.push(`- ${String(h.text || '').replace(/\s+/g, ' ').trim()}`);
+      if (h.note) lines.push(`  - 📝 ${h.note}`);
+    }
+    lines.push('');
+  }
+  if (bms.length) {
+    lines.push('## 书签', '');
+    for (const b of bms) lines.push(`- ${b.title}（约 ${Math.round((b.scroll_pct || 0) * 100)}% 处）`);
+    lines.push('');
+  }
+  if (kind === 'md') {
+    try {
+      const raw = await fetch(sourceURL).then((r) => r.text());
+      lines.push('---', '', '## 笔记全文', '', raw);
+    } catch {}
+  } else if (!hls.length && !bms.length) {
+    lines.push('（这门课程还没有高亮或书签——在正文里划选文字即可添加高亮）');
+  }
+  const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${meta.title || '笔记'}-复习摘要.md`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  toast('复习摘要已导出');
+}
+
+// ========== 只读分享链接 ==========
+async function shareCourse() {
+  try {
+    const res = await fetch('/api/share', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file }),
+    });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || '生成失败');
+    const url = new URL(d.url, location.origin).href;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast('已复制只读分享链接（30 天内有效）');
+    } catch {
+      prompt('复制这个只读分享链接（30 天内有效）：', url);
+    }
+  } catch (e) {
+    toast('分享失败：' + (e.message || '未知错误'));
+  }
+}
+
+// 轻提示
+let toastT = null;
+function toast(msg) {
+  let el = document.getElementById('nb-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'nb-toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => el.classList.remove('show'), 2600);
 }
 
 // ===== 建立 / 校验索引 =====

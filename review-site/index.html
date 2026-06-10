@@ -9,7 +9,7 @@
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
   </script>
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=20260607c">
-  <link rel="stylesheet" href="/assets/style.css?v=20260608d">
+  <link rel="stylesheet" href="/assets/style.css?v=20260610a">
 </head>
 <body class="home">
   <header class="topbar">
@@ -20,7 +20,7 @@
     <div class="topbar-right">
       <div class="search-wrap">
         <span class="search-icon">⌕</span>
-        <input type="search" id="search" placeholder="搜索课程、学科…" autocomplete="off">
+        <input type="search" id="search" placeholder="搜索课程、学科…按 Enter 搜全文" autocomplete="off">
       </div>
       <div class="settings-wrap">
         <button class="settings-btn" id="settings-btn" title="设置" aria-haspopup="true" aria-expanded="false">⚙️</button>
@@ -61,6 +61,7 @@
         <h2 class="section-title">我的笔记</h2>
         <div class="sh-actions">
           <button class="ghost-btn omni-btn" id="omni-btn" title="基于你全部课程与记录的 AI 问答">💡 全能问答</button>
+          <a class="ghost-btn" href="/editor.html" title="在站内直接写 Markdown 笔记">✏️ 写笔记</a>
           <button class="create-btn" id="create-btn">＋ 创建课程</button>
         </div>
       </div>
@@ -142,6 +143,18 @@
     </form>
   </aside>
 
+  <!-- 深入搜索（搜索框按 Enter 触发：语义 + 全文） -->
+  <div class="modal-overlay" id="search-modal" hidden>
+    <div class="modal search-modal">
+      <div class="srch-head">
+        <h3>🔍 深入搜索</h3>
+        <span class="srch-q" id="srch-q"></span>
+        <button class="icon-btn" id="srch-close" title="关闭">✕</button>
+      </div>
+      <div class="srch-body" id="srch-body"></div>
+    </div>
+  </div>
+
   <!-- 关于 / 学习画像 -->
   <div class="modal-overlay about-overlay" id="about-modal" hidden>
     <div class="about-card" role="dialog" aria-modal="true" aria-label="关于">
@@ -171,6 +184,6 @@
 
   <script src="/assets/theme.js?v=20260608a"></script>
   <script src="/assets/md.js?v=20260608d"></script>
-  <script src="/assets/app.js?v=20260608d"></script>
+  <script src="/assets/app.js?v=20260610a"></script>
 </body>
 </html>

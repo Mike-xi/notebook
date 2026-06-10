@@ -8,7 +8,7 @@
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
   </script>
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=20260607c">
-  <link rel="stylesheet" href="/assets/style.css?v=20260608d">
+  <link rel="stylesheet" href="/assets/style.css?v=20260610a">
 </head>
 <body class="reader">
   <iframe id="content" src="" title="复习文档"></iframe>
@@ -22,9 +22,64 @@
       <span class="rb-title" id="doc-title">加载中…</span>
     </div>
     <span class="rb-progress" id="progress-pct">0%</span>
+    <button class="rb-btn rb-aa" id="prefs-toggle" title="阅读设置">Aa</button>
     <button class="rb-btn" id="bookmark-btn" title="加书签">☆</button>
     <button class="rb-btn" id="bookmarks-toggle" title="书签列表">☰</button>
+    <button class="rb-btn" id="more-toggle" title="更多">⋯</button>
   </div>
+
+  <!-- 更多菜单（专注/分屏/导出/打印/分享/编辑） -->
+  <div class="more-menu" id="more-menu" hidden>
+    <button class="mm-item" id="mm-focus"><span class="mm-ic">⛶</span><span>专注模式</span><span class="mm-state" id="mm-focus-state"></span></button>
+    <button class="mm-item" id="mm-split"><span class="mm-ic">⧉</span><span>分屏对话</span><span class="mm-state" id="mm-split-state"></span></button>
+    <div class="mm-divider"></div>
+    <button class="mm-item" id="mm-export"><span class="mm-ic">⤓</span><span>导出复习摘要 (.md)</span></button>
+    <button class="mm-item" id="mm-print"><span class="mm-ic">🖨</span><span>打印 / 存为 PDF</span></button>
+    <button class="mm-item" id="mm-share"><span class="mm-ic">🔗</span><span>复制分享链接</span></button>
+    <button class="mm-item" id="mm-edit" hidden><span class="mm-ic">✏️</span><span>编辑此笔记</span></button>
+  </div>
+
+  <!-- 阅读设置面板 -->
+  <aside id="prefs-panel" hidden>
+    <div class="panel-header">
+      <h3>阅读设置</h3>
+      <button class="icon-btn" id="prefs-close">✕</button>
+    </div>
+    <div class="prefs-body">
+      <div class="pref-row" id="pref-row-scale">
+        <span class="pref-label">字号</span>
+        <input type="range" id="pref-scale" min="85" max="130" step="5" value="100">
+        <span class="pref-val" id="pref-scale-val">100%</span>
+      </div>
+      <div class="pref-row" id="pref-row-lh">
+        <span class="pref-label">行距</span>
+        <div class="seg">
+          <button class="seg-btn" data-lh="0">默认</button>
+          <button class="seg-btn" data-lh="1.5">紧凑</button>
+          <button class="seg-btn" data-lh="1.7">适中</button>
+          <button class="seg-btn" data-lh="1.9">宽松</button>
+        </div>
+      </div>
+      <div class="pref-row" id="pref-row-width">
+        <span class="pref-label">阅读宽度</span>
+        <div class="seg">
+          <button class="seg-btn" data-width="680">窄</button>
+          <button class="seg-btn" data-width="820">适中</button>
+          <button class="seg-btn" data-width="1000">宽</button>
+        </div>
+      </div>
+      <div class="pref-row">
+        <span class="pref-label">护眼色温</span>
+        <div class="seg">
+          <button class="seg-btn" data-warm="0">关</button>
+          <button class="seg-btn" data-warm="0.14">微暖</button>
+          <button class="seg-btn" data-warm="0.28">暖</button>
+        </div>
+      </div>
+      <button class="pref-reset" id="pref-reset">恢复默认</button>
+      <p class="sm-tip" id="prefs-tip">设置只对这门课程生效，并会同步到云端。</p>
+    </div>
+  </aside>
 
   <!-- 鼠标移到顶部时唤出工具栏的感应区 -->
   <div class="reader-hotzone" id="reader-hotzone"></div>
@@ -76,6 +131,6 @@
   <script src="/assets/theme.js?v=20260608a"></script>
   <script src="/assets/md.js?v=20260608d"></script>
   <script src="/assets/highlights.js?v=20260607d"></script>
-  <script src="/assets/reader.js?v=20260608d"></script>
+  <script src="/assets/reader.js?v=20260610a"></script>
 </body>
 </html>

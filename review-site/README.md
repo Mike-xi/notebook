@@ -5,13 +5,18 @@
 ## 功能
 
 - 📚 课程卡片首页（按学科分色）+ 最近阅读
-- 📄 **多格式**：HTML / Markdown（KaTeX 公式 + 代码高亮）/ PDF（自定义 PDF.js 阅读器，连续滚动 + 缩放 + 大纲）
+- 📄 **多格式**：HTML / Markdown（KaTeX 公式 + 代码高亮）/ PDF（自定义 PDF.js 阅读器，连续滚动 + 缩放 + 大纲 + 文本层选中复制 + 页内搜索）
 - ⬆️ **站内上传**：HTML/Markdown 存 D1，PDF 存 R2
+- ✏️ **站内编辑器**：直接新建 / 编辑 Markdown 笔记，左编辑右预览（公式 + 代码高亮），Ctrl+S 保存，新建草稿防丢
 - 📍 自动记录上次阅读位置（PDF/MD 同样支持，跨设备同步）
 - 🔖 任意位置加书签 + 命名 + 跳转
 - 📑 **目录 TOC**：自动从标题/PDF 大纲生成，点击跳转
 - 🖍️ **高亮 + 批注**（HTML/Markdown）：选词 4 色高亮、加批注，重开还原
-- 🔍 课程列表搜索
+- 🔍 **搜索**：输入即时过滤课程；按 Enter 深入搜索（Vectorize 语义检索 + 全文关键词匹配），语义结果可直跳对应小节
+- 🅰️ **阅读偏好**：字号 / 行距 / 阅读宽度 / 护眼色温，按课程记忆并同步云端
+- 🧘 **专注模式**（滚动不再唤出工具栏）与 **分屏对话**（左正文右 AI）
+- ⤓ **导出**：高亮批注 + 书签一键导出复习摘要 (.md)；打印 / 浏览器存 PDF
+- 🔗 **只读分享链接**：HMAC 签名 token，默认 30 天有效，对方无需登录
 - 🌙 **深浅色切换**：手动 跟随系统 / 浅 / 深 三态
 - 🔐 密码保护（HMAC 签名 cookie）
 
@@ -137,7 +142,11 @@ review-site/
 │       ├── courses.js       # GET/POST(multipart)/DELETE: 站内课程（html/md→D1, pdf→R2）
 │       ├── course-html.js   # GET: 取 D1 里的 html/md 正文
 │       ├── file.js          # GET: 从 R2 流式返回 pdf（支持 Range）
-│       └── highlights.js    # GET/POST/PUT/DELETE: 高亮+批注
+│       ├── highlights.js    # GET/POST/PUT/DELETE: 高亮+批注
+│       ├── search.js        # GET: 深入搜索（Vectorize 语义 + D1/静态全文）
+│       ├── prefs.js         # GET/PUT: 阅读偏好等键值（reader: 前缀白名单）
+│       ├── share.js         # POST: 生成只读分享 token（HMAC 无状态）
+│       └── shared.js        # GET: 分享取数（公开路径，token 自鉴权）
 ├── notes/                   # 静态课程文件（html/md/pdf）
 ├── assets/
 │   ├── style.css            # Material You 主题（data-theme 驱动深浅色）
@@ -147,8 +156,10 @@ review-site/
 │   ├── pdf-viewer.js        # PDF.js 连续滚动阅读器
 │   ├── md-viewer.js         # Markdown 渲染（markdown-it+KaTeX+hljs）
 │   └── highlights.js        # 高亮+批注引擎
-├── index.html               # 首页（课程卡片 + 上传弹窗）
-├── reader.html              # 阅读器（iframe + 悬浮工具栏 + TOC/书签面板）
+├── index.html               # 首页（课程卡片 + 上传弹窗 + 深入搜索）
+├── editor.html              # 站内 Markdown 编辑器（左编辑右预览）
+├── share.html               # 只读分享页（公开，凭 token 取数）
+├── reader.html              # 阅读器（iframe + 悬浮工具栏 + TOC/书签/阅读设置面板）
 ├── viewer-pdf.html          # PDF 阅读器外壳（reader iframe 内）
 ├── viewer-md.html           # Markdown 阅读器外壳（reader iframe 内）
 ├── login.html               # 登录页
@@ -189,5 +200,4 @@ highlights(id PK, file, start_off, end_off, text, color, note, created_at)
 - **PWA 离线**：加 `manifest.json` + Service Worker
 - **标签筛选**：首页加标签筛选条，按 `courses.json` 里的 tags 过滤
 - **抽认卡 / 间隔重复（SRS）**：把高亮/批注转成复习卡
-- **AI 问答**：选中段落 → 调用你的 SJTU AI 网关
-- **PDF 文字层**：当前 PDF 阅读器是 canvas 渲染（不可选词）；可加 pdf.js text layer 支持选中/搜索
+- **AI 学习教练**：聚合进度 / 答题 / 提问历史，生成每日总结与复习计划

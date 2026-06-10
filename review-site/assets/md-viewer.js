@@ -92,11 +92,22 @@
     if (din) din.disabled = !dark;
   }
 
+  // ===== 阅读偏好（字号/行距/宽度/色温，由父页 reader 下发） =====
+  function applyReadPrefs(p) {
+    if (!p) return;
+    const wrap = document.getElementById('md-wrap');
+    if (wrap) wrap.style.maxWidth = (p.width || 820) + 'px';
+    contentEl.style.fontSize = (Math.round(16 * (p.scale || 100)) / 100) + 'px';
+    contentEl.style.lineHeight = p.lh ? String(p.lh) : '';
+    document.body.style.filter = p.warm > 0 ? `sepia(${p.warm})` : '';
+  }
+
   // ===== 与父页通信 =====
   function post(msg) { try { parent.postMessage(msg, location.origin); } catch {} }
   window.addEventListener('message', (e) => {
     const d = e.data || {};
     if (d.type === 'nb-theme') applyTheme(d.effective);
     else if (d.type === 'nb-goto-id') gotoId(d.id);
+    else if (d.type === 'nb-read-prefs') applyReadPrefs(d.prefs);
   });
 })();

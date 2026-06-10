@@ -112,6 +112,24 @@ async function renderPage(i) {
     const ph = div.querySelector('.pdf-ph-num');
     if (ph) ph.remove();
     div.appendChild(canvas);
+    // 文本层：与 canvas 同尺寸叠放，让 PDF 可选中、可复制、可被页内搜索高亮
+    try {
+      const tl = document.createElement('div');
+      tl.className = 'textLayer';
+      tl.style.setProperty('--scale-factor', String(scale));
+      const textLayer = new pdfjsLib.TextLayer({
+        textContentSource: page.streamTextContent(),
+        container: tl,
+        viewport: page.getViewport({ scale }),   // CSS 像素尺寸（不乘 dpr）
+      });
+      await textLayer.render();
+      if (myLayout === layoutId && pageDivs[i] === div) {
+        div.appendChild(tl);
+        if (searchQuery) highlightPage(div);
+      }
+    } catch (e) {
+      console.warn('[pdf] text layer page', i, 'failed', e);
+    }
     rendered.add(i);
   } catch (e) {
     // 单页渲染失败不影响其它页
@@ -209,6 +227,88 @@ function gotoPage(p) {
   if (d) window.scrollTo({ top: d.offsetTop - 8, behavior: 'smooth' });
 }
 
+// ========== 页内搜索 ==========
+// 文本逐页取自 getTextContent（懒加载缓存）；命中按页导航，当前已渲染页的
+// 文本层 span 若包含关键词则加高亮。关键词跨 span 断开时无法精确高亮（只跳页），属已知近似。
+const searchBox = document.getElementById('pv-search');
+const searchInput = document.getElementById('pv-q');
+const searchCount = document.getElementById('pv-count');
+let searchQuery = '';
+let pageTexts = null;      // [i] -> 该页全文 lowercase
+let hitPages = [];         // 含命中的页码列表
+let hitTotal = 0;
+let curHit = -1;
+
+document.getElementById('pv-find').addEventListener('click', toggleSearch);
+document.getElementById('pv-x').addEventListener('click', closeSearch);
+document.getElementById('pv-prev').addEventListener('click', () => stepHit(-1));
+document.getElementById('pv-next').addEventListener('click', () => stepHit(1));
+searchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); runSearch(); }
+  if (e.key === 'Escape') closeSearch();
+});
+
+function toggleSearch() {
+  if (searchBox.hidden) { searchBox.hidden = false; searchInput.focus(); }
+  else closeSearch();
+}
+function closeSearch() {
+  searchBox.hidden = true;
+  searchQuery = '';
+  hitPages = []; curHit = -1;
+  clearHighlights();
+}
+
+async function ensurePageTexts() {
+  if (pageTexts) return;
+  pageTexts = [];
+  for (let i = 1; i <= pdfDoc.numPages; i++) {
+    try {
+      const tc = await (await pdfDoc.getPage(i)).getTextContent();
+      pageTexts[i] = tc.items.map((it) => it.str).join(' ').toLowerCase();
+    } catch { pageTexts[i] = ''; }
+  }
+}
+
+async function runSearch() {
+  const q = searchInput.value.trim().toLowerCase();
+  if (!q || !pdfDoc) return;
+  searchCount.textContent = '搜索中…';
+  await ensurePageTexts();
+  searchQuery = q;
+  hitPages = []; hitTotal = 0;
+  for (let i = 1; i <= pdfDoc.numPages; i++) {
+    let n = 0;
+    for (let p = pageTexts[i].indexOf(q); p >= 0 && n < 99; p = pageTexts[i].indexOf(q, p + q.length)) n++;
+    if (n > 0) { hitPages.push(i); hitTotal += n; }
+  }
+  clearHighlights();
+  pageDivs.forEach((d) => d && highlightPage(d));
+  if (!hitPages.length) { searchCount.textContent = '无结果'; curHit = -1; return; }
+  curHit = 0;
+  gotoPage(hitPages[0]);
+  updateHitCount();
+}
+
+function stepHit(dir) {
+  if (!hitPages.length) { runSearch(); return; }
+  curHit = (curHit + dir + hitPages.length) % hitPages.length;
+  gotoPage(hitPages[curHit]);
+  updateHitCount();
+}
+function updateHitCount() {
+  searchCount.textContent = `第 ${curHit + 1}/${hitPages.length} 页 · 共 ${hitTotal} 处`;
+}
+function clearHighlights() {
+  document.querySelectorAll('.textLayer .pv-hit').forEach((s) => s.classList.remove('pv-hit'));
+}
+function highlightPage(pageDiv) {
+  if (!searchQuery) return;
+  pageDiv.querySelectorAll('.textLayer span').forEach((s) => {
+    if ((s.textContent || '').toLowerCase().includes(searchQuery)) s.classList.add('pv-hit');
+  });
+}
+
 // ========== 主题 ==========
 function currentTheme() {
   try {
@@ -226,6 +326,11 @@ window.addEventListener('message', (e) => {
   const d = e.data || {};
   if (d.type === 'nb-theme') applyTheme(d.effective);
   else if (d.type === 'nb-goto-page' && typeof d.page === 'number') gotoPage(d.page);
+  else if (d.type === 'nb-read-prefs') {
+    // PDF 只支持护眼色温（字号/行距由 PDF 自身排版决定）
+    const warm = (d.prefs && d.prefs.warm) || 0;
+    document.body.style.filter = warm > 0 ? `sepia(${warm})` : '';
+  }
 });
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }

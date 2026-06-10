@@ -7,6 +7,7 @@ const KIND_ICON = { html: '📘', md: '📝', pdf: '📕' };
 
 let studyProfile = null;       // 「关于」弹窗用：基于你自己的课程数据生成的学习画像
 let staticCoursesData = [];     // 静态课程元数据，供「全能问答」随请求带给后端
+let allCoursesMap = new Map();  // file -> 课程元数据，深入搜索结果展示用
 
 function detectKind(name) {
   const ext = (name.split('.').pop() || '').toLowerCase();
@@ -46,6 +47,7 @@ async function loadAndRender() {
     .filter((c) => c.title);
 
   staticCoursesData = staticCourses;
+  allCoursesMap = new Map(courses.map((c) => [c.file, c]));
   studyProfile = buildProfile(courses, progress, recent);
 
   const recentSection = document.getElementById('recent-section');
@@ -65,13 +67,93 @@ async function loadAndRender() {
 }
 
 // ========== 搜索 ==========
-document.getElementById('search').addEventListener('input', (e) => {
+// 输入即时过滤卡片（标题/学科/简介/标签）；按 Enter 走 /api/search 深入搜索（语义 + 全文）
+const searchInput = document.getElementById('search');
+searchInput.addEventListener('input', (e) => {
   const q = e.target.value.trim().toLowerCase();
   document.querySelectorAll('#courses .nb-card').forEach((card) => {
     const text = card.dataset.search;
     card.style.display = !q || text.includes(q) ? '' : 'none';
   });
 });
+searchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const q = searchInput.value.trim();
+    if (q) openDeepSearch(q);
+  }
+});
+
+// ========== 深入搜索弹窗 ==========
+const searchModal = document.getElementById('search-modal');
+const srchBody = document.getElementById('srch-body');
+const srchQ = document.getElementById('srch-q');
+
+document.getElementById('srch-close').addEventListener('click', () => { searchModal.hidden = true; });
+searchModal.addEventListener('click', (e) => { if (e.target === searchModal) searchModal.hidden = true; });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !searchModal.hidden) searchModal.hidden = true; });
+
+async function openDeepSearch(q) {
+  srchQ.textContent = `「${q}」`;
+  srchBody.innerHTML = '<p class="srch-loading">正在做语义检索与全文匹配…</p>';
+  searchModal.hidden = false;
+  let data = null;
+  try {
+    const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    data = await r.json();
+    if (!r.ok) throw new Error(data.error || '搜索失败');
+  } catch (e) {
+    srchBody.innerHTML = `<p class="srch-empty">⚠️ ${escapeHTML(e.message || '搜索失败，请重试')}</p>`;
+    return;
+  }
+  renderDeepSearch(q, data || {});
+}
+
+function courseLabel(file) {
+  const c = allCoursesMap.get(file);
+  return c ? `${c.icon || '📄'} ${c.title}` : file;
+}
+
+// 在摘录里高亮命中词（先转义，再替换）
+function markHit(text, q) {
+  const safe = escapeHTML(text);
+  const safeQ = escapeHTML(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  try { return safe.replace(new RegExp(safeQ, 'gi'), (m) => `<mark>${m}</mark>`); }
+  catch { return safe; }
+}
+
+function renderDeepSearch(q, data) {
+  const semantic = (data.semantic || []).filter((s) => allCoursesMap.has(s.file));
+  const keyword = (data.keyword || []).filter((k) => allCoursesMap.has(k.file) && k.count > 0);
+  let html = '';
+  if (semantic.length) {
+    html += '<p class="srch-section-title">✨ 语义匹配（按相关度）</p>';
+    html += semantic.map((s) => `
+      <a class="srch-item" href="/reader.html?file=${encodeURIComponent(s.file)}&goto=${encodeURIComponent(s.heading)}">
+        <span class="srch-item-top">
+          <span class="srch-item-course">${escapeHTML(courseLabel(s.file))}</span>
+          <span class="srch-item-heading">${escapeHTML(s.heading)}</span>
+        </span>
+        <span class="srch-item-text">${markHit(s.text, q)}</span>
+      </a>`).join('');
+  }
+  if (keyword.length) {
+    html += '<p class="srch-section-title">🔤 全文匹配</p>';
+    html += keyword.map((k) => `
+      <a class="srch-item" href="/reader.html?file=${encodeURIComponent(k.file)}">
+        <span class="srch-item-top">
+          <span class="srch-item-course">${escapeHTML(courseLabel(k.file))}</span>
+          <span class="srch-item-count">命中 ${k.count >= 99 ? '99+' : k.count} 处</span>
+        </span>
+        <span class="srch-item-text">${markHit(k.snippet, q)}</span>
+      </a>`).join('');
+  }
+  if (!html) {
+    html = '<p class="srch-empty">没有找到相关内容</p>';
+  }
+  html += '<p class="srch-foot-tip">语义搜索覆盖已建立索引的课程——打开某门课程的 AI 对话即会自动为它建索引。点语义结果可直接跳到对应小节。</p>';
+  srchBody.innerHTML = html;
+}
 
 // ========== 设置菜单（⚙️ 下拉：外观 / 关于 / 退出） ==========
 const settingsWrap = document.querySelector('.settings-wrap');
@@ -320,8 +402,15 @@ function renderAbout() {
   document.getElementById('about-note').textContent = note;
 }
 
-// ========== 删除动态课程（事件委托） ==========
+// ========== 删除 / 编辑动态课程（事件委托） ==========
 document.getElementById('courses').addEventListener('click', async (e) => {
+  const edit = e.target.closest('.nb-edit');
+  if (edit) {
+    e.preventDefault();
+    e.stopPropagation();
+    location.href = `/editor.html?file=${encodeURIComponent(edit.dataset.file)}`;
+    return;
+  }
   const del = e.target.closest('.nb-del');
   if (!del) return;
   e.preventDefault();
@@ -633,6 +722,11 @@ function cardHTML(c, deletable = false) {
     ? `<button class="nb-del" data-file="${escapeAttr(c.file)}" title="删除课程" aria-label="删除课程">✕</button>`
     : '';
 
+  // 站内创建/上传的 Markdown 课程可直接进编辑器改
+  const editBtn = (deletable && c.dynamic && c.kind === 'md')
+    ? `<button class="nb-edit" data-file="${escapeAttr(c.file)}" title="编辑笔记" aria-label="编辑笔记">✏️</button>`
+    : '';
+
   // 主网格（deletable=true）的卡片可拖动排序；「最近阅读」不可
   const dragHandle = deletable
     ? `<button type="button" class="nb-drag" title="拖动排序" aria-label="拖动排序">⠿</button>`
@@ -643,7 +737,7 @@ function cardHTML(c, deletable = false) {
        style="--accent: ${c.color || '#6750A4'}"
        data-file="${escapeAttr(c.file)}"
        data-search="${escapeAttr(searchText)}">
-      ${dragHandle}${delBtn}
+      ${dragHandle}${delBtn}${editBtn}
       <span class="nb-card-icon">${escapeHTML(c.icon || '📄')}</span>
       <div class="nb-card-body">
         <span class="nb-card-subject">${escapeHTML(c.subject || '笔记')}</span>

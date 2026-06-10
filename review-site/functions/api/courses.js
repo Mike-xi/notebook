@@ -125,6 +125,39 @@ export async function onRequestPost({ request, env }) {
   return Response.json({ ok: true, file, kind });
 }
 
+// PUT /api/courses {file, content?, title?, subject?, description?} —— 站内编辑器保存
+// 仅允许编辑动态 Markdown 课程（u-*.md，正文在 D1）。内容变更后阅读器会按 hash 自动重建 RAG 索引。
+export async function onRequestPut({ request, env }) {
+  await ensureCoursesSchema(env);
+
+  let body;
+  try { body = await request.json(); }
+  catch { return err('请求格式错误'); }
+
+  const file = str(body?.file);
+  if (!file.startsWith('u-')) return err('非法的课程标识');
+  const row = await env.DB.prepare('SELECT kind FROM courses WHERE file = ?').bind(file).first();
+  if (!row) return err('课程不存在', 404);
+  if (row.kind !== 'md') return err('仅支持编辑 Markdown 笔记');
+
+  const sets = [], binds = [];
+  if (typeof body.content === 'string') {
+    if (!body.content.trim()) return err('内容不能为空');
+    const bytes = new TextEncoder().encode(body.content).length;
+    if (bytes > MAX_TEXT_BYTES) return errSize(bytes, MAX_TEXT_BYTES, 'Markdown');
+    sets.push('html = ?'); binds.push(body.content);
+  }
+  const title = str(body?.title);
+  if (title) { sets.push('title = ?'); binds.push(title.slice(0, 80)); }
+  if (typeof body?.subject === 'string') { sets.push('subject = ?'); binds.push(str(body.subject).slice(0, 40)); }
+  if (typeof body?.description === 'string') { sets.push('description = ?'); binds.push(str(body.description).slice(0, 120)); }
+  if (!sets.length) return err('没有要更新的内容');
+
+  await env.DB.prepare(`UPDATE courses SET ${sets.join(', ')} WHERE file = ?`).bind(...binds, file).run();
+  await logEvent(env, 'edit', `${file} · ${title.slice(0, 60)}`);
+  return Response.json({ ok: true });
+}
+
 export async function onRequestDelete({ request, env }) {
   await ensureCoursesSchema(env);
 

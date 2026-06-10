@@ -4,6 +4,8 @@ const PUBLIC_PATHS = new Set([
   '/login.html',
   '/login',
   '/api/login',
+  '/share.html',   // 只读分享页（页面本身公开，取数靠 /api/shared 的 token 自鉴权）
+  '/api/shared',
 ]);
 
 export async function onRequest(context) {
