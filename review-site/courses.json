@@ -38,5 +38,15 @@
     "color": "#00E5FF",
     "kind": "html",
     "tags": ["OSINT", "情报", "实时地图"]
+  },
+  {
+    "file": "basketball.html",
+    "title": "3D 投篮物理模拟器",
+    "subject": "大学物理",
+    "description": "抛体运动 · 恢复系数 · Rapier 真实刚体物理 · 第三人称投篮仿真（滚轮调力度/左键出手）",
+    "icon": "🏀",
+    "color": "#E2521B",
+    "kind": "html",
+    "tags": ["物理", "抛体运动", "碰撞", "互动仿真"]
   }
 ]
