@@ -8,6 +8,11 @@ const KIND_ICON = { html: '📘', md: '📝', pdf: '📕' };
 let studyProfile = null;       // 「关于」弹窗用：基于你自己的课程数据生成的学习画像
 let staticCoursesData = [];     // 静态课程元数据，供「全能问答」随请求带给后端
 let allCoursesMap = new Map();  // file -> 课程元数据，深入搜索结果展示用
+let activeTab = 'all';          // 当前分类 Tab：all / learn / explore / play
+let searchQ = '';               // 即时搜索词（小写）
+let hasRecent = false;          // 是否存在「最近阅读」
+let totalCourses = 0;           // 课程总数（空状态判断用）
+let ncCat = 'learn';            // 创建课程时选择的分类
 
 function detectKind(name) {
   const ext = (name.split('.').pop() || '').toLowerCase();
@@ -54,31 +59,26 @@ async function loadAndRender() {
   allCoursesMap = new Map(courses.map((c) => [c.file, c]));
   studyProfile = buildProfile(courses, progress, recent);
 
-  const recentSection = document.getElementById('recent-section');
-  if (recent.length > 0) {
-    recentSection.hidden = false;
+  hasRecent = recent.length > 0;
+  if (hasRecent) {
     document.getElementById('recent').innerHTML = recent.map((c) => cardHTML(c)).join('');
-  } else {
-    recentSection.hidden = true;
   }
 
   // 全部课程
   const grid = document.getElementById('courses');
-  document.getElementById('empty-hint').hidden = courses.length > 0;
+  totalCourses = courses.length;
   grid.innerHTML = courses
     .map((c) => cardHTML({ ...c, ...progressMap[c.file] }, true))
     .join('');
+  applyFilters();
 }
 
 // ========== 搜索 ==========
 // 输入即时过滤卡片（标题/学科/简介/标签）；按 Enter 走 /api/search 深入搜索（语义 + 全文）
 const searchInput = document.getElementById('search');
 searchInput.addEventListener('input', (e) => {
-  const q = e.target.value.trim().toLowerCase();
-  document.querySelectorAll('#courses .nb-card').forEach((card) => {
-    const text = card.dataset.search;
-    card.style.display = !q || text.includes(q) ? '' : 'none';
-  });
+  searchQ = e.target.value.trim().toLowerCase();
+  applyFilters();
 });
 searchInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
@@ -87,6 +87,43 @@ searchInput.addEventListener('keydown', (e) => {
     if (q) openDeepSearch(q);
   }
 });
+
+// ========== 分类 Tab（All / Learn / Explore / Play）+ 搜索联合过滤 ==========
+const homeTabs = document.getElementById('home-tabs');
+homeTabs.addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab');
+  if (!btn) return;
+  activeTab = btn.dataset.tab || 'all';
+  homeTabs.querySelectorAll('.tab').forEach((b) => {
+    const on = b === btn;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  applyFilters();
+});
+
+// 课程卡按「当前 Tab 分类」与「搜索词」联合显隐；Recent 仅在 All 且无搜索时出现
+function applyFilters() {
+  let visible = 0;
+  document.querySelectorAll('#courses .nb-card').forEach((card) => {
+    const catOk = activeTab === 'all' || (card.dataset.category || 'learn') === activeTab;
+    const sOk = !searchQ || (card.dataset.search || '').includes(searchQ);
+    const show = catOk && sOk;
+    card.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  document.getElementById('recent-section').hidden = !(hasRecent && activeTab === 'all' && !searchQ);
+  const empty = document.getElementById('empty-hint');
+  if (totalCourses === 0) {
+    empty.hidden = false;
+    empty.innerHTML = 'No notebooks here yet — use <b>Create</b> to add one.';
+  } else if (visible === 0) {
+    empty.hidden = false;
+    empty.textContent = searchQ ? 'No notebooks match your search.' : 'Nothing in this category yet.';
+  } else {
+    empty.hidden = true;
+  }
+}
 
 // ========== 深入搜索弹窗 ==========
 const searchModal = document.getElementById('search-modal');
@@ -98,16 +135,16 @@ searchModal.addEventListener('click', (e) => { if (e.target === searchModal) sea
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !searchModal.hidden) searchModal.hidden = true; });
 
 async function openDeepSearch(q) {
-  srchQ.textContent = `「${q}」`;
-  srchBody.innerHTML = '<p class="srch-loading">正在做语义检索与全文匹配…</p>';
+  srchQ.textContent = `“${q}”`;
+  srchBody.innerHTML = '<p class="srch-loading">Running semantic and full-text search…</p>';
   searchModal.hidden = false;
   let data = null;
   try {
     const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
     data = await r.json();
-    if (!r.ok) throw new Error(data.error || '搜索失败');
+    if (!r.ok) throw new Error(data.error || 'Search failed');
   } catch (e) {
-    srchBody.innerHTML = `<p class="srch-empty">⚠️ ${escapeHTML(e.message || '搜索失败，请重试')}</p>`;
+    srchBody.innerHTML = `<p class="srch-empty">⚠️ ${escapeHTML(e.message || 'Search failed, please retry')}</p>`;
     return;
   }
   renderDeepSearch(q, data || {});
@@ -131,7 +168,7 @@ function renderDeepSearch(q, data) {
   const keyword = (data.keyword || []).filter((k) => allCoursesMap.has(k.file) && k.count > 0);
   let html = '';
   if (semantic.length) {
-    html += '<p class="srch-section-title">✨ 语义匹配（按相关度）</p>';
+    html += '<p class="srch-section-title">Semantic matches</p>';
     html += semantic.map((s) => `
       <a class="srch-item" href="/reader.html?file=${encodeURIComponent(s.file)}&goto=${encodeURIComponent(s.heading)}">
         <span class="srch-item-top">
@@ -142,20 +179,20 @@ function renderDeepSearch(q, data) {
       </a>`).join('');
   }
   if (keyword.length) {
-    html += '<p class="srch-section-title">🔤 全文匹配</p>';
+    html += '<p class="srch-section-title">Full-text matches</p>';
     html += keyword.map((k) => `
       <a class="srch-item" href="/reader.html?file=${encodeURIComponent(k.file)}">
         <span class="srch-item-top">
           <span class="srch-item-course">${escapeHTML(courseLabel(k.file))}</span>
-          <span class="srch-item-count">命中 ${k.count >= 99 ? '99+' : k.count} 处</span>
+          <span class="srch-item-count">${k.count >= 99 ? '99+' : k.count} hits</span>
         </span>
         <span class="srch-item-text">${markHit(k.snippet, q)}</span>
       </a>`).join('');
   }
   if (!html) {
-    html = '<p class="srch-empty">没有找到相关内容</p>';
+    html = '<p class="srch-empty">No matches found</p>';
   }
-  html += '<p class="srch-foot-tip">语义搜索覆盖已建立索引的课程——打开某门课程的 AI 对话即会自动为它建索引。点语义结果可直接跳到对应小节。</p>';
+  html += '<p class="srch-foot-tip">Semantic search covers notebooks that have been indexed — open a notebook’s AI chat to index it. Click a semantic result to jump straight to that section.</p>';
   srchBody.innerHTML = html;
 }
 
@@ -174,6 +211,7 @@ function closeSettings() {
 }
 settingsBtn.addEventListener('click', (e) => {
   e.stopPropagation();
+  closeCreateMenu();
   settingsMenu.hidden ? openSettings() : closeSettings();
 });
 // 点菜单内部不关闭（主题分段控件要连点）；点外部 / Esc 关闭
@@ -538,13 +576,28 @@ function resetForm() {
   document.getElementById('nc-file').value = '';
   setTags([]);
   selectIcon('📘');
+  selectCat('learn');
   setAIStatus('');
   hint.textContent = '支持 HTML / Markdown（≤1.5 MB）或 PDF（≤20 MB）。选好文件后可让 AI 自动填充。';
   hint.classList.remove('err');
 }
 function setHint(msg, isErr) { hint.textContent = msg; hint.classList.toggle('err', !!isErr); }
 
-document.getElementById('create-btn').addEventListener('click', openModal);
+// Create 按钮：下拉两路（上传文件 / 写 Markdown 笔记）
+const createBtn = document.getElementById('create-btn');
+const createMenu = document.getElementById('create-menu');
+function openCreateMenu() { createMenu.hidden = false; createBtn.setAttribute('aria-expanded', 'true'); }
+function closeCreateMenu() { createMenu.hidden = true; createBtn.setAttribute('aria-expanded', 'false'); }
+createBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  closeSettings();
+  createMenu.hidden ? openCreateMenu() : closeCreateMenu();
+});
+createMenu.addEventListener('click', (e) => e.stopPropagation());
+document.addEventListener('click', closeCreateMenu);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCreateMenu(); });
+document.getElementById('cm-upload').addEventListener('click', () => { closeCreateMenu(); openModal(); });
+
 document.getElementById('nc-cancel').addEventListener('click', closeModal);
 modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 document.addEventListener('keydown', (e) => {
@@ -584,6 +637,7 @@ submitBtn.addEventListener('click', async () => {
     fd.append('icon', document.getElementById('nc-icon').value.trim());
     fd.append('tags', JSON.stringify(ncTags));
     fd.append('kind', kind);
+    fd.append('category', ncCat);
     fd.append('file', f, f.name);
     const res = await fetch('/api/courses', { method: 'POST', body: fd });
     const data = await res.json().catch(() => ({}));
@@ -628,6 +682,17 @@ function selectIcon(emoji) {
 iconPicker.addEventListener('click', (e) => {
   const b = e.target.closest('.icon-opt');
   if (b) selectIcon(b.dataset.icon);
+});
+
+// 分类选择（创建课程：Learn / Explore / Play）
+const catSeg = document.getElementById('nc-cat');
+function selectCat(cat) {
+  ncCat = ['learn', 'explore', 'play'].includes(cat) ? cat : 'learn';
+  catSeg.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.cat === ncCat));
+}
+catSeg.addEventListener('click', (e) => {
+  const b = e.target.closest('.seg-btn');
+  if (b) selectCat(b.dataset.cat);
 });
 
 function renderTags() {
@@ -718,29 +783,32 @@ function cardHTML(c, deletable = false) {
   const progressBlock = pct > 0
     ? `<div class="nb-progress">
          <div class="nb-progress-bar"><i style="width:${pct}%"></i></div>
-         <span>已读 ${pct}%</span>
+         <span>${pct}% read</span>
        </div>`
     : '';
 
+  const ic = (n, s) => (window.NBIcon ? NBIcon(n, { size: s }) : '');
+
   // 所有课程地位相同，均可删除（静态课删除＝从首页隐藏）
   const delBtn = deletable
-    ? `<button class="nb-del" data-file="${escapeAttr(c.file)}" title="删除课程" aria-label="删除课程">✕</button>`
+    ? `<button class="nb-del" data-file="${escapeAttr(c.file)}" title="删除课程" aria-label="删除课程">${ic('close', 16)}</button>`
     : '';
 
   // 站内创建/上传的 Markdown 课程可直接进编辑器改
   const editBtn = (deletable && c.dynamic && c.kind === 'md')
-    ? `<button class="nb-edit" data-file="${escapeAttr(c.file)}" title="编辑笔记" aria-label="编辑笔记">✏️</button>`
+    ? `<button class="nb-edit" data-file="${escapeAttr(c.file)}" title="编辑笔记" aria-label="编辑笔记">${ic('edit', 15)}</button>`
     : '';
 
   // 主网格（deletable=true）的卡片可拖动排序；「最近阅读」不可
   const dragHandle = deletable
-    ? `<button type="button" class="nb-drag" title="拖动排序" aria-label="拖动排序">⠿</button>`
+    ? `<button type="button" class="nb-drag" title="拖动排序" aria-label="拖动排序">${ic('drag', 16)}</button>`
     : '';
 
   return `
     <a class="nb-card" href="/reader.html?file=${encodeURIComponent(c.file)}"
        style="--accent: ${c.color || '#6750A4'}"
        data-file="${escapeAttr(c.file)}"
+       data-category="${escapeAttr(c.category || 'learn')}"
        data-search="${escapeAttr(searchText)}">
       ${dragHandle}${delBtn}${editBtn}
       <span class="nb-card-icon">${escapeHTML(c.icon || '📄')}</span>

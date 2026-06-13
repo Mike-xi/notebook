@@ -1,36 +1,56 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>复习笔记</title>
+  <title>Xi Notebook</title>
   <script>
     // 首屏前定主题，避免浅/深闪烁；完整逻辑在 theme.js
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
   </script>
-  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=20260607c">
-  <link rel="stylesheet" href="/assets/style.css?v=20260613a">
+  <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613b">
+  <link rel="stylesheet" href="/assets/style.css?v=20260613b">
 </head>
 <body class="home">
   <header class="topbar">
-    <div class="brand">
-      <span class="brand-mark">📓</span>
-      <span class="brand-name">复习笔记</span>
-    </div>
+    <a class="brand" href="/" aria-label="Xi Notebook">
+      <img class="brand-logo" src="/assets/brand-xinotebook.png?v=20260613b" alt="Xi Notebook">
+    </a>
     <div class="topbar-right">
       <div class="search-wrap">
-        <span class="search-icon">⌕</span>
-        <input type="search" id="search" placeholder="搜索课程、学科…按 Enter 搜全文" autocomplete="off">
+        <span class="search-icon ic" data-icon="search" data-icon-size="18"></span>
+        <input type="search" id="search" placeholder="Search notebooks · press Enter for full text" autocomplete="off">
+      </div>
+      <button class="pill-btn" id="omni-btn" title="Ask AI across all your notebooks">
+        <span class="ic" data-icon="sparkle" data-icon-size="18"></span><span class="pill-label">AI</span>
+      </button>
+      <div class="create-wrap">
+        <button class="pill-btn pill-primary" id="create-btn" aria-haspopup="true" aria-expanded="false">
+          <span class="ic" data-icon="plus" data-icon-size="18"></span><span class="pill-label">Create</span>
+          <span class="ic pill-caret" data-icon="caret" data-icon-size="14"></span>
+        </button>
+        <div class="create-menu" id="create-menu" hidden role="menu">
+          <button class="cm-item" id="cm-upload" type="button" role="menuitem">
+            <span class="cm-ic ic" data-icon="upload" data-icon-size="20"></span>
+            <span class="cm-text"><b>上传文件</b><em>HTML / Markdown / PDF</em></span>
+          </button>
+          <a class="cm-item" href="/editor.html?v=20260613b" role="menuitem">
+            <span class="cm-ic ic" data-icon="write" data-icon-size="20"></span>
+            <span class="cm-text"><b>写 Markdown 笔记</b><em>在站内直接撰写</em></span>
+          </a>
+        </div>
       </div>
       <div class="settings-wrap">
-        <button class="settings-btn" id="settings-btn" title="设置" aria-haspopup="true" aria-expanded="false">⚙️</button>
+        <button class="settings-btn" id="settings-btn" title="Settings" aria-haspopup="true" aria-expanded="false">
+          <span class="ic" data-icon="gear" data-icon-size="20"></span>
+        </button>
         <div class="settings-menu" id="settings-menu" hidden role="menu">
           <div class="sm-section">
             <span class="sm-label">外观</span>
             <div class="seg" role="group" aria-label="主题">
               <button class="seg-btn" data-theme-set="auto" aria-pressed="false">跟随系统</button>
-              <button class="seg-btn" data-theme-set="light" aria-pressed="false">☀️ 浅色</button>
-              <button class="seg-btn" data-theme-set="dark" aria-pressed="false">🌙 深色</button>
+              <button class="seg-btn" data-theme-set="light" aria-pressed="false">浅色</button>
+              <button class="seg-btn" data-theme-set="dark" aria-pressed="false">深色</button>
             </div>
           </div>
           <div class="sm-section">
@@ -43,34 +63,34 @@
             <p class="sm-tip">数值越“迟钝”，需要越快地向上滑动才会唤出顶部工具栏。</p>
           </div>
           <div class="sm-divider"></div>
-          <button class="sm-item" id="about-btn" role="menuitem"><span class="sm-ic">✨</span><span>关于</span></button>
-          <button class="sm-item sm-danger" id="logout-btn" role="menuitem"><span class="sm-ic">⏻</span><span>退出登录</span></button>
+          <button class="sm-item" id="about-btn" role="menuitem"><span class="sm-ic ic" data-icon="sparkle" data-icon-size="18"></span><span>关于</span></button>
+          <button class="sm-item sm-danger" id="logout-btn" role="menuitem"><span class="sm-ic ic" data-icon="signout" data-icon-size="18"></span><span>退出登录</span></button>
         </div>
       </div>
     </div>
   </header>
 
   <main>
+    <nav class="home-tabs" id="home-tabs" role="tablist" aria-label="Categories">
+      <button class="tab active" data-tab="all" role="tab" aria-selected="true">All</button>
+      <button class="tab" data-tab="learn" role="tab" aria-selected="false">Learn</button>
+      <button class="tab" data-tab="explore" role="tab" aria-selected="false">Explore</button>
+      <button class="tab" data-tab="play" role="tab" aria-selected="false">Play</button>
+    </nav>
+
     <section id="recent-section" hidden>
-      <h2 class="section-title">最近阅读</h2>
+      <h2 class="section-title">Recent</h2>
       <div id="recent" class="card-grid"></div>
     </section>
 
     <section>
-      <div class="section-head">
-        <h2 class="section-title">我的笔记</h2>
-        <div class="sh-actions">
-          <button class="ghost-btn omni-btn" id="omni-btn" title="基于你全部课程与记录的 AI 问答">💡 全能问答</button>
-          <a class="ghost-btn" href="/editor.html" title="在站内直接写 Markdown 笔记">✏️ 写笔记</a>
-          <button class="create-btn" id="create-btn">＋ 创建课程</button>
-        </div>
-      </div>
+      <h2 class="section-title" id="grid-title">My notebooks</h2>
       <div id="courses" class="card-grid"></div>
-      <p id="empty-hint" class="empty-state" hidden>还没有课程笔记，点「创建课程」上传一个 HTML 试试</p>
+      <p id="empty-hint" class="empty-state" hidden>No notebooks here yet — use <b>Create</b> to add one.</p>
     </section>
   </main>
 
-  <!-- 创建课程弹窗 -->
+  <!-- 创建课程弹窗（Create → 上传文件） -->
   <div class="modal-overlay" id="create-modal" hidden>
     <div class="modal">
       <h3>创建新课程</h3>
@@ -85,7 +105,7 @@
       <p class="modal-hint" id="nc-hint">支持 HTML / Markdown（≤1.5 MB）或 PDF（≤20 MB）。选好文件后可让 AI 自动填充。</p>
 
       <div class="ai-fill-row">
-        <button class="ai-fill-btn" id="nc-ai" type="button">✨ AI 智能填充</button>
+        <button class="ai-fill-btn" id="nc-ai" type="button"><span class="ic" data-icon="sparkle" data-icon-size="15"></span> AI 智能填充</button>
         <span class="ai-fill-status" id="nc-ai-status"></span>
       </div>
 
@@ -94,11 +114,20 @@
           <span>学科（可选）</span>
           <input type="text" id="nc-subject" placeholder="例如：大学物理" maxlength="40" autocomplete="off">
         </label>
-        <label class="field">
-          <span>简介（可选）</span>
-          <input type="text" id="nc-desc" placeholder="一句话描述" maxlength="120" autocomplete="off">
-        </label>
+        <div class="field">
+          <span class="field-label">分类</span>
+          <div class="seg nc-cat" id="nc-cat" role="group" aria-label="分类">
+            <button type="button" class="seg-btn active" data-cat="learn">Learn</button>
+            <button type="button" class="seg-btn" data-cat="explore">Explore</button>
+            <button type="button" class="seg-btn" data-cat="play">Play</button>
+          </div>
+        </div>
       </div>
+
+      <label class="field">
+        <span>简介（可选）</span>
+        <input type="text" id="nc-desc" placeholder="一句话描述" maxlength="120" autocomplete="off">
+      </label>
 
       <div class="field">
         <span>标签</span>
@@ -120,26 +149,26 @@
   <!-- 全能问答（基于全部课程 + 日志的 AI 对话，布局沿用课程内对话） -->
   <aside id="omni-panel" hidden>
     <div class="panel-header">
-      <h3>💡 全能问答 <span id="omni-status" class="chat-status"></span></h3>
+      <h3><span class="ic" data-icon="sparkle" data-icon-size="18"></span> Ask AI <span id="omni-status" class="chat-status"></span></h3>
       <div class="ph-actions">
-        <button class="icon-btn" id="omni-clear" title="清空对话历史">🗑</button>
-        <button class="icon-btn" id="omni-close" title="关闭">✕</button>
+        <button class="icon-btn" id="omni-clear" title="Clear history"><span class="ic" data-icon="trash" data-icon-size="18"></span></button>
+        <button class="icon-btn" id="omni-close" title="Close"><span class="ic" data-icon="close" data-icon-size="18"></span></button>
       </div>
     </div>
     <div class="chat-model-bar">
-      <span class="cmb-icon" aria-hidden="true">🧠</span>
-      <label class="cmb-label" for="omni-model">模型</label>
+      <span class="cmb-icon ic" data-icon="brain" data-icon-size="15" aria-hidden="true"></span>
+      <label class="cmb-label" for="omni-model">Model</label>
       <div class="cmb-select">
-        <select id="omni-model" title="选择 AI 模型"></select>
-        <span class="cmb-caret" aria-hidden="true">▾</span>
+        <select id="omni-model" title="Choose AI model"></select>
+        <span class="cmb-caret ic" data-icon="caret" data-icon-size="13" aria-hidden="true"></span>
       </div>
     </div>
     <div id="omni-msgs" class="chat-msgs">
       <p class="chat-hint" id="omni-hint">我了解你所有的课程、阅读进度，以及上传 / 登录等操作记录。问我「我都上传过哪些笔记」「最近读到哪了」「把概率和 Python 的重点对比一下」都可以。</p>
     </div>
     <form id="omni-form" class="chat-form">
-      <textarea id="omni-input" rows="1" placeholder="问点关于你整个笔记库的问题…" autocomplete="off"></textarea>
-      <button type="submit" id="omni-send" title="发送">↑</button>
+      <textarea id="omni-input" rows="1" placeholder="Ask anything about your library…" autocomplete="off"></textarea>
+      <button type="submit" id="omni-send" title="Send"><span class="ic" data-icon="send" data-icon-size="18"></span></button>
     </form>
   </aside>
 
@@ -147,9 +176,9 @@
   <div class="modal-overlay" id="search-modal" hidden>
     <div class="modal search-modal">
       <div class="srch-head">
-        <h3>🔍 深入搜索</h3>
+        <h3><span class="ic" data-icon="search" data-icon-size="18"></span> Search</h3>
         <span class="srch-q" id="srch-q"></span>
-        <button class="icon-btn" id="srch-close" title="关闭">✕</button>
+        <button class="icon-btn" id="srch-close" title="Close"><span class="ic" data-icon="close" data-icon-size="18"></span></button>
       </div>
       <div class="srch-body" id="srch-body"></div>
     </div>
@@ -158,7 +187,7 @@
   <!-- 关于 / 学习画像 -->
   <div class="modal-overlay about-overlay" id="about-modal" hidden>
     <div class="about-card" role="dialog" aria-modal="true" aria-label="关于">
-      <button class="about-close" id="about-close" aria-label="关闭">✕</button>
+      <button class="about-close" id="about-close" aria-label="关闭"><span class="ic" data-icon="close" data-icon-size="16"></span></button>
       <div class="about-hero">
         <div class="about-aurora" aria-hidden="true"></div>
         <div class="about-hero-inner">
@@ -176,14 +205,15 @@
         <p class="about-note" id="about-note"></p>
       </div>
       <div class="about-foot">
-        <span class="about-foot-brand">📓 复习笔记 · AI 助教</span>
+        <span class="about-foot-brand">Xi Notebook · AI 助教</span>
         <span class="about-foot-dim">本地优先 · 不收集隐私 · 以上小结只由你自己的课程数据生成</span>
       </div>
     </div>
   </div>
 
+  <script src="/assets/icons.js?v=20260613b"></script>
   <script src="/assets/theme.js?v=20260608a"></script>
   <script src="/assets/md.js?v=20260608d"></script>
-  <script src="/assets/app.js?v=20260613a"></script>
+  <script src="/assets/app.js?v=20260613b"></script>
 </body>
 </html>

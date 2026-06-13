@@ -52,13 +52,13 @@ if (shareMode) {
   fetch(`/api/shared?token=${encodeURIComponent(shareToken)}`)
     .then((r) => (r.ok ? r.json() : null))
     .then((d) => {
-      if (!d) { docTitleEl.textContent = '分享内容不可用'; return; }
+      if (!d) { docTitleEl.textContent = 'Shared content unavailable'; return; }
       courseMeta = { title: d.title, subject: d.subject };
-      docTitleEl.textContent = d.title || '分享笔记';
+      docTitleEl.textContent = d.title || 'Shared note';
       docSubjectEl.textContent = d.subject || '';
-      document.title = `${d.title || '分享笔记'} · 只读分享`;
+      document.title = `${d.title || 'Shared note'} · Read-only`;
     })
-    .catch(() => { docTitleEl.textContent = '分享笔记'; });
+    .catch(() => { docTitleEl.textContent = 'Shared note'; });
 } else {
   // 普通模式：合并静态 courses.json 与用户创建的 /api/courses
   Promise.all([
@@ -71,7 +71,7 @@ if (shareMode) {
       if (courseMeta) {
         docTitleEl.textContent = courseMeta.title;
         docSubjectEl.textContent = courseMeta.subject || '';
-        document.title = `${courseMeta.title} · 阅读`;
+        document.title = `${courseMeta.title} · Reader`;
       } else {
         docTitleEl.textContent = file;
       }
@@ -344,7 +344,7 @@ function renderBookmarks(items) {
           <span>${escapeHTML(b.title)}</span>
           <span class="bm-pct">${Math.round(b.scroll_pct * 100)}%</span>
         </button>
-        <button class="bm-del" data-id="${b.id}" title="删除">✕</button>
+        <button class="bm-del" data-id="${b.id}" title="Delete">${window.NBIcon ? NBIcon('close', { size: 15 }) : '✕'}</button>
       </li>
     `).join('');
 }
@@ -365,7 +365,7 @@ bookmarksList.addEventListener('click', async (e) => {
   if (delBtn) {
     e.stopPropagation();
     const id = parseInt(delBtn.dataset.id);
-    if (!confirm('删除这个书签？')) return;
+    if (!confirm('Delete this bookmark?')) return;
     await fetch('/api/bookmarks', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
@@ -377,16 +377,16 @@ bookmarksList.addEventListener('click', async (e) => {
 
 // 自定义 prompt 弹框
 function showBookmarkPrompt() {
-  const defaultTitle = `位置 ${Math.round(currentPct * 100)}%`;
+  const defaultTitle = `Position ${Math.round(currentPct * 100)}%`;
   const overlay = document.createElement('div');
   overlay.className = 'bm-prompt-overlay';
   overlay.innerHTML = `
     <div class="bm-prompt">
-      <h3>添加书签</h3>
+      <h3>Add bookmark</h3>
       <input type="text" id="bm-input" value="${escapeAttr(defaultTitle)}" autofocus>
       <div class="btn-row">
-        <button class="btn-cancel" type="button">取消</button>
-        <button class="btn-confirm" type="button">保存</button>
+        <button class="btn-cancel" type="button">Cancel</button>
+        <button class="btn-confirm" type="button">Save</button>
       </div>
     </div>
   `;
@@ -575,9 +575,9 @@ document.getElementById('chat-close').addEventListener('click', closeChatPanel);
 const chatClearBtn = document.getElementById('chat-clear');
 if (chatClearBtn) {
   chatClearBtn.addEventListener('click', async () => {
-    if (!confirm('清空这门课程的对话历史？')) return;
+    if (!confirm('Clear this notebook’s chat history?')) return;
     try { await fetch('/api/chat-history', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scope: file }) }); } catch {}
-    chatMsgs.innerHTML = '<p class="chat-hint" id="chat-hint">问我这篇笔记里的内容——我会带你定位到大致小节，并参考你的高亮和书签。也可以在正文里划选一段文字再「💬 问 AI」。</p>';
+    chatMsgs.innerHTML = '<p class="chat-hint" id="chat-hint">问我这篇笔记里的内容——我会带你定位到大致小节，并参考你的高亮和书签。也可以在正文里划选一段文字再点「Ask AI」。</p>';
   });
 }
 
@@ -588,7 +588,7 @@ function askFromSelection(text) {
   openChat();
   currentQuote = t;
   chatQuoteBox.hidden = false;
-  chatQuoteBox.innerHTML = `<span class="cq-label">划选</span><span class="cq-text">${escapeHTML(t.slice(0, 140))}${t.length > 140 ? '…' : ''}</span><button class="cq-clear" title="取消">✕</button>`;
+  chatQuoteBox.innerHTML = `<span class="cq-label">Quote</span><span class="cq-text">${escapeHTML(t.slice(0, 140))}${t.length > 140 ? '…' : ''}</span><button class="cq-clear" title="Remove">${window.NBIcon ? NBIcon('close', { size: 14 }) : '✕'}</button>`;
 }
 chatQuoteBox.addEventListener('click', (e) => { if (e.target.closest('.cq-clear')) clearQuote(); });
 function clearQuote() { currentQuote = ''; chatQuoteBox.hidden = true; chatQuoteBox.innerHTML = ''; }
@@ -605,10 +605,10 @@ async function sendMessage() {
   const q = chatInput.value.trim();
   if (!q || chatBusy) return;
   const quote = currentQuote;
-  appendMsg('user', q + (quote ? '　🔖（针对划选内容）' : ''));
+  appendMsg('user', q + (quote ? '　🔖 (re: quote)' : ''));
   chatInput.value = ''; autoGrow(); clearQuote();
   chatBusy = true;
-  const thinking = appendMsg('ai', '思考中…', null, true);
+  const thinking = appendMsg('ai', 'Thinking…', null, true);
   try {
     const model = chatModelSelect ? chatModelSelect.value : undefined;
     const res = await fetch('/api/rag/chat', {
@@ -617,11 +617,11 @@ async function sendMessage() {
     });
     const d = await res.json().catch(() => ({}));
     thinking.remove();
-    if (!res.ok) throw new Error(d.error || '请求失败');
-    appendMsg('ai', d.answer || '(没有得到回答)', d.sources || []);
+    if (!res.ok) throw new Error(d.error || 'Request failed');
+    appendMsg('ai', d.answer || '(no answer)', d.sources || []);
   } catch (e) {
     thinking.remove();
-    appendMsg('ai', '⚠️ ' + (e.message || '请求失败'));
+    appendMsg('ai', '⚠️ ' + (e.message || 'Request failed'));
   } finally {
     chatBusy = false;
   }
@@ -645,7 +645,7 @@ function appendMsg(role, text, sources, thinking) {
   if (sources && sources.length) {
     const src = document.createElement('div');
     src.className = 'chat-sources';
-    src.innerHTML = '<span class="cs-label">📍 相关位置</span>'
+    src.innerHTML = '<span class="cs-label">Related sections</span>'
       + sources.map((h) => `<button class="cs-chip" data-h="${escapeAttr(h)}">${escapeHTML(h)}</button>`).join('');
     wrap.appendChild(src);
   }
@@ -737,7 +737,7 @@ if (kind === 'pdf') {
   document.getElementById('pref-row-scale').hidden = true;
   document.getElementById('pref-row-lh').hidden = true;
   document.getElementById('pref-row-width').hidden = true;
-  document.getElementById('prefs-tip').textContent = 'PDF 由原文件排版，这里只支持护眼色温。';
+  document.getElementById('prefs-tip').textContent = 'PDF keeps its original layout — only warmth can be adjusted here.';
 } else if (kind === 'html') {
   document.getElementById('pref-row-width').hidden = true;
 }
@@ -806,7 +806,7 @@ function openShareModal() {
   shareDays = 0;
   shareExp.querySelectorAll('.seg-btn').forEach((b) => b.classList.remove('active'));
   shareGenBtn.disabled = true;
-  shareGenBtn.textContent = '生成链接';
+  shareGenBtn.textContent = 'Create link';
   shareResult.hidden = true;
   prefsPanel.hidden = true;
   shareModal.hidden = false;
@@ -825,38 +825,38 @@ document.getElementById('share-cancel')?.addEventListener('click', closeShareMod
 if (shareModal) shareModal.addEventListener('click', (e) => { if (e.target === shareModal) closeShareModal(); });
 
 if (shareGenBtn) shareGenBtn.addEventListener('click', async () => {
-  if (!shareDays) { toast('请先选择有效期'); return; }
+  if (!shareDays) { toast('Pick an expiry first'); return; }
   shareGenBtn.disabled = true;
-  shareGenBtn.textContent = '生成中…';
+  shareGenBtn.textContent = 'Creating…';
   try {
     const res = await fetch('/api/share', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ file, days: shareDays }),
     });
     const d = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(d.error || '生成失败');
+    if (!res.ok) throw new Error(d.error || 'Failed to create link');
     const url = new URL(d.url, location.origin).href;
     shareLinkInput.value = url;
     const exp = new Date(d.expires_at);
     const pad = (n) => String(n).padStart(2, '0');
-    shareExpiryEl.textContent = `链接有效至 ${exp.getFullYear()}-${pad(exp.getMonth() + 1)}-${pad(exp.getDate())} ${pad(exp.getHours())}:${pad(exp.getMinutes())}`;
+    shareExpiryEl.textContent = `Link valid until ${exp.getFullYear()}-${pad(exp.getMonth() + 1)}-${pad(exp.getDate())} ${pad(exp.getHours())}:${pad(exp.getMinutes())}`;
     shareResult.hidden = false;
-    shareGenBtn.textContent = '重新生成';
-    try { await navigator.clipboard.writeText(url); toast('链接已生成并复制'); }
-    catch { toast('链接已生成'); }
+    shareGenBtn.textContent = 'Regenerate';
+    try { await navigator.clipboard.writeText(url); toast('Link created and copied'); }
+    catch { toast('Link created'); }
     shareLinkInput.focus();
     shareLinkInput.select();
   } catch (e) {
-    toast('分享失败：' + (e.message || '未知错误'));
-    shareGenBtn.textContent = '生成链接';
+    toast('Share failed: ' + (e.message || 'unknown error'));
+    shareGenBtn.textContent = 'Create link';
   } finally {
     shareGenBtn.disabled = !shareDays;
   }
 });
 document.getElementById('share-copy')?.addEventListener('click', async () => {
   if (!shareLinkInput.value) return;
-  try { await navigator.clipboard.writeText(shareLinkInput.value); toast('已复制'); }
-  catch { shareLinkInput.select(); try { document.execCommand('copy'); toast('已复制'); } catch {} }
+  try { await navigator.clipboard.writeText(shareLinkInput.value); toast('Copied'); }
+  catch { shareLinkInput.select(); try { document.execCommand('copy'); toast('Copied'); } catch {} }
 });
 
 // 轻提示
@@ -876,7 +876,7 @@ function toast(msg) {
 
 // ===== 建立 / 校验索引 =====
 async function ensureIndexed() {
-  if (kind === 'pdf') { ragSupported = false; setChatStatus('PDF 暂不支持全文检索，可基于高亮/书签问答'); return; }
+  if (kind === 'pdf') { ragSupported = false; setChatStatus('Full-text search isn’t available for PDFs — ask using highlights / bookmarks'); return; }
   let sections = [];
   try { sections = kind === 'md' ? await extractSectionsMd() : extractSectionsFromDoc(iframe.contentDocument); } catch {}
   const joined = sections.map((s) => s.text).join('\n').trim();
@@ -884,18 +884,18 @@ async function ensureIndexed() {
   const hash = hashText(joined);
   try {
     const st = await fetch(`/api/rag/status?file=${encodeURIComponent(file)}`).then((r) => r.json());
-    if (st.hasVectorize === false) { ragSupported = false; setChatStatus('未启用向量检索'); return; }
-    if (st.indexed && st.hash === hash) { setChatStatus(st.chunks ? `已索引 ${st.chunks} 段` : ''); return; }
+    if (st.hasVectorize === false) { ragSupported = false; setChatStatus('Vector search not enabled'); return; }
+    if (st.indexed && st.hash === hash) { setChatStatus(st.chunks ? `Indexed ${st.chunks} sections` : ''); return; }
   } catch {}
-  setChatStatus('正在建立索引…');
+  setChatStatus('Indexing…');
   try {
     const res = await fetch('/api/rag/ingest', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ file, hash, sections }),
     });
     const d = await res.json().catch(() => ({}));
-    setChatStatus(res.ok ? (d.chunks ? `已索引 ${d.chunks} 段` : '') : '索引失败（仍可直接提问）');
-  } catch { setChatStatus('索引失败（仍可直接提问）'); }
+    setChatStatus(res.ok ? (d.chunks ? `Indexed ${d.chunks} sections` : '') : 'Indexing failed (you can still ask)');
+  } catch { setChatStatus('Indexing failed (you can still ask)'); }
 }
 
 // html：用 Range 取每个 h1-h3 标题到下一个标题之间的纯文本，保留小节结构
@@ -905,13 +905,13 @@ function extractSectionsFromDoc(doc) {
   const heads = [...body.querySelectorAll('h1, h2, h3')];
   if (!heads.length) {
     const t = (body.innerText || body.textContent || '').replace(/\s+/g, ' ').trim();
-    return t ? [{ heading: '全文', level: 0, text: t.slice(0, 4000) }] : [];
+    return t ? [{ heading: 'Full text', level: 0, text: t.slice(0, 4000) }] : [];
   }
   const sections = [];
   try {
     const r0 = doc.createRange(); r0.setStart(body, 0); r0.setEndBefore(heads[0]);
     const lead = r0.toString().replace(/\s+/g, ' ').trim();
-    if (lead) sections.push({ heading: '(开头)', level: 0, text: lead.slice(0, 4000) });
+    if (lead) sections.push({ heading: '(intro)', level: 0, text: lead.slice(0, 4000) });
   } catch {}
   heads.forEach((h, i) => {
     const title = (h.textContent || '').trim();
@@ -933,11 +933,11 @@ async function extractSectionsMd() {
   try { raw = await fetch(sourceURL).then((r) => r.text()); } catch { return []; }
   const lines = String(raw).split(/\r?\n/);
   const out = [];
-  let cur = { heading: '(开头)', level: 0, lines: [] };
+  let cur = { heading: '(intro)', level: 0, lines: [] };
   for (const ln of lines) {
     const m = /^(#{1,3})\s+(.*)/.exec(ln);
     if (m) {
-      if (cur.lines.join('').trim() || cur.heading !== '(开头)') out.push(cur);
+      if (cur.lines.join('').trim() || cur.heading !== '(intro)') out.push(cur);
       cur = { heading: m[2].trim(), level: m[1].length, lines: [] };
     } else cur.lines.push(ln);
   }

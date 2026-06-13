@@ -13,6 +13,7 @@ const MAX_PDF_BYTES = 20_000_000;   // pdf 存 R2，限 20MB
 const DEFAULT_ICON = { html: '📘', md: '📝', pdf: '📕' };
 const DEFAULT_DESC = { html: '上传的复习笔记', md: '上传的 Markdown 笔记', pdf: '上传的 PDF 文档' };
 const PALETTE = ['#6750A4', '#0EA5E9', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6'];
+const CATEGORIES = ['learn', 'explore', 'play'];
 
 const str = (v) => (typeof v === 'string' ? v : (v == null ? '' : String(v))).trim();
 const err = (msg, status = 400) => Response.json({ error: msg }, { status });
@@ -31,7 +32,7 @@ function detectKind(name, explicit) {
 export async function onRequestGet({ env }) {
   await ensureCoursesSchema(env);
   const { results } = await env.DB.prepare(
-    `SELECT file, title, subject, description, icon, color, tags, kind, created_at
+    `SELECT file, title, subject, description, icon, color, tags, kind, category, created_at
      FROM courses ORDER BY created_at DESC`
   ).all();
   const courses = (results || []).map((r) => ({
@@ -43,6 +44,7 @@ export async function onRequestGet({ env }) {
     color: r.color || PALETTE[0],
     tags: safeTags(r.tags),
     kind: r.kind || 'html',
+    category: CATEGORIES.includes(r.category) ? r.category : 'learn',
     created_at: r.created_at,
     dynamic: true,
   }));
@@ -73,6 +75,7 @@ export async function onRequestPost({ request, env }) {
       icon: str(form.get('icon')),
       color: str(form.get('color')),
       tags: form.get('tags'),
+      category: str(form.get('category')),
     };
 
     if (kind === 'pdf') {
@@ -97,7 +100,7 @@ export async function onRequestPost({ request, env }) {
     contentText = body.html;
     const bytes = new TextEncoder().encode(contentText).length;
     if (bytes > MAX_TEXT_BYTES) return errSize(bytes, MAX_TEXT_BYTES, 'HTML');
-    meta = { subject: str(body.subject), description: str(body.description), icon: str(body.icon), color: str(body.color), tags: body.tags };
+    meta = { subject: str(body.subject), description: str(body.description), icon: str(body.icon), color: str(body.color), tags: body.tags, category: str(body.category) };
   }
 
   const ext = kind === 'pdf' ? 'pdf' : kind === 'md' ? 'md' : 'html';
@@ -117,11 +120,12 @@ export async function onRequestPost({ request, env }) {
   const finalSubject = meta.subject.slice(0, 40) || '我的笔记';
   const finalDesc = meta.description.slice(0, 120) || DEFAULT_DESC[kind];
   const finalTags = JSON.stringify(parseTags(meta.tags));
+  const finalCategory = CATEGORIES.includes(meta.category) ? meta.category : 'learn';
 
   await env.DB.prepare(
-    `INSERT INTO courses (file, title, subject, description, icon, color, tags, html, kind, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(file, title.slice(0, 80), finalSubject, finalDesc, finalIcon, finalColor, finalTags, contentText, kind, Date.now()).run();
+    `INSERT INTO courses (file, title, subject, description, icon, color, tags, html, kind, category, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(file, title.slice(0, 80), finalSubject, finalDesc, finalIcon, finalColor, finalTags, contentText, kind, finalCategory, Date.now()).run();
 
   await logEvent(env, 'upload', `${kind} · ${title.slice(0, 60)}`);
   return Response.json({ ok: true, file, kind });

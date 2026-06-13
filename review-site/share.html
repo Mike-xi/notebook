@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex">
-  <title>打开分享…</title>
+  <title>Opening share…</title>
   <script>
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
   </script>
-  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=20260607c">
+  <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613b">
   <style>
     html,body{height:100%;margin:0;}
     body{display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,"PingFang SC",sans-serif;
@@ -19,20 +19,20 @@
 </head>
 <body>
   <!-- 旧分享链接（/share.html?token=…）入口：拿到 kind 后重定向到带 token 的完整阅读器。 -->
-  <div class="msg" id="msg">正在打开分享…</div>
+  <div class="msg" id="msg">Opening share…</div>
   <script>
     (function () {
       var msg = document.getElementById('msg');
       var token = new URLSearchParams(location.search).get('token') || '';
-      if (!token) { msg.textContent = '⚠️ 缺少分享凭证'; return; }
+      if (!token) { msg.textContent = '⚠️ Missing share token'; return; }
       fetch('/api/shared?token=' + encodeURIComponent(token))
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) {
-          if (!d) { msg.textContent = '⚠️ 分享链接无效或已过期'; return; }
+          if (!d) { msg.textContent = '⚠️ This share link is invalid or has expired'; return; }
           var k = (d.kind === 'pdf' || d.kind === 'md') ? d.kind : 'html';
           location.replace('/reader.html?share=' + encodeURIComponent(token) + '&k=' + k);
         })
-        .catch(function () { msg.textContent = '⚠️ 打开失败，请稍后再试'; });
+        .catch(function () { msg.textContent = '⚠️ Failed to open, please try again later'; });
     })();
   </script>
 </body>

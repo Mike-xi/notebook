@@ -15,12 +15,16 @@ export async function ensureCoursesSchema(env) {
        tags        TEXT,
        html        TEXT NOT NULL DEFAULT '',
        kind        TEXT NOT NULL DEFAULT 'html',
+       category    TEXT NOT NULL DEFAULT 'learn',
        created_at  INTEGER NOT NULL
      )`
   ).run();
-  // 给历史表补 kind 列；若已存在会抛 duplicate column，忽略即可
+  // 给历史表补 kind / category 列；若已存在会抛 duplicate column，忽略即可
   try {
     await env.DB.prepare("ALTER TABLE courses ADD COLUMN kind TEXT NOT NULL DEFAULT 'html'").run();
+  } catch {}
+  try {
+    await env.DB.prepare("ALTER TABLE courses ADD COLUMN category TEXT NOT NULL DEFAULT 'learn'").run();
   } catch {}
   schemaReady = true;
 }

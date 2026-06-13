@@ -120,6 +120,10 @@ h1, h2, h3 { margin: 0; font-weight: 500; letter-spacing: -0.01em; }
 }
 .icon-btn:hover { background: var(--surface-container-high); }
 
+/* 统一线性图标（Phosphor 内联 SVG，fill:currentColor，尺寸由 data-icon-size / size 决定） */
+.nbi { display: block; flex: none; }
+.ic { display: inline-flex; align-items: center; justify-content: center; line-height: 0; }
+
 /* ========================================
    首页（NotebookLM 风格）
    ======================================== */
@@ -141,15 +145,17 @@ body.home {
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
   flex-shrink: 0;
+  text-decoration: none;
+  color: inherit;
 }
-.brand-mark { font-size: 26px; line-height: 1; }
-.brand-name {
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+.brand-logo {
+  height: 28px;
+  width: auto;
+  display: block;
 }
+/* 深色模式：单色藏青字标统一反白 */
+[data-theme="dark"] .brand-logo { filter: brightness(0) invert(1); }
 
 .topbar-right {
   display: flex;
@@ -166,11 +172,11 @@ body.home {
 }
 .search-icon {
   position: absolute;
-  left: 16px;
+  left: 14px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--on-surface-variant);
-  font-size: 18px;
+  line-height: 0;
   pointer-events: none;
 }
 #search {
@@ -219,6 +225,98 @@ body.home {
   transition: background-color var(--transition), border-color var(--transition);
 }
 .theme-toggle:hover { background: var(--surface-container-high); }
+
+/* 顶栏胶囊按钮（AI / Create） */
+.pill-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 16px;
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--on-surface);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--transition), border-color var(--transition), filter var(--transition);
+}
+.pill-btn:hover { background: var(--surface-container-high); }
+.pill-btn .pill-label { line-height: 1; }
+.pill-btn .pill-caret { margin-left: -2px; opacity: .65; }
+.pill-primary {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: transparent;
+}
+.pill-primary:hover { background: var(--primary); filter: brightness(1.06); }
+
+/* Create 下拉菜单 */
+.create-wrap { position: relative; flex-shrink: 0; }
+.create-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 300px;
+  padding: 8px;
+  background: var(--surface-container-high);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 60;
+  animation: settings-pop 140ms ease-out;
+  transform-origin: top right;
+}
+.cm-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--on-surface);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color var(--transition);
+}
+.cm-item:hover { background: var(--surface-container-highest); }
+.cm-ic {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--primary-container);
+  color: var(--on-primary-container);
+}
+.cm-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cm-text b { font-size: 14px; font-weight: 600; }
+.cm-text em { font-size: 12px; font-style: normal; color: var(--on-surface-variant); }
+
+/* 分类 Tab（All / Learn / Explore / Play） */
+.home-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 10px 4px 20px;
+  flex-wrap: wrap;
+}
+.tab {
+  padding: 7px 16px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--on-surface-variant);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition), color var(--transition);
+}
+.tab:hover { background: var(--surface-container-high); color: var(--on-surface); }
+.tab.active { background: var(--on-surface); color: var(--surface); }
 
 main {
   max-width: 1360px;
@@ -501,6 +599,9 @@ body.sorting .nb-card:hover { transform: none; box-shadow: none; }
 /* 上传弹窗：AI 智能填充按钮 + 标签 chips + 图标点选网格 */
 .ai-fill-row { display: flex; align-items: center; gap: 10px; margin: -4px 0 16px; }
 .ai-fill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   border: 1px solid var(--primary);
   color: var(--primary);
   background: transparent;
@@ -845,7 +946,8 @@ body.reader.split-chat #chat-panel {
   padding: 12px 16px;
   border-bottom: 1px solid var(--outline-variant);
 }
-.panel-header h3 { font-size: 14px; font-weight: 500; }
+.panel-header h3 { display: flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 600; }
+.panel-header h3 .chat-status { font-weight: 400; }
 .ph-actions { display: flex; align-items: center; gap: 2px; }
 
 /* AI 模型切换条：独占一行，custom 样式的下拉 + 圆角胶囊 */
@@ -857,7 +959,7 @@ body.reader.split-chat #chat-panel {
   border-bottom: 1px solid var(--outline-variant);
   background: var(--surface-container-low);
 }
-.chat-model-bar .cmb-icon { font-size: 13px; line-height: 1; }
+.chat-model-bar .cmb-icon { display: inline-flex; color: var(--on-surface-variant); }
 .chat-model-bar .cmb-label {
   font-size: 12px;
   color: var(--on-surface-variant);
@@ -887,11 +989,11 @@ body.reader.split-chat #chat-panel {
 }
 .cmb-select .cmb-caret {
   position: absolute;
-  right: 12px;
+  right: 11px;
   top: 50%;
   transform: translateY(-50%);
   pointer-events: none;
-  font-size: 11px;
+  line-height: 0;
   color: var(--on-surface-variant);
 }
 #bookmarks-list {
@@ -1124,11 +1226,13 @@ body.reader.split-chat #chat-panel {
 #chat-send, #omni-send {
   flex: none;
   width: 38px; height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: 50%;
   background: var(--primary);
   color: var(--on-primary);
-  font-size: 17px;
   cursor: pointer;
   transition: filter var(--transition);
 }
@@ -1401,7 +1505,15 @@ body.login {
   max-width: 400px;
   box-shadow: var(--shadow-md);
 }
-.login-card h1 { font-size: 32px; font-weight: 400; margin-bottom: 32px; }
+.login-logo {
+  width: 210px;
+  max-width: 72%;
+  height: auto;
+  display: block;
+  margin: 4px auto 22px;
+}
+[data-theme="dark"] .login-logo { filter: brightness(0) invert(1); }
+body.login .eyebrow { display: block; text-align: center; margin: 0 0 26px; }
 .login-card label {
   display: block;
   font-size: 12px;
@@ -1449,8 +1561,13 @@ body.login {
    响应式
    ======================================== */
 @media (max-width: 640px) {
-  .topbar { padding: 16px 20px; flex-wrap: wrap; }
+  .topbar { padding: 16px 20px; flex-wrap: wrap; gap: 14px; }
   .topbar-right { width: 100%; }
+  .search-wrap { max-width: none; flex: 1; }
+  /* 窄屏胶囊收成纯图标，省横向空间 */
+  .pill-btn .pill-label, .pill-btn .pill-caret { display: none; }
+  .pill-btn { padding: 9px 11px; }
+  .create-menu { width: min(300px, calc(100vw - 40px)); }
   main { padding: 8px 20px 56px; }
   .card-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
   .nb-card { min-height: 160px; padding: 16px; }
@@ -1571,7 +1688,7 @@ body.login {
   transition: background-color var(--transition);
 }
 .sm-item:hover { background: var(--surface-container-highest); }
-.sm-item .sm-ic { font-size: 15px; width: 18px; text-align: center; }
+.sm-item .sm-ic { display: inline-flex; align-items: center; justify-content: center; width: 18px; }
 .sm-danger { color: var(--error); }
 .sm-danger:hover { background: color-mix(in srgb, var(--error) 12%, transparent); }
 
@@ -1595,11 +1712,13 @@ body.login {
   right: 12px;
   width: 32px;
   height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: var(--radius-full);
   background: rgba(255,255,255,.18);
   color: #fff;
-  font-size: 14px;
   cursor: pointer;
   z-index: 2;
   backdrop-filter: blur(4px);

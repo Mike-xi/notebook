@@ -7,6 +7,7 @@
     "icon": "🐍",
     "color": "#4B8BBE",
     "kind": "html",
+    "category": "learn",
     "tags": ["python", "程序设计", "期末"]
   },
   {
@@ -17,6 +18,7 @@
     "icon": "🎲",
     "color": "#8B5CF6",
     "kind": "html",
+    "category": "learn",
     "tags": ["概率", "统计", "期末"]
   },
   {
@@ -27,6 +29,7 @@
     "icon": "⚛️",
     "color": "#0EA5E9",
     "kind": "pdf",
+    "category": "learn",
     "tags": ["物理", "大纲", "期末"]
   },
   {
@@ -37,6 +40,7 @@
     "icon": "🛰️",
     "color": "#00E5FF",
     "kind": "html",
+    "category": "explore",
     "tags": ["OSINT", "情报", "实时地图"]
   },
   {
@@ -47,6 +51,7 @@
     "icon": "🏀",
     "color": "#E2521B",
     "kind": "html",
+    "category": "play",
     "tags": ["物理", "抛体运动", "碰撞", "互动仿真"]
   }
 ]

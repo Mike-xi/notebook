@@ -3,58 +3,58 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>阅读器</title>
+  <title>Reader · Xi Notebook</title>
   <script>
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
   </script>
-  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=20260607c">
-  <link rel="stylesheet" href="/assets/style.css?v=20260613a">
+  <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613b">
+  <link rel="stylesheet" href="/assets/style.css?v=20260613b">
 </head>
 <body class="reader">
-  <iframe id="content" src="" title="复习文档"></iframe>
+  <iframe id="content" src="" title="Document"></iframe>
 
   <div class="reader-bar" id="reader-bar">
-    <a class="rb-btn rb-back" href="/" title="返回笔记库">←</a>
-    <span class="rb-ro" id="rb-ro" hidden>只读分享</span>
-    <button class="rb-btn" id="toc-toggle" title="目录" hidden>📑</button>
-    <button class="rb-btn" id="chat-toggle" title="AI 对话">💬</button>
+    <a class="rb-btn rb-back" href="/" title="Back to library"><span class="ic" data-icon="back" data-icon-size="20"></span></a>
+    <span class="rb-ro" id="rb-ro" hidden>Read-only</span>
+    <button class="rb-btn" id="toc-toggle" title="Contents" hidden><span class="ic" data-icon="list" data-icon-size="20"></span></button>
+    <button class="rb-btn" id="chat-toggle" title="Ask AI"><span class="ic" data-icon="chat" data-icon-size="20"></span></button>
     <div class="rb-info">
       <span class="rb-subject" id="doc-subject"></span>
-      <span class="rb-title" id="doc-title">加载中…</span>
+      <span class="rb-title" id="doc-title">Loading…</span>
     </div>
     <span class="rb-progress" id="progress-pct">0%</span>
-    <button class="rb-btn rb-aa" id="prefs-toggle" title="阅读设置">Aa</button>
-    <button class="rb-btn" id="bookmark-btn" title="加书签">☆</button>
-    <button class="rb-btn" id="bookmarks-toggle" title="书签列表">☰</button>
-    <button class="rb-btn" id="share-btn" title="分享只读链接">🔗</button>
+    <button class="rb-btn rb-aa" id="prefs-toggle" title="Reading settings"><span class="ic" data-icon="textaa" data-icon-size="20"></span></button>
+    <button class="rb-btn" id="bookmark-btn" title="Add bookmark"><span class="ic" data-icon="bookmark" data-icon-size="20"></span></button>
+    <button class="rb-btn" id="bookmarks-toggle" title="Bookmarks"><span class="ic" data-icon="bookmarks" data-icon-size="20"></span></button>
+    <button class="rb-btn" id="share-btn" title="Share read-only link"><span class="ic" data-icon="share" data-icon-size="20"></span></button>
   </div>
 
   <!-- 分享对话框：必须先设有效期（最长一年），再生成只读链接 -->
   <div class="modal-overlay" id="share-modal" hidden>
     <div class="modal share-dialog">
-      <h3>🔗 分享这门课程</h3>
-      <p class="modal-hint">生成一个只读链接。对方无需登录，打开即是完整的课程页面（目录 / 主题 / 阅读设置一应俱全），但看不到你的其它笔记，也无法回到你的笔记库。</p>
+      <h3><span class="ic" data-icon="share" data-icon-size="18"></span> Share this notebook</h3>
+      <p class="modal-hint">Create a read-only link. Anyone with it can open the full notebook — contents, theme and reading settings included — without signing in. They can’t see your other notebooks or get back to your library.</p>
       <div class="field">
-        <span>有效期 <em>*</em></span>
-        <div class="seg share-exp" id="share-exp" role="group" aria-label="有效期">
-          <button type="button" class="seg-btn" data-days="7">7 天</button>
-          <button type="button" class="seg-btn" data-days="30">30 天</button>
-          <button type="button" class="seg-btn" data-days="90">90 天</button>
-          <button type="button" class="seg-btn" data-days="180">半年</button>
-          <button type="button" class="seg-btn" data-days="365">1 年</button>
+        <span>Expires in <em>*</em></span>
+        <div class="seg share-exp" id="share-exp" role="group" aria-label="Expiry">
+          <button type="button" class="seg-btn" data-days="7">7 days</button>
+          <button type="button" class="seg-btn" data-days="30">30 days</button>
+          <button type="button" class="seg-btn" data-days="90">90 days</button>
+          <button type="button" class="seg-btn" data-days="180">6 months</button>
+          <button type="button" class="seg-btn" data-days="365">1 year</button>
         </div>
-        <p class="sm-tip">必须设置有效期，最长一年；到期后链接自动失效。</p>
+        <p class="sm-tip">An expiry is required (up to one year); the link stops working afterwards.</p>
       </div>
       <div class="share-result" id="share-result" hidden>
         <div class="share-link-row">
           <input type="text" id="share-link" readonly>
-          <button type="button" class="btn-confirm" id="share-copy">复制</button>
+          <button type="button" class="btn-confirm" id="share-copy">Copy</button>
         </div>
         <p class="sm-tip" id="share-expiry"></p>
       </div>
       <div class="btn-row">
-        <button type="button" class="btn-cancel" id="share-cancel">关闭</button>
-        <button type="button" class="btn-confirm" id="share-gen" disabled>生成链接</button>
+        <button type="button" class="btn-cancel" id="share-cancel">Close</button>
+        <button type="button" class="btn-confirm" id="share-gen" disabled>Create link</button>
       </div>
     </div>
   </div>
@@ -62,42 +62,42 @@
   <!-- 阅读设置面板 -->
   <aside id="prefs-panel" hidden>
     <div class="panel-header">
-      <h3>阅读设置</h3>
-      <button class="icon-btn" id="prefs-close">✕</button>
+      <h3>Reading</h3>
+      <button class="icon-btn" id="prefs-close"><span class="ic" data-icon="close" data-icon-size="18"></span></button>
     </div>
     <div class="prefs-body">
       <div class="pref-row" id="pref-row-scale">
-        <span class="pref-label">字号</span>
+        <span class="pref-label">Size</span>
         <input type="range" id="pref-scale" min="85" max="130" step="5" value="100">
         <span class="pref-val" id="pref-scale-val">100%</span>
       </div>
       <div class="pref-row" id="pref-row-lh">
-        <span class="pref-label">行距</span>
+        <span class="pref-label">Line height</span>
         <div class="seg">
-          <button class="seg-btn" data-lh="0">默认</button>
-          <button class="seg-btn" data-lh="1.5">紧凑</button>
-          <button class="seg-btn" data-lh="1.7">适中</button>
-          <button class="seg-btn" data-lh="1.9">宽松</button>
+          <button class="seg-btn" data-lh="0">Default</button>
+          <button class="seg-btn" data-lh="1.5">Tight</button>
+          <button class="seg-btn" data-lh="1.7">Cozy</button>
+          <button class="seg-btn" data-lh="1.9">Loose</button>
         </div>
       </div>
       <div class="pref-row" id="pref-row-width">
-        <span class="pref-label">阅读宽度</span>
+        <span class="pref-label">Width</span>
         <div class="seg">
-          <button class="seg-btn" data-width="680">窄</button>
-          <button class="seg-btn" data-width="820">适中</button>
-          <button class="seg-btn" data-width="1000">宽</button>
+          <button class="seg-btn" data-width="680">Narrow</button>
+          <button class="seg-btn" data-width="820">Medium</button>
+          <button class="seg-btn" data-width="1000">Wide</button>
         </div>
       </div>
       <div class="pref-row">
-        <span class="pref-label">护眼色温</span>
+        <span class="pref-label">Warmth</span>
         <div class="seg">
-          <button class="seg-btn" data-warm="0">关</button>
-          <button class="seg-btn" data-warm="0.14">微暖</button>
-          <button class="seg-btn" data-warm="0.28">暖</button>
+          <button class="seg-btn" data-warm="0">Off</button>
+          <button class="seg-btn" data-warm="0.14">Warm</button>
+          <button class="seg-btn" data-warm="0.28">Warmer</button>
         </div>
       </div>
-      <button class="pref-reset" id="pref-reset">恢复默认</button>
-      <p class="sm-tip" id="prefs-tip">设置只对这门课程生效，并会同步到云端。</p>
+      <button class="pref-reset" id="pref-reset">Reset</button>
+      <p class="sm-tip" id="prefs-tip">Applies to this notebook only, and syncs to the cloud.</p>
     </div>
   </aside>
 
@@ -106,51 +106,52 @@
 
   <aside id="bookmarks-panel" hidden>
     <div class="panel-header">
-      <h3>书签</h3>
-      <button class="icon-btn" id="panel-close">✕</button>
+      <h3>Bookmarks</h3>
+      <button class="icon-btn" id="panel-close"><span class="ic" data-icon="close" data-icon-size="18"></span></button>
     </div>
     <ul id="bookmarks-list"></ul>
-    <p id="bookmarks-empty" class="empty-hint">还没有书签</p>
+    <p id="bookmarks-empty" class="empty-hint">No bookmarks yet</p>
   </aside>
 
   <aside id="toc-panel" hidden>
     <div class="panel-header">
-      <h3>目录</h3>
-      <button class="icon-btn" id="toc-close">✕</button>
+      <h3>Contents</h3>
+      <button class="icon-btn" id="toc-close"><span class="ic" data-icon="close" data-icon-size="18"></span></button>
     </div>
     <ul id="toc-list"></ul>
-    <p id="toc-empty" class="empty-hint">本文档没有可用目录</p>
+    <p id="toc-empty" class="empty-hint">No contents available</p>
   </aside>
 
   <aside id="chat-panel" hidden>
     <div class="panel-header">
-      <h3>AI 对话 <span id="chat-status" class="chat-status"></span></h3>
+      <h3><span class="ic" data-icon="sparkle" data-icon-size="18"></span> Ask AI <span id="chat-status" class="chat-status"></span></h3>
       <div class="ph-actions">
-        <button class="icon-btn" id="chat-clear" title="清空对话历史">🗑</button>
-        <button class="icon-btn" id="chat-close" title="关闭">✕</button>
+        <button class="icon-btn" id="chat-clear" title="Clear history"><span class="ic" data-icon="trash" data-icon-size="18"></span></button>
+        <button class="icon-btn" id="chat-close" title="Close"><span class="ic" data-icon="close" data-icon-size="18"></span></button>
       </div>
     </div>
     <div class="chat-model-bar">
-      <span class="cmb-icon" aria-hidden="true">🧠</span>
-      <label class="cmb-label" for="chat-model">模型</label>
+      <span class="cmb-icon ic" data-icon="brain" data-icon-size="15" aria-hidden="true"></span>
+      <label class="cmb-label" for="chat-model">Model</label>
       <div class="cmb-select">
-        <select id="chat-model" title="选择 AI 模型"></select>
-        <span class="cmb-caret" aria-hidden="true">▾</span>
+        <select id="chat-model" title="Choose AI model"></select>
+        <span class="cmb-caret ic" data-icon="caret" data-icon-size="13" aria-hidden="true"></span>
       </div>
     </div>
     <div id="chat-msgs" class="chat-msgs">
-      <p class="chat-hint" id="chat-hint">问我这篇笔记里的内容——我会带你定位到大致小节，并参考你的高亮和书签。也可以在正文里划选一段文字再「💬 问 AI」。</p>
+      <p class="chat-hint" id="chat-hint">问我这篇笔记里的内容——我会带你定位到大致小节，并参考你的高亮和书签。也可以在正文里划选一段文字再点「Ask AI」。</p>
     </div>
     <div id="chat-quote" class="chat-quote" hidden></div>
     <form id="chat-form" class="chat-form">
-      <textarea id="chat-input" rows="1" placeholder="问点这篇笔记的内容…" autocomplete="off"></textarea>
-      <button type="submit" id="chat-send" title="发送">↑</button>
+      <textarea id="chat-input" rows="1" placeholder="Ask about this note…" autocomplete="off"></textarea>
+      <button type="submit" id="chat-send" title="Send"><span class="ic" data-icon="send" data-icon-size="18"></span></button>
     </form>
   </aside>
 
+  <script src="/assets/icons.js?v=20260613b"></script>
   <script src="/assets/theme.js?v=20260608a"></script>
   <script src="/assets/md.js?v=20260608d"></script>
   <script src="/assets/highlights.js?v=20260607d"></script>
-  <script src="/assets/reader.js?v=20260613a"></script>
+  <script src="/assets/reader.js?v=20260613b"></script>
 </body>
 </html>
