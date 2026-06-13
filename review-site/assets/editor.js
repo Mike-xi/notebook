@@ -141,6 +141,88 @@
     }
   });
 
+  // ===== Markdown 工具栏 =====
+  const toolbar = document.getElementById('ed-toolbar');
+
+  function afterEdit() {
+    inputEl.focus();
+    markDirty();
+    schedulePreview();
+    if (!file) backupDraft();
+  }
+
+  // 行内包裹：有选区→两侧加标记并保持选中；无选区→插入占位文字并选中，便于直接改写
+  function wrapInline(before, after, placeholder) {
+    const s = inputEl.selectionStart, e = inputEl.selectionEnd;
+    const sel = inputEl.value.slice(s, e) || placeholder || '';
+    inputEl.setRangeText(before + sel + after, s, e, 'end');
+    const innerStart = s + before.length;
+    inputEl.setSelectionRange(innerStart, innerStart + sel.length);
+    afterEdit();
+  }
+
+  // 行前缀：对选区涉及的每一整行套用前缀（标题/列表/引用等）
+  function prefixLines(makePrefix) {
+    const val = inputEl.value;
+    const s = inputEl.selectionStart, e = inputEl.selectionEnd;
+    const lineStart = val.lastIndexOf('\n', s - 1) + 1;
+    let lineEnd = val.indexOf('\n', e);
+    if (lineEnd === -1) lineEnd = val.length;
+    const out = val.slice(lineStart, lineEnd).split('\n').map(makePrefix).join('\n');
+    inputEl.setRangeText(out, lineStart, lineEnd, 'end');
+    inputEl.setSelectionRange(lineStart, lineStart + out.length);
+    afterEdit();
+  }
+
+  // 块级插入：保证前后有空行，符合 Markdown 块语义
+  function insertBlock(text) {
+    const s = inputEl.selectionStart, e = inputEl.selectionEnd;
+    const val = inputEl.value;
+    const nlBefore = s > 0 && val[s - 1] !== '\n' ? '\n' : '';
+    const nlAfter = e < val.length && val[e] !== '\n' ? '\n' : '';
+    inputEl.setRangeText(nlBefore + text + nlAfter, s, e, 'end');
+    afterEdit();
+  }
+
+  function applyMd(type) {
+    switch (type) {
+      case 'bold': return wrapInline('**', '**', '粗体');
+      case 'italic': return wrapInline('*', '*', '斜体');
+      case 'strike': return wrapInline('~~', '~~', '删除线');
+      case 'h2': return prefixLines((ln) => '## ' + ln.replace(/^#{1,6}\s*/, ''));
+      case 'ul': return prefixLines((ln) => '- ' + ln.replace(/^[-*]\s+/, ''));
+      case 'ol': return prefixLines((ln, i) => (i + 1) + '. ' + ln.replace(/^\d+\.\s+/, ''));
+      case 'task': return prefixLines((ln) => '- [ ] ' + ln.replace(/^- \[[ x]\]\s+/, ''));
+      case 'quote': return prefixLines((ln) => '> ' + ln.replace(/^>\s?/, ''));
+      case 'code': {
+        const sel = inputEl.value.slice(inputEl.selectionStart, inputEl.selectionEnd);
+        return sel.includes('\n') ? insertBlock('```\n' + sel + '\n```') : wrapInline('`', '`', '代码');
+      }
+      case 'formula': {
+        const sel = inputEl.value.slice(inputEl.selectionStart, inputEl.selectionEnd);
+        return sel.includes('\n') ? insertBlock('$$\n' + (sel || 'a^2 + b^2 = c^2') + '\n$$') : wrapInline('$', '$', 'a^2+b^2=c^2');
+      }
+      case 'link': return wrapInline('[', '](https://)', '链接文字');
+      case 'table': return insertBlock('| 列 1 | 列 2 |\n| --- | --- |\n| 内容 | 内容 |');
+      case 'hr': return insertBlock('---');
+    }
+  }
+
+  if (toolbar) toolbar.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-md]');
+    if (!btn) return;
+    e.preventDefault();
+    applyMd(btn.dataset.md);
+  });
+
+  // 编辑区内快捷键：Ctrl/⌘+B 加粗、Ctrl/⌘+I 斜体（保存快捷键见下方全局监听）
+  inputEl.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    const k = e.key.toLowerCase();
+    if (k === 'b') { e.preventDefault(); applyMd('bold'); }
+    else if (k === 'i') { e.preventDefault(); applyMd('italic'); }
+  });
+
   // ===== 保存 =====
   function guessTitle() {
     const t = titleEl.value.trim();

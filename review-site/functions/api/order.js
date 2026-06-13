@@ -9,13 +9,15 @@ const KEY = 'course_order';
 
 export async function onRequestGet({ env }) {
   await ensurePrefsSchema(env);
-  const row = await env.DB.prepare('SELECT value FROM prefs WHERE key = ?').bind(KEY).first();
-  let order = [];
-  try {
-    const p = JSON.parse(row?.value || '[]');
-    if (Array.isArray(p)) order = p.filter((x) => typeof x === 'string');
-  } catch {}
-  return Response.json({ order });
+  const rows = await env.DB.prepare("SELECT key, value FROM prefs WHERE key IN (?, 'hidden_courses')").bind(KEY).all();
+  const map = {};
+  for (const r of (rows.results || [])) map[r.key] = r.value;
+  const parseList = (v) => {
+    try { const p = JSON.parse(v || '[]'); return Array.isArray(p) ? p.filter((x) => typeof x === 'string') : []; }
+    catch { return []; }
+  };
+  // order：课程显示顺序；hidden：被删除的静态课程（首页据此过滤）
+  return Response.json({ order: parseList(map[KEY]), hidden: parseList(map['hidden_courses']) });
 }
 
 export async function onRequestPut({ request, env }) {

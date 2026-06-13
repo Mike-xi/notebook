@@ -17,7 +17,7 @@ function detectKind(name) {
 }
 
 async function loadAndRender() {
-  let staticCourses = [], dynamic = [], progress = [], order = [];
+  let staticCourses = [], dynamic = [], progress = [], order = [], hidden = [];
   try {
     const [c1, c2, pr, od] = await Promise.all([
       fetch('/courses.json').then((r) => (r.ok ? r.json() : [])),
@@ -29,11 +29,15 @@ async function loadAndRender() {
     dynamic = c2 || [];
     progress = pr || [];
     order = (od && od.order) || [];
+    hidden = (od && od.hidden) || [];
   } catch (e) {
     console.warn('[home] load failed', e);
   }
 
-  const courses = applyOrder([...staticCourses, ...dynamic], order);
+  // 被删除的静态课程（courses.json 无法物理删除，按隐藏列表过滤）
+  const hiddenSet = new Set(hidden);
+  const courses = applyOrder([...staticCourses, ...dynamic], order)
+    .filter((c) => !hiddenSet.has(c.file));
 
   const progressMap = {};
   for (const p of progress) progressMap[p.file] = p;
@@ -718,7 +722,8 @@ function cardHTML(c, deletable = false) {
        </div>`
     : '';
 
-  const delBtn = (deletable && c.dynamic)
+  // 所有课程地位相同，均可删除（静态课删除＝从首页隐藏）
+  const delBtn = deletable
     ? `<button class="nb-del" data-file="${escapeAttr(c.file)}" title="删除课程" aria-label="删除课程">✕</button>`
     : '';
 

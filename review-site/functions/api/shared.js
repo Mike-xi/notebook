@@ -1,6 +1,7 @@
 // 只读分享的取数端点（公开路径，_middleware 放行，凭 HMAC token 自鉴权，无需登录）。
-// GET /api/shared?token=...        -> { kind, file, title, subject, content? }（html/md 返回正文文本）
-// GET /api/shared?token=...&raw=1  -> pdf 原始流（动态取 R2，静态经 ASSETS）
+// GET /api/shared?token=...        -> { kind, file, title, subject, content? }（元数据，给阅读器取标题）
+// GET /api/shared?token=...&raw=1  -> 正文原始流：html→text/html、md→text/markdown、pdf→application/pdf
+//                                    （供分享模式的阅读器 iframe / viewer 同源加载，享完整阅读功能）
 import { hmacSign } from '../_lib/auth.js';
 import { ensureCoursesSchema } from '../_lib/db.js';
 
@@ -45,22 +46,40 @@ export async function onRequestGet({ request, env }) {
   const kind = kindOf(file);
   const isDynamic = file.startsWith('u-');
 
-  // pdf 原始流
+  // 正文原始流（供分享模式阅读器同源加载）
   if (url.searchParams.get('raw') === '1') {
-    if (kind !== 'pdf') return Response.json({ error: '仅 PDF 支持 raw' }, { status: 400 });
-    if (isDynamic) {
-      try {
-        const obj = await env.FILES.get(file);
-        if (!obj) return new Response('not found', { status: 404 });
-        return new Response(obj.body, {
-          headers: { 'Content-Type': 'application/pdf', 'Cache-Control': 'private, max-age=600' },
-        });
-      } catch { return new Response('not found', { status: 404 }); }
+    // pdf：动态取 R2、静态经 ASSETS，流式返回
+    if (kind === 'pdf') {
+      if (isDynamic) {
+        try {
+          const obj = await env.FILES.get(file);
+          if (!obj) return new Response('not found', { status: 404 });
+          return new Response(obj.body, {
+            headers: { 'Content-Type': 'application/pdf', 'Cache-Control': 'private, max-age=600' },
+          });
+        } catch { return new Response('not found', { status: 404 }); }
+      }
+      const r = await env.ASSETS.fetch(new Request(url.origin + '/notes/' + encodeURIComponent(file)));
+      if (!r.ok) return new Response('not found', { status: 404 });
+      return new Response(r.body, {
+        headers: { 'Content-Type': 'application/pdf', 'Cache-Control': 'private, max-age=600' },
+      });
     }
-    const r = await env.ASSETS.fetch(new Request(url.origin + '/notes/' + encodeURIComponent(file)));
-    if (!r.ok) return new Response('not found', { status: 404 });
-    return new Response(r.body, {
-      headers: { 'Content-Type': 'application/pdf', 'Cache-Control': 'private, max-age=600' },
+
+    // html / md：动态取 D1、静态读 /notes/，按类型设置 Content-Type
+    let content = null;
+    if (isDynamic) {
+      await ensureCoursesSchema(env);
+      const row = await env.DB.prepare('SELECT html FROM courses WHERE file = ?').bind(file).first();
+      content = row ? row.html : null;
+    } else {
+      const r = await env.ASSETS.fetch(new Request(url.origin + '/notes/' + encodeURIComponent(file)));
+      content = r.ok ? await r.text() : null;
+    }
+    if (content == null) return new Response('not found', { status: 404 });
+    const ctype = kind === 'md' ? 'text/markdown; charset=utf-8' : 'text/html; charset=utf-8';
+    return new Response(content, {
+      headers: { 'Content-Type': ctype, 'Cache-Control': 'private, max-age=300', 'X-Content-Type-Options': 'nosniff' },
     });
   }
 

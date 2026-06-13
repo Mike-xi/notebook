@@ -673,6 +673,49 @@ body.reader {
 /* 阅读工具栏：Aa 按钮（文字款） */
 .rb-aa { font-size: 14px; font-weight: 700; letter-spacing: 0.02em; }
 
+/* 只读分享徽标（仅分享模式显示） */
+.rb-ro {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: var(--primary-container);
+  color: var(--on-primary-container);
+}
+
+/* 分享模式：隐藏一切「回主页 / 写入账号」的入口，只保留纯阅读功能 */
+body.share-mode .rb-back,
+body.share-mode #chat-toggle,
+body.share-mode #bookmark-btn,
+body.share-mode #bookmarks-toggle,
+body.share-mode #share-btn { display: none; }
+
+/* 分享对话框 */
+.share-exp { flex-wrap: wrap; }
+.share-exp .seg-btn { flex: 1 0 auto; min-width: 54px; }
+.share-result { margin: 4px 0 14px; }
+.share-link-row { display: flex; gap: 8px; align-items: stretch; }
+.share-link-row input {
+  flex: 1; min-width: 0;
+  border: 1px solid var(--outline-variant);
+  border-radius: 10px;
+  background: var(--surface-container-lowest);
+  color: var(--on-surface);
+  font-size: 12.5px;
+  padding: 9px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.share-link-row .btn-confirm {
+  flex: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 18px;
+  border-radius: 10px;
+}
+
 /* 更多菜单（工具栏右端 ⋯ 下拉） */
 .more-menu {
   position: fixed;

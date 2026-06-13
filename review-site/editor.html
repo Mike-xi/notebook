@@ -2,13 +2,13 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>写笔记</title>
   <script>
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
   </script>
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg?v=20260607c">
-  <link rel="stylesheet" href="/assets/style.css?v=20260610a">
+  <link rel="stylesheet" href="/assets/style.css?v=20260613a">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
   <link id="hljs-light" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css">
   <link id="hljs-dark" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" disabled>
@@ -21,13 +21,14 @@
     }
     :root[data-theme="dark"] { --md-link: #79b8ff; }
 
-    body.editor { height: 100vh; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); }
+    body.editor { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); }
 
+    /* 顶栏 */
     .ed-bar {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 10px 16px;
+      padding: 10px 14px;
       border-bottom: 1px solid var(--outline-variant);
       background: var(--surface-container-low);
       flex: none;
@@ -61,15 +62,47 @@
     .ed-status.err { color: var(--error); }
     #ed-preview-toggle { display: none; }
 
-    .ed-main { flex: 1; display: flex; min-height: 0; }
+    /* Markdown 工具栏 */
+    .ed-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 5px 10px;
+      border-bottom: 1px solid var(--outline-variant);
+      background: var(--surface-container-lowest);
+      flex: none;
+      overflow-x: auto;
+      scrollbar-width: thin;
+      -webkit-overflow-scrolling: touch;
+    }
+    .ed-toolbar::-webkit-scrollbar { height: 0; }
+    .ed-tool {
+      flex: none;
+      min-width: 36px; height: 34px;
+      padding: 0 9px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border: none; border-radius: 8px;
+      background: transparent; color: var(--on-surface-variant);
+      font-size: 14px; font-family: inherit; cursor: pointer;
+      transition: background-color var(--transition), color var(--transition);
+    }
+    .ed-tool:hover { background: var(--surface-container-high); color: var(--on-surface); }
+    .ed-tool:active { background: var(--surface-container-highest); }
+    .ed-tool b, .ed-tool i { font-style: normal; }
+    .ed-tool i { font-style: italic; }
+    .ed-tool-sep { flex: none; width: 1px; align-self: stretch; margin: 6px 5px; background: var(--outline-variant); }
+
+    /* 编辑 + 预览 双栏 */
+    .ed-main { flex: 1; display: flex; min-height: 0; max-width: none; margin: 0; padding: 0; width: 100%; }
     #ed-input {
       flex: 1; min-width: 0;
       border: none; outline: none; resize: none;
-      padding: 24px 26px 80px;
+      padding: 22px 24px 96px;
       background: var(--surface);
       color: var(--on-surface);
+      text-align: left; direction: ltr;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "PingFang SC", monospace;
-      font-size: 14px; line-height: 1.75;
+      font-size: 15px; line-height: 1.8;
       tab-size: 2;
     }
     #ed-preview-wrap {
@@ -78,7 +111,7 @@
       border-left: 1px solid var(--outline-variant);
       background: var(--surface);
     }
-    #ed-preview { max-width: 760px; margin: 0 auto; padding: 24px 28px 120px; font-size: 15.5px; line-height: 1.7; color: var(--md-fg); word-wrap: break-word; }
+    #ed-preview { max-width: 760px; margin: 0 auto; padding: 24px 28px 120px; font-size: 15.5px; line-height: 1.7; color: var(--md-fg); word-wrap: break-word; text-align: left; }
 
     /* 预览排版（精简自 viewer-md） */
     #ed-preview h1, #ed-preview h2, #ed-preview h3, #ed-preview h4 { font-weight: 600; line-height: 1.3; margin: 1.5em 0 .55em; }
@@ -101,13 +134,20 @@
     #ed-preview .katex-display { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
     .ed-preview-empty { color: var(--md-muted); font-size: 13.5px; padding: 24px 0; }
 
-    /* 窄屏：编辑/预览二选一切换 */
+    /* 窄屏：编辑/预览二选一切换，手机更顺手 */
     @media (max-width: 760px) {
+      .ed-bar { gap: 8px; padding: 9px 12px; }
       #ed-subject { display: none; }
+      .ed-status { display: none; }
+      #ed-title { font-size: 16px; }
       #ed-preview-toggle { display: inline-flex; padding: 7px 14px; font-size: 12.5px; }
+      #ed-input { font-size: 16px; padding: 18px 18px 120px; }   /* 16px 防 iOS 聚焦缩放 */
+      #ed-preview { padding: 20px 18px 120px; }
       .ed-main.show-preview #ed-input { display: none; }
       .ed-main:not(.show-preview) #ed-preview-wrap { display: none; }
       #ed-preview-wrap { border-left: none; }
+      .ed-toolbar { padding: 4px 8px; }
+      .ed-tool { min-width: 40px; height: 38px; }   /* 触控更大 */
     }
   </style>
 </head>
@@ -121,11 +161,30 @@
     <button class="create-btn" id="ed-save" type="button">保存</button>
   </header>
 
+  <!-- Markdown 工具栏：点一下即插入/包裹语法，手机也好用 -->
+  <div class="ed-toolbar" id="ed-toolbar" role="toolbar" aria-label="Markdown 工具">
+    <button class="ed-tool" type="button" data-md="h2" title="标题">H</button>
+    <button class="ed-tool" type="button" data-md="bold" title="加粗 (Ctrl/⌘+B)"><b>B</b></button>
+    <button class="ed-tool" type="button" data-md="italic" title="斜体 (Ctrl/⌘+I)"><i>I</i></button>
+    <button class="ed-tool" type="button" data-md="strike" title="删除线">S̶</button>
+    <span class="ed-tool-sep" aria-hidden="true"></span>
+    <button class="ed-tool" type="button" data-md="ul" title="无序列表">•—</button>
+    <button class="ed-tool" type="button" data-md="ol" title="有序列表">1.</button>
+    <button class="ed-tool" type="button" data-md="task" title="任务清单">☑</button>
+    <button class="ed-tool" type="button" data-md="quote" title="引用">❝</button>
+    <span class="ed-tool-sep" aria-hidden="true"></span>
+    <button class="ed-tool" type="button" data-md="code" title="行内代码 / 代码块">&lt;/&gt;</button>
+    <button class="ed-tool" type="button" data-md="formula" title="数学公式">∑</button>
+    <button class="ed-tool" type="button" data-md="link" title="链接">🔗</button>
+    <button class="ed-tool" type="button" data-md="table" title="表格">▦</button>
+    <button class="ed-tool" type="button" data-md="hr" title="分隔线">—</button>
+  </div>
+
   <main class="ed-main" id="ed-main">
     <textarea id="ed-input" placeholder="# 开始写你的笔记吧…
 
 支持 Markdown 语法、$行内公式$、$$块级公式$$、```代码块```。
-Ctrl/⌘ + S 随时保存，保存后笔记会出现在首页课程列表里。" spellcheck="false"></textarea>
+上方工具栏可一键插入格式；Ctrl/⌘ + S 随时保存，保存后笔记会出现在首页课程列表里。" spellcheck="false"></textarea>
     <div id="ed-preview-wrap"><article id="ed-preview"></article></div>
   </main>
 
@@ -134,6 +193,6 @@ Ctrl/⌘ + S 随时保存，保存后笔记会出现在首页课程列表里。"
   <script src="https://cdn.jsdelivr.net/npm/markdown-it-texmath@1.0.0/texmath.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
   <script src="/assets/theme.js?v=20260608a"></script>
-  <script src="/assets/editor.js?v=20260610a"></script>
+  <script src="/assets/editor.js?v=20260613a"></script>
 </body>
 </html>

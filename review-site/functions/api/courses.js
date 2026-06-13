@@ -4,7 +4,9 @@
 //                                        也兼容旧的 JSON {title, html}（仅 html）
 // DELETE /api/courses  {file}         -> 删除课程，清理其 R2 对象与进度/书签
 // 鉴权由 _middleware.js 统一处理（只有登录用户能访问 /api/*）
-import { ensureCoursesSchema, logEvent } from '../_lib/db.js';
+import { ensureCoursesSchema, ensurePrefsSchema, logEvent } from '../_lib/db.js';
+
+const HIDDEN_KEY = 'hidden_courses';   // 静态课程（courses.json，在 git 里无法物理删除）改为隐藏
 
 const MAX_TEXT_BYTES = 1_500_000;   // html/md 存 D1，单值上限 2MB，留余量
 const MAX_PDF_BYTES = 20_000_000;   // pdf 存 R2，限 20MB
@@ -166,14 +168,29 @@ export async function onRequestDelete({ request, env }) {
   catch { return err('请求格式错误'); }
 
   const file = body?.file;
-  if (typeof file !== 'string' || !file.startsWith('u-')) {
+  if (typeof file !== 'string' || !file || file.length > 200 || file.includes('/')) {
     return err('非法的课程标识');
   }
-  await env.DB.prepare('DELETE FROM courses WHERE file = ?').bind(file).run();
-  // 清理 R2 对象（pdf）与关联进度/书签，尽力而为
-  if (file.endsWith('.pdf')) {
-    try { await env.FILES.delete(file); } catch {}
+
+  if (file.startsWith('u-')) {
+    // 动态课程：内容在 D1/R2，物理删除
+    await env.DB.prepare('DELETE FROM courses WHERE file = ?').bind(file).run();
+    if (file.endsWith('.pdf')) {
+      try { await env.FILES.delete(file); } catch {}
+    }
+  } else {
+    // 静态课程：内容在 courses.json（git 里），无法物理删除，改为加入隐藏列表（首页据此过滤）
+    await ensurePrefsSchema(env);
+    const row = await env.DB.prepare('SELECT value FROM prefs WHERE key = ?').bind(HIDDEN_KEY).first();
+    let hidden = [];
+    try { const p = JSON.parse(row?.value || '[]'); if (Array.isArray(p)) hidden = p.filter((x) => typeof x === 'string'); } catch {}
+    if (!hidden.includes(file)) hidden.push(file);
+    await env.DB.prepare(
+      'INSERT INTO prefs (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+    ).bind(HIDDEN_KEY, JSON.stringify(hidden.slice(0, 500))).run();
   }
+
+  // 清理关联进度 / 书签 / 高亮，尽力而为
   try { await env.DB.prepare('DELETE FROM progress WHERE file = ?').bind(file).run(); } catch {}
   try { await env.DB.prepare('DELETE FROM bookmarks WHERE file = ?').bind(file).run(); } catch {}
   try { await env.DB.prepare('DELETE FROM highlights WHERE file = ?').bind(file).run(); } catch {}

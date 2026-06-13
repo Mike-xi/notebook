@@ -1,12 +1,31 @@
 // 阅读器：全屏 iframe + 悬浮工具栏。HTML 笔记走同源进度/书签；PDF 仅全屏展示。
+// 两种模式：① 普通模式（?file=...，需登录）；② 只读分享模式（?share=<token>&k=<kind>，免登录，
+//    凭 token 经 /api/shared 取数，享完整阅读功能但不写入账号、不能回主页）。
 const params = new URLSearchParams(location.search);
-const file = params.get('file');
-if (!file) { location.href = '/'; throw new Error('no file'); }
+const shareToken = params.get('share');
+const shareMode = !!shareToken;
 
-const ext = (file.split('.').pop() || '').toLowerCase();
-const kind = ext === 'pdf' ? 'pdf' : (ext === 'md' || ext === 'markdown') ? 'md' : 'html';
-const isDynamic = file.startsWith('u-'); // 用户在线创建的课程，正文存 D1/R2
-const usesViewer = kind === 'pdf' || kind === 'md'; // 我们自己的 viewer（iframe 内可滚动 + postMessage 联动）
+let file, kind, isDynamic, usesViewer, sourceURL;
+if (shareMode) {
+  // 分享模式：真实 file 名不暴露在 URL，kind 由 k 提示（正文仍由 token 鉴权，提示被改至多渲染失败）。
+  kind = ['html', 'md', 'pdf'].includes(params.get('k')) ? params.get('k') : 'html';
+  isDynamic = false;
+  usesViewer = kind === 'pdf' || kind === 'md';
+  file = 'share:' + shareToken.slice(0, 24); // 仅作 localStorage 键（本地偏好等），不参与取数
+  sourceURL = `/api/shared?token=${encodeURIComponent(shareToken)}&raw=1`;
+  document.body.classList.add('share-mode');
+} else {
+  file = params.get('file');
+  if (!file) { location.href = '/'; throw new Error('no file'); }
+  const ext = (file.split('.').pop() || '').toLowerCase();
+  kind = ext === 'pdf' ? 'pdf' : (ext === 'md' || ext === 'markdown') ? 'md' : 'html';
+  isDynamic = file.startsWith('u-'); // 用户在线创建的课程，正文存 D1/R2
+  usesViewer = kind === 'pdf' || kind === 'md'; // 我们自己的 viewer（iframe 内可滚动 + postMessage 联动）
+  // 正文来源 URL：动态课程走 Function（html/md 取 D1、pdf 取 R2），静态课程读 /notes/
+  sourceURL = isDynamic
+    ? (kind === 'pdf' ? `/api/file?file=${encodeURIComponent(file)}` : `/api/course-html?file=${encodeURIComponent(file)}`)
+    : `/notes/${encodeURIComponent(file)}`;
+}
 
 const iframe = document.getElementById('content');
 const docTitleEl = document.getElementById('doc-title');
@@ -22,32 +41,43 @@ const hotzone = document.getElementById('reader-hotzone');
 const chatToggle = document.getElementById('chat-toggle');
 const chatPanel = document.getElementById('chat-panel');
 const prefsPanel = document.getElementById('prefs-panel');
-const moreMenu = document.getElementById('more-menu');
+const moreMenu = { hidden: true };   // 旧「更多」菜单已移除，留空对象兼容历史显隐引用
 const gotoTitle = params.get('goto');   // 搜索结果跳转：按小节标题定位
 
-// 课程元数据（显示标题、学科）：合并静态 courses.json 与用户创建的 /api/courses
+// 课程元数据（显示标题、学科）
 let courseMeta = null;
-Promise.all([
-  fetch('/courses.json').then((r) => (r.ok ? r.json() : [])),
-  fetch('/api/courses').then((r) => (r.ok ? r.json() : [])),
-])
-  .then(([staticCourses, dynamic]) => {
-    const courses = [...(staticCourses || []), ...(dynamic || [])];
-    courseMeta = courses.find((c) => c.file === file);
-    if (courseMeta) {
-      docTitleEl.textContent = courseMeta.title;
-      docSubjectEl.textContent = courseMeta.subject || '';
-      document.title = `${courseMeta.title} · 阅读`;
-    } else {
-      docTitleEl.textContent = file;
-    }
-  })
-  .catch(() => { docTitleEl.textContent = file; });
-
-// 正文来源 URL：动态课程走 Function（html/md 取 D1、pdf 取 R2），静态课程读 /notes/
-const sourceURL = isDynamic
-  ? (kind === 'pdf' ? `/api/file?file=${encodeURIComponent(file)}` : `/api/course-html?file=${encodeURIComponent(file)}`)
-  : `/notes/${encodeURIComponent(file)}`;
+if (shareMode) {
+  // 分享模式：标题/学科从 /api/shared 元数据取（无登录态，拿不到 courses.json）
+  document.getElementById('rb-ro').hidden = false;
+  fetch(`/api/shared?token=${encodeURIComponent(shareToken)}`)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => {
+      if (!d) { docTitleEl.textContent = '分享内容不可用'; return; }
+      courseMeta = { title: d.title, subject: d.subject };
+      docTitleEl.textContent = d.title || '分享笔记';
+      docSubjectEl.textContent = d.subject || '';
+      document.title = `${d.title || '分享笔记'} · 只读分享`;
+    })
+    .catch(() => { docTitleEl.textContent = '分享笔记'; });
+} else {
+  // 普通模式：合并静态 courses.json 与用户创建的 /api/courses
+  Promise.all([
+    fetch('/courses.json').then((r) => (r.ok ? r.json() : [])),
+    fetch('/api/courses').then((r) => (r.ok ? r.json() : [])),
+  ])
+    .then(([staticCourses, dynamic]) => {
+      const courses = [...(staticCourses || []), ...(dynamic || [])];
+      courseMeta = courses.find((c) => c.file === file);
+      if (courseMeta) {
+        docTitleEl.textContent = courseMeta.title;
+        docSubjectEl.textContent = courseMeta.subject || '';
+        document.title = `${courseMeta.title} · 阅读`;
+      } else {
+        docTitleEl.textContent = file;
+      }
+    })
+    .catch(() => { docTitleEl.textContent = file; });
+}
 
 // html 直接喂 iframe；pdf/md 走我们自己的 viewer（用 ?src= 指向正文）
 iframe.src = usesViewer
@@ -90,13 +120,15 @@ async function initIframe() {
   try { await prefsLoaded; } catch {}
   applyReadPrefs();
 
-  // 恢复上次进度
-  try {
-    const res = await fetch(`/api/progress?file=${encodeURIComponent(file)}`);
-    const data = await res.json();
-    if (data.scroll_pct > 0) restoreScroll(data.scroll_pct);
-  } catch (e) {
-    console.warn('[reader] failed to load progress', e);
+  // 恢复上次进度（分享模式不读账号进度）
+  if (!shareMode) {
+    try {
+      const res = await fetch(`/api/progress?file=${encodeURIComponent(file)}`);
+      const data = await res.json();
+      if (data.scroll_pct > 0) restoreScroll(data.scroll_pct);
+    } catch (e) {
+      console.warn('[reader] failed to load progress', e);
+    }
   }
 
   // 绑定 scroll 监听（只绑定一次）
@@ -122,7 +154,8 @@ async function initIframe() {
 // 内容就绪后：构建目录 + 启用高亮（html/md）
 function setupContentFeatures() {
   buildTOC();
-  if (kind !== 'pdf' && window.NBHighlights) {
+  // 分享模式不启用高亮批注（属个人数据，需写入账号）
+  if (!shareMode && kind !== 'pdf' && window.NBHighlights) {
     const win = iframe.contentWindow, doc = iframe.contentDocument;
     const root = kind === 'md' ? doc.getElementById('md-content') : (doc && doc.body);
     if (win && doc && root) NBHighlights.init({ doc, win, root, file, onAskAI: askFromSelection });
@@ -213,6 +246,7 @@ function updateProgressDisplay() {
 }
 
 async function saveProgress() {
+  if (shareMode) return;   // 分享访客不写入账号进度
   try {
     await fetch('/api/progress', {
       method: 'POST',
@@ -226,7 +260,7 @@ async function saveProgress() {
 
 // 关闭页面时用 sendBeacon 兜底保存
 window.addEventListener('beforeunload', () => {
-  if (currentPct > 0) {
+  if (!shareMode && currentPct > 0) {
     const blob = new Blob(
       [JSON.stringify({ file, scroll_pct: currentPct })],
       { type: 'application/json' }
@@ -286,6 +320,7 @@ document.getElementById('panel-close').addEventListener('click', () => {
 });
 
 async function loadBookmarks() {
+  if (shareMode) return;
   try {
     const res = await fetch(`/api/bookmarks?file=${encodeURIComponent(file)}`);
     const items = await res.json();
@@ -455,7 +490,8 @@ function postToViewer(msg) {
 // 快捷键：Esc 关面板 / 返回
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    if (!moreMenu.hidden) { moreMenu.hidden = true; return; }
+    const sm = document.getElementById('share-modal');
+    if (sm && !sm.hidden) { sm.hidden = true; return; }
     if (!prefsPanel.hidden) { prefsPanel.hidden = true; return; }
     if (!chatPanel.hidden) { closeChatPanel(); return; }
     if (!tocPanel.hidden) { tocPanel.hidden = true; return; }
@@ -495,6 +531,7 @@ let chatBusy = false;
 function setChatStatus(msg) { if (chatStatus) chatStatus.textContent = msg || ''; }
 
 function openChat() {
+  if (shareMode) return;   // 分享模式不开放 AI 对话（会动用账号 AI 额度）
   tocPanel.hidden = true;
   bookmarksPanel.hidden = true;
   prefsPanel.hidden = true;
@@ -516,7 +553,7 @@ function closeChatPanel() {
 // 载入近一个月的历史对话（仅一次）
 let histLoaded = false;
 async function loadChatHistory() {
-  if (histLoaded || !file) return;
+  if (histLoaded || !file || shareMode) return;
   histLoaded = true;
   try {
     const r = await fetch('/api/chat-history?scope=' + encodeURIComponent(file));
@@ -633,6 +670,16 @@ function jumpToHeading(title) {
 const DEFAULT_READ_PREFS = { scale: 100, lh: 0, width: 820, warm: 0 };  // lh=0 表示不覆盖原排版
 let readPrefs = { ...DEFAULT_READ_PREFS };
 const prefsLoaded = (async () => {
+  // 分享模式无账号，读偏好走本地 localStorage（仍可个性化，但不入账号）
+  if (shareMode) {
+    try {
+      const p = JSON.parse(localStorage.getItem('nb-share-prefs') || 'null');
+      if (p) for (const k of Object.keys(DEFAULT_READ_PREFS)) if (p[k] != null) readPrefs[k] = p[k];
+    } catch {}
+    await Promise.resolve();   // 让出一拍，确保下方 const（prefScale 等）已初始化，避免 TDZ
+    syncPrefsUI();
+    return;
+  }
   try {
     const r = await fetch(`/api/prefs?key=${encodeURIComponent('reader:' + file)}`);
     const d = await r.json();
@@ -646,6 +693,10 @@ const prefsLoaded = (async () => {
 
 let prefsSaveT = null;
 function saveReadPrefs() {
+  if (shareMode) {
+    try { localStorage.setItem('nb-share-prefs', JSON.stringify(readPrefs)); } catch {}
+    return;
+  }
   clearTimeout(prefsSaveT);
   prefsSaveT = setTimeout(() => {
     fetch('/api/prefs', {
@@ -725,117 +776,88 @@ function syncPrefsUI() {
   mark('[data-warm]', (b) => parseFloat(b.dataset.warm) === (readPrefs.warm || 0));
 }
 
-// ========== 专注模式 / 分屏对话 ==========
-let focusMode = localStorage.getItem('nb-focus') === '1';
-let splitMode = localStorage.getItem('nb-split') === '1';
-if (splitMode) document.body.classList.add('split-chat');   // 面板在 initIframe 后再开
+// ========== 专注模式（内部能力保留，UI 入口已随「更多」菜单移除） ==========
+let focusMode = false;
+let splitMode = false;
+function updateMoreStates() {}   // 「更多」菜单已移除，保留空函数兼容历史调用
 
 function setFocus(on) {
   focusMode = !!on;
-  localStorage.setItem('nb-focus', focusMode ? '1' : '0');
   if (focusMode) bar.classList.add('hidden');
-  updateMoreStates();
 }
 function setSplit(on) {
   splitMode = !!on;
-  localStorage.setItem('nb-split', splitMode ? '1' : '0');
   document.body.classList.toggle('split-chat', splitMode);
   if (splitMode && chatPanel.hidden) openChat();
-  updateMoreStates();
 }
 
-// ========== 更多菜单（专注/分屏/导出/打印/分享/编辑） ==========
-const moreToggle = document.getElementById('more-toggle');
-moreToggle.addEventListener('click', (e) => {
-  e.stopPropagation();
-  if (!moreMenu.hidden) { moreMenu.hidden = true; return; }
+// ========== 分享：设置有效期（最长一年）→ 生成只读链接 ==========
+const shareBtn = document.getElementById('share-btn');
+const shareModal = document.getElementById('share-modal');
+const shareExp = document.getElementById('share-exp');
+const shareGenBtn = document.getElementById('share-gen');
+const shareResult = document.getElementById('share-result');
+const shareLinkInput = document.getElementById('share-link');
+const shareExpiryEl = document.getElementById('share-expiry');
+let shareDays = 0;
+
+if (shareBtn) shareBtn.addEventListener('click', openShareModal);
+function openShareModal() {
+  shareDays = 0;
+  shareExp.querySelectorAll('.seg-btn').forEach((b) => b.classList.remove('active'));
+  shareGenBtn.disabled = true;
+  shareGenBtn.textContent = '生成链接';
+  shareResult.hidden = true;
   prefsPanel.hidden = true;
-  updateMoreStates();
-  moreMenu.hidden = false;
+  shareModal.hidden = false;
   showBar();
-});
-document.addEventListener('click', (e) => {
-  if (!moreMenu.hidden && !moreMenu.contains(e.target) && !e.target.closest('#more-toggle')) moreMenu.hidden = true;
-});
-function updateMoreStates() {
-  document.getElementById('mm-focus-state').textContent = focusMode ? '✓' : '';
-  document.getElementById('mm-split-state').textContent = splitMode ? '✓' : '';
 }
-document.getElementById('mm-focus').addEventListener('click', () => { setFocus(!focusMode); moreMenu.hidden = true; });
-document.getElementById('mm-split').addEventListener('click', () => { setSplit(!splitMode); moreMenu.hidden = true; });
-document.getElementById('mm-export').addEventListener('click', () => { moreMenu.hidden = true; exportSummary(); });
-document.getElementById('mm-print').addEventListener('click', () => {
-  moreMenu.hidden = true;
-  try { iframe.contentWindow.print(); }
-  catch { toast('当前文档不支持打印'); }
-});
-document.getElementById('mm-share').addEventListener('click', () => { moreMenu.hidden = true; shareCourse(); });
-const mmEdit = document.getElementById('mm-edit');
-if (isDynamic && kind === 'md') {
-  mmEdit.hidden = false;
-  mmEdit.addEventListener('click', () => { location.href = `/editor.html?file=${encodeURIComponent(file)}`; });
-}
+function closeShareModal() { shareModal.hidden = true; }
 
-// ========== 导出复习摘要（.md：元信息 + 高亮批注 + 书签，md 课程附全文） ==========
-async function exportSummary() {
-  const meta = courseMeta || { title: file, subject: '' };
-  let hls = [], bms = [];
-  try { hls = (await fetch(`/api/highlights?file=${encodeURIComponent(file)}`).then((r) => r.json())) || []; } catch {}
-  try { bms = (await fetch(`/api/bookmarks?file=${encodeURIComponent(file)}`).then((r) => r.json())) || []; } catch {}
-  const lines = [
-    `# ${meta.title} · 复习摘要`, '',
-    `> 学科：${meta.subject || '—'} · 导出于 ${new Date().toLocaleString()} · 阅读进度 ${Math.round(currentPct * 100)}%`, '',
-  ];
-  if (hls.length) {
-    lines.push('## 我的高亮与批注', '');
-    for (const h of hls) {
-      lines.push(`- ${String(h.text || '').replace(/\s+/g, ' ').trim()}`);
-      if (h.note) lines.push(`  - 📝 ${h.note}`);
-    }
-    lines.push('');
-  }
-  if (bms.length) {
-    lines.push('## 书签', '');
-    for (const b of bms) lines.push(`- ${b.title}（约 ${Math.round((b.scroll_pct || 0) * 100)}% 处）`);
-    lines.push('');
-  }
-  if (kind === 'md') {
-    try {
-      const raw = await fetch(sourceURL).then((r) => r.text());
-      lines.push('---', '', '## 笔记全文', '', raw);
-    } catch {}
-  } else if (!hls.length && !bms.length) {
-    lines.push('（这门课程还没有高亮或书签——在正文里划选文字即可添加高亮）');
-  }
-  const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${meta.title || '笔记'}-复习摘要.md`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  toast('复习摘要已导出');
-}
+if (shareExp) shareExp.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-days]');
+  if (!b) return;
+  shareDays = parseInt(b.dataset.days, 10) || 0;
+  shareExp.querySelectorAll('.seg-btn').forEach((x) => x.classList.toggle('active', x === b));
+  shareGenBtn.disabled = !shareDays;
+});
+document.getElementById('share-cancel')?.addEventListener('click', closeShareModal);
+if (shareModal) shareModal.addEventListener('click', (e) => { if (e.target === shareModal) closeShareModal(); });
 
-// ========== 只读分享链接 ==========
-async function shareCourse() {
+if (shareGenBtn) shareGenBtn.addEventListener('click', async () => {
+  if (!shareDays) { toast('请先选择有效期'); return; }
+  shareGenBtn.disabled = true;
+  shareGenBtn.textContent = '生成中…';
   try {
     const res = await fetch('/api/share', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ file }),
+      body: JSON.stringify({ file, days: shareDays }),
     });
     const d = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(d.error || '生成失败');
     const url = new URL(d.url, location.origin).href;
-    try {
-      await navigator.clipboard.writeText(url);
-      toast('已复制只读分享链接（30 天内有效）');
-    } catch {
-      prompt('复制这个只读分享链接（30 天内有效）：', url);
-    }
+    shareLinkInput.value = url;
+    const exp = new Date(d.expires_at);
+    const pad = (n) => String(n).padStart(2, '0');
+    shareExpiryEl.textContent = `链接有效至 ${exp.getFullYear()}-${pad(exp.getMonth() + 1)}-${pad(exp.getDate())} ${pad(exp.getHours())}:${pad(exp.getMinutes())}`;
+    shareResult.hidden = false;
+    shareGenBtn.textContent = '重新生成';
+    try { await navigator.clipboard.writeText(url); toast('链接已生成并复制'); }
+    catch { toast('链接已生成'); }
+    shareLinkInput.focus();
+    shareLinkInput.select();
   } catch (e) {
     toast('分享失败：' + (e.message || '未知错误'));
+    shareGenBtn.textContent = '生成链接';
+  } finally {
+    shareGenBtn.disabled = !shareDays;
   }
-}
+});
+document.getElementById('share-copy')?.addEventListener('click', async () => {
+  if (!shareLinkInput.value) return;
+  try { await navigator.clipboard.writeText(shareLinkInput.value); toast('已复制'); }
+  catch { shareLinkInput.select(); try { document.execCommand('copy'); toast('已复制'); } catch {} }
+});
 
 // 轻提示
 let toastT = null;
