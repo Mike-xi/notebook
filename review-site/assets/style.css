@@ -317,6 +317,14 @@ body.home {
 }
 .tab:hover { background: var(--surface-container-high); color: var(--on-surface); }
 .tab.active { background: var(--on-surface); color: var(--surface); }
+/* 拖动课程卡时：Tab 显出可放置边框；悬停的目标 Tab 高亮成「投放区」 */
+body.sorting .home-tabs .tab { box-shadow: inset 0 0 0 1.5px var(--outline-variant); transition: none; }
+.home-tabs .tab.drop-target {
+  background: var(--primary);
+  color: var(--on-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 30%, transparent);
+  transform: scale(1.06);
+}
 
 main {
   max-width: 1360px;
@@ -1728,39 +1736,33 @@ body.login .eyebrow { display: block; text-align: center; margin: 0 0 26px; }
 
 .about-hero {
   position: relative;
-  padding: 38px 28px 30px;
+  padding: 36px 28px 28px;
   text-align: center;
   color: #fff;
   overflow: hidden;
-  background: linear-gradient(135deg, #6750A4 0%, #8E5BC8 45%, #4A7DD6 100%);
+  background: linear-gradient(140deg, #6750A4 0%, #8E5BC8 52%, #5A7FE0 100%);
 }
+/* 柔和单色高光，取代原先的彩色极光，与全站简洁观感统一 */
 .about-aurora {
   position: absolute;
-  inset: -40%;
+  inset: 0;
   background:
-    radial-gradient(40% 40% at 20% 30%, rgba(255,180,120,.55), transparent 60%),
-    radial-gradient(45% 45% at 80% 20%, rgba(120,220,255,.50), transparent 60%),
-    radial-gradient(50% 50% at 60% 80%, rgba(255,120,200,.45), transparent 60%);
-  filter: blur(14px);
-  animation: aurora 14s ease-in-out infinite alternate;
-}
-@keyframes aurora {
-  0%   { transform: translate(0,0) rotate(0deg) scale(1); }
-  50%  { transform: translate(4%, -3%) rotate(8deg) scale(1.15); }
-  100% { transform: translate(-3%, 4%) rotate(-6deg) scale(1.05); }
+    radial-gradient(60% 90% at 25% 0%, rgba(255,255,255,.22), transparent 65%),
+    radial-gradient(55% 80% at 90% 110%, rgba(255,255,255,.14), transparent 70%);
+  pointer-events: none;
 }
 .about-hero-inner { position: relative; z-index: 1; }
-.about-emoji {
-  font-size: 40px;
-  display: inline-block;
-  filter: drop-shadow(0 3px 8px rgba(0,0,0,.25));
-  animation: about-float 4s ease-in-out infinite;
+.about-badge {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-full);
+  background: rgba(255,255,255,.16);
+  border: 1px solid rgba(255,255,255,.28);
+  color: #fff;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
 }
-@keyframes about-float {
-  0%,100% { transform: translateY(0) rotate(-4deg); }
-  50%     { transform: translateY(-7px) rotate(4deg); }
-}
-.about-title { font-size: 22px; font-weight: 700; margin: 10px 0 6px; }
+.about-title { font-size: 22px; font-weight: 700; margin: 14px 0 6px; }
 .about-sub { font-size: 13.5px; opacity: .92; line-height: 1.5; max-width: 320px; margin: 0 auto; }
 
 .about-body { padding: 22px 24px 6px; }
@@ -1780,7 +1782,7 @@ body.login .eyebrow { display: block; text-align: center; margin: 0 0 26px; }
   border-radius: var(--radius-md, 12px);
   border: 1px solid var(--outline-variant);
 }
-.about-stat .as-ic { font-size: 16px; }
+.about-stat .as-ic { display: inline-flex; align-items: center; justify-content: center; color: var(--primary); margin-bottom: 2px; }
 .about-stat .as-n {
   font-size: 22px;
   font-weight: 700;

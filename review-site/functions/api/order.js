@@ -9,15 +9,23 @@ const KEY = 'course_order';
 
 export async function onRequestGet({ env }) {
   await ensurePrefsSchema(env);
-  const rows = await env.DB.prepare("SELECT key, value FROM prefs WHERE key IN (?, 'hidden_courses')").bind(KEY).all();
+  const rows = await env.DB.prepare("SELECT key, value FROM prefs WHERE key IN (?, 'hidden_courses', 'category_overrides')").bind(KEY).all();
   const map = {};
   for (const r of (rows.results || [])) map[r.key] = r.value;
   const parseList = (v) => {
     try { const p = JSON.parse(v || '[]'); return Array.isArray(p) ? p.filter((x) => typeof x === 'string') : []; }
     catch { return []; }
   };
-  // order：课程显示顺序；hidden：被删除的静态课程（首页据此过滤）
-  return Response.json({ order: parseList(map[KEY]), hidden: parseList(map['hidden_courses']) });
+  const parseMap = (v) => {
+    try { const p = JSON.parse(v || '{}'); return (p && typeof p === 'object' && !Array.isArray(p)) ? p : {}; }
+    catch { return {}; }
+  };
+  // order：显示顺序；hidden：被删除的静态课程；categories：拖拽改分类的覆盖 {file: category}
+  return Response.json({
+    order: parseList(map[KEY]),
+    hidden: parseList(map['hidden_courses']),
+    categories: parseMap(map['category_overrides']),
+  });
 }
 
 export async function onRequestPut({ request, env }) {

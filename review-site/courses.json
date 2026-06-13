@@ -53,5 +53,16 @@
     "kind": "html",
     "category": "play",
     "tags": ["物理", "抛体运动", "碰撞", "互动仿真"]
+  },
+  {
+    "file": "gomoku.html",
+    "title": "五子棋 · Gomoku",
+    "subject": "对弈",
+    "description": "黑白对弈 · 算法 / Workers AI 对手 + 联机和朋友对战 · 三档难度（Alpha-Beta 棋形评分）",
+    "icon": "⚫",
+    "color": "#B5793B",
+    "kind": "html",
+    "category": "play",
+    "tags": ["五子棋", "博弈AI", "联机", "Alpha-Beta"]
   }
 ]

@@ -22,7 +22,7 @@ function detectKind(name) {
 }
 
 async function loadAndRender() {
-  let staticCourses = [], dynamic = [], progress = [], order = [], hidden = [];
+  let staticCourses = [], dynamic = [], progress = [], order = [], hidden = [], categoryOverrides = {};
   try {
     const [c1, c2, pr, od] = await Promise.all([
       fetch('/courses.json').then((r) => (r.ok ? r.json() : [])),
@@ -35,6 +35,7 @@ async function loadAndRender() {
     progress = pr || [];
     order = (od && od.order) || [];
     hidden = (od && od.hidden) || [];
+    categoryOverrides = (od && od.categories) || {};
   } catch (e) {
     console.warn('[home] load failed', e);
   }
@@ -43,6 +44,12 @@ async function loadAndRender() {
   const hiddenSet = new Set(hidden);
   const courses = applyOrder([...staticCourses, ...dynamic], order)
     .filter((c) => !hiddenSet.has(c.file));
+
+  // 叠加「拖拽改分类」的覆盖（统一作用于静态/动态课程）
+  for (const c of courses) {
+    const ov = categoryOverrides[c.file];
+    if (ov && ['learn', 'explore', 'play'].includes(ov)) c.category = ov;
+  }
 
   const progressMap = {};
   for (const p of progress) progressMap[p.file] = p;
@@ -400,21 +407,22 @@ function renderAbout() {
 
   // 一句话人设（确定性，按数据挑模板，纯鼓励、不涉隐私）
   let tagline;
-  if (p.courseCount === 0) tagline = '一张空白的星图，正等你点亮第一颗星 ✦';
-  else if (p.subjectCount >= 3) tagline = '横跨多个领域的探索者 — 你的好奇心没有边界 🚀';
-  else if (p.topSubject) tagline = `专注「${p.topSubject}」的深耕者 — 一寸一寸把它啃透 🔬`;
-  else tagline = '稳步推进的笔记收藏家 📚';
+  if (p.courseCount === 0) tagline = '一张空白的星图，正等你点亮第一颗星';
+  else if (p.subjectCount >= 3) tagline = '横跨多个领域的探索者 — 你的好奇心没有边界';
+  else if (p.topSubject) tagline = `专注「${p.topSubject}」的深耕者 — 一寸一寸把它啃透`;
+  else tagline = '稳步推进的笔记收藏家';
   document.getElementById('about-tagline').textContent = tagline;
 
+  const aic = (n) => (window.NBIcon ? NBIcon(n, { size: 20 }) : '');
   const stats = [
-    { n: p.courseCount, label: '门课程', ic: '📚' },
-    { n: p.subjectCount, label: '个学科', ic: '🧭' },
-    { n: p.tagCount, label: '个标签', ic: '🏷️' },
-    { n: p.readCount, label: '篇在读', ic: '🔖' },
+    { n: p.courseCount, label: '门课程', ic: 'stack' },
+    { n: p.subjectCount, label: '个学科', ic: 'compass' },
+    { n: p.tagCount, label: '个标签', ic: 'tag' },
+    { n: p.readCount, label: '篇在读', ic: 'bookopen' },
   ];
   document.getElementById('about-stats').innerHTML = stats.map((s) => `
     <div class="about-stat">
-      <span class="as-ic">${s.ic}</span>
+      <span class="as-ic">${aic(s.ic)}</span>
       <span class="as-n">${s.n}</span>
       <span class="as-label">${s.label}</span>
     </div>`).join('');
@@ -485,7 +493,36 @@ function applyOrder(list, order) {
 
 const coursesGrid = document.getElementById('courses');
 let dragState = null;
+let dragOverTab = null;        // 拖拽中悬停的分类 Tab（拖到 Tab 上松手即改分类）
 let suppressClickUntil = 0;
+
+function clearTabDropHighlight() {
+  document.querySelectorAll('#home-tabs .tab.drop-target').forEach((t) => t.classList.remove('drop-target'));
+}
+
+let toastT = null;
+function toast(msg) {
+  let el = document.getElementById('nb-toast');
+  if (!el) { el = document.createElement('div'); el.id = 'nb-toast'; document.body.appendChild(el); }
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// 拖动课程卡到某个 Tab → 改该课程分类（乐观更新 + 写后端覆盖表）
+function recategorize(file, cat) {
+  const card = coursesGrid.querySelector('.nb-card[data-file="' + file + '"]');
+  if (!card || (card.dataset.category || 'learn') === cat) return;
+  card.dataset.category = cat;
+  applyFilters();
+  const label = { learn: 'Learn', explore: 'Explore', play: 'Play' }[cat] || cat;
+  toast('Moved to ' + label);
+  fetch('/api/category', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ file, category: cat }),
+  }).catch(() => {});
+}
 
 function persistOrder() {
   const order = Array.from(coursesGrid.querySelectorAll('.nb-card'))
@@ -530,6 +567,17 @@ window.addEventListener('pointermove', (e) => {
   ghost.style.top = (e.clientY - dragState.offY) + 'px';
 
   const under = document.elementFromPoint(e.clientX, e.clientY);
+
+  // 拖到顶部分类 Tab 上：高亮该 Tab，本次不参与网格重排（松手时改分类）
+  const tabEl = under && under.closest ? under.closest('#home-tabs .tab') : null;
+  clearTabDropHighlight();
+  if (tabEl && tabEl.dataset.tab && tabEl.dataset.tab !== 'all') {
+    dragOverTab = tabEl.dataset.tab;
+    tabEl.classList.add('drop-target');
+    return;
+  }
+  dragOverTab = null;
+
   const target = under && under.closest('.nb-card');
   if (target && target !== card && target.parentElement === coursesGrid && target.style.display !== 'none') {
     const r = target.getBoundingClientRect();
@@ -546,7 +594,16 @@ function endDrag() {
   ghost.remove();
   card.classList.remove('nb-card-placeholder');
   document.body.classList.remove('sorting');
+  const tabTarget = dragOverTab;
+  dragOverTab = null;
+  clearTabDropHighlight();
   dragState = null;
+  if (tabTarget) {
+    suppressClickUntil = Date.now() + 350;
+    if (moved) persistOrder();
+    recategorize(card.dataset.file, tabTarget);
+    return;
+  }
   if (moved) { suppressClickUntil = Date.now() + 350; persistOrder(); }
 }
 window.addEventListener('pointerup', endDrag);
