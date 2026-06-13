@@ -367,6 +367,7 @@ main {
 }
 
 .nb-card-icon {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", sans-serif;
   font-size: 34px;
   line-height: 1;
   margin-bottom: auto;
@@ -650,6 +651,8 @@ body.sorting .nb-card:hover { transform: none; box-shadow: none; }
 .icon-opt {
   width: 34px; height: 34px;
   display: flex; align-items: center; justify-content: center;
+  /* 显式走彩色 emoji 字体：部分系统下 button 不会自动回退到 emoji 字体，会显示空白方块 */
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", sans-serif;
   font-size: 19px; line-height: 1;
   border: 1.5px solid transparent;
   border-radius: 9px;

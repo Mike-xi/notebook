@@ -18,10 +18,17 @@ async function ensureSchema(env) {
        white       TEXT,
        winner      INTEGER NOT NULL DEFAULT 0,
        win_line    TEXT,
+       req_kind    TEXT,
+       req_by      TEXT,
+       chat        TEXT NOT NULL DEFAULT '[]',
        updated_at  INTEGER NOT NULL,
        created_at  INTEGER NOT NULL
      )`
   ).run();
+  // 旧表补列（重开/悔棋的待同意请求 + 对局聊天）；列已存在则忽略报错
+  for (const col of ['req_kind TEXT', 'req_by TEXT', "chat TEXT NOT NULL DEFAULT '[]'"]) {
+    try { await env.DB.prepare(`ALTER TABLE gomoku_rooms ADD COLUMN ${col}`).run(); } catch {}
+  }
   ready = true;
 }
 
@@ -44,6 +51,8 @@ function stateOf(row, clientId) {
     blackTaken: !!row.black,
     whiteTaken: !!row.white,
     you: seatOf(row, clientId),
+    pending: row.req_kind ? { kind: row.req_kind, by: row.req_by } : null,
+    chat: safeMoves(row.chat),
     updated_at: row.updated_at,
   };
 }
@@ -147,8 +156,64 @@ export async function onRequestPost({ request, env }) {
     let winner = 0, winLine = null;
     if (line) { winner = turn; winLine = line; }
     else if (moves.length >= size * size) winner = 3; // 平局
-    await env.DB.prepare('UPDATE gomoku_rooms SET moves=?, turn=?, winner=?, win_line=?, updated_at=? WHERE id=?')
+    // 落子即作废任何待同意的请求
+    await env.DB.prepare('UPDATE gomoku_rooms SET moves=?, turn=?, winner=?, win_line=?, req_kind=NULL, req_by=NULL, updated_at=? WHERE id=?')
       .bind(JSON.stringify(moves), winner ? row.turn : (turn === 1 ? 2 : 1), winner, winLine ? JSON.stringify(winLine) : null, Date.now(), id).run();
+    return json(stateOf(await getRow(env, id), clientId));
+  }
+
+  // 发起请求：重开 / 悔棋，待对方同意
+  if (action === 'request') {
+    const seat = seatOf(row, clientId);
+    if (seat === 'spectator') return json({ error: 'not a player', ...stateOf(row, clientId) }, 403);
+    const kind = body.kind === 'undo' ? 'undo' : 'reset';
+    if (kind === 'undo' && safeMoves(row.moves).length === 0) return json({ error: 'nothing to undo', ...stateOf(row, clientId) }, 409);
+    await env.DB.prepare('UPDATE gomoku_rooms SET req_kind=?, req_by=?, updated_at=? WHERE id=?').bind(kind, seat, Date.now(), id).run();
+    return json(stateOf(await getRow(env, id), clientId));
+  }
+
+  // 对局聊天：仅落座玩家可发，保留最近 40 条
+  if (action === 'chat') {
+    const seat = seatOf(row, clientId);
+    if (seat === 'spectator') return json({ error: 'not a player', ...stateOf(row, clientId) }, 403);
+    let t = typeof body.text === 'string' ? body.text : '';
+    t = t.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 120);
+    if (!t) return json(stateOf(row, clientId));
+    const chat = safeMoves(row.chat);
+    chat.push({ by: seat, t, ts: Date.now() });
+    await env.DB.prepare('UPDATE gomoku_rooms SET chat=?, updated_at=? WHERE id=?').bind(JSON.stringify(chat.slice(-40)), Date.now(), id).run();
+    return json(stateOf(await getRow(env, id), clientId));
+  }
+
+  // 撤回自己发起的请求
+  if (action === 'cancel') {
+    const seat = seatOf(row, clientId);
+    if (row.req_kind && row.req_by === seat) {
+      await env.DB.prepare('UPDATE gomoku_rooms SET req_kind=NULL, req_by=NULL, updated_at=? WHERE id=?').bind(Date.now(), id).run();
+    }
+    return json(stateOf(await getRow(env, id), clientId));
+  }
+
+  // 回应对方的请求：accept 则执行重开/悔棋
+  if (action === 'respond') {
+    const seat = seatOf(row, clientId);
+    if (!row.req_kind || seat === 'spectator' || seat === row.req_by) {
+      return json({ error: 'no request for you', ...stateOf(row, clientId) }, 409);
+    }
+    if (!body.accept) { // 拒绝：清掉请求
+      await env.DB.prepare('UPDATE gomoku_rooms SET req_kind=NULL, req_by=NULL, updated_at=? WHERE id=?').bind(Date.now(), id).run();
+      return json(stateOf(await getRow(env, id), clientId));
+    }
+    if (row.req_kind === 'reset') {
+      await env.DB.prepare("UPDATE gomoku_rooms SET moves='[]', turn=1, winner=0, win_line=NULL, req_kind=NULL, req_by=NULL, updated_at=? WHERE id=?").bind(Date.now(), id).run();
+    } else { // undo：撤回到发起者上一手之前（先撤对手压在上面的一手，再撤发起者自己那一手）
+      const reqColor = row.req_by === 'black' ? 1 : 2;
+      const mv = safeMoves(row.moves);
+      if (mv.length && mv[mv.length - 1][2] !== reqColor) mv.pop();
+      if (mv.length && mv[mv.length - 1][2] === reqColor) mv.pop();
+      await env.DB.prepare('UPDATE gomoku_rooms SET moves=?, turn=?, winner=0, win_line=NULL, req_kind=NULL, req_by=NULL, updated_at=? WHERE id=?')
+        .bind(JSON.stringify(mv), reqColor, Date.now(), id).run();
+    }
     return json(stateOf(await getRow(env, id), clientId));
   }
 
