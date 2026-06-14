@@ -17,13 +17,16 @@ export async function hmacSign(secret, message) {
     .join('');
 }
 
-export async function createSessionToken(env) {
+export async function createSessionToken(env, role = 'guest') {
   const expiry = Date.now() + SESSION_DURATION_MS;
-  const payload = String(expiry);
+  const r = role === 'admin' ? 'admin' : 'guest';
+  const payload = `${expiry}|${r}`;            // 把角色编进已签名的 payload
   const sig = await hmacSign(env.AUTH_SECRET, payload);
   return `${payload}.${sig}`;
 }
 
+// 校验通过返回角色字符串（'admin' | 'guest'），失败返回 false。
+// 旧版（payload 只有 expiry、无角色）token 一律按最低权限 'guest' 处理。
 export async function verifySessionToken(token, env) {
   if (!token) return false;
   const parts = token.split('.');
@@ -31,9 +34,16 @@ export async function verifySessionToken(token, env) {
   const [payload, sig] = parts;
   const expectedSig = await hmacSign(env.AUTH_SECRET, payload);
   if (sig !== expectedSig) return false;
-  const expiry = parseInt(payload, 10);
+  const [expStr, roleStr] = payload.split('|');
+  const expiry = parseInt(expStr, 10);
   if (isNaN(expiry) || expiry < Date.now()) return false;
-  return true;
+  return roleStr === 'admin' ? 'admin' : 'guest';
+}
+
+// 取当前请求的角色（'admin' | 'guest'）；未登录/无效返回 null
+export async function getRole(request, env) {
+  const role = await verifySessionToken(getCookie(request, COOKIE_NAME), env);
+  return role || null;
 }
 
 export function getCookie(request, name) {

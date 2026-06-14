@@ -77,25 +77,14 @@
     "tags": ["狼人杀", "社交推理", "AI玩家", "预女猎"]
   },
   {
-    "file": "noname.html",
-    "title": "无名杀 · Noname（Vercel）",
-    "subject": "桌游",
-    "description": "三国杀开源实现（无名杀）· 单机人机 / 联机对战 · 部署在 Vercel，iframe 嵌入",
-    "icon": "🀄",
-    "color": "#7A2E2E",
-    "kind": "html",
-    "category": "play",
-    "tags": ["三国杀", "无名杀", "卡牌", "桌游"]
-  },
-  {
     "file": "noname-cf.html",
-    "title": "无名杀 · Noname（CF Pages）",
+    "title": "三国杀",
     "subject": "桌游",
-    "description": "三国杀开源实现（无名杀）· 单机人机 / 联机对战 · 部署在 Cloudflare Pages，iframe 嵌入",
-    "icon": "🀄",
-    "color": "#5A6E3E",
+    "description": "经典三国杀 · 单机人机 / 联机对战 · 和好友开房同玩",
+    "icon": "/assets/icons/sanguosha.svg",
+    "color": "#9b1c1c",
     "kind": "html",
     "category": "play",
-    "tags": ["三国杀", "无名杀", "卡牌", "桌游"]
+    "tags": ["三国杀", "卡牌", "桌游", "联机"]
   }
 ]

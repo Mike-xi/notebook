@@ -4,11 +4,14 @@
 // POST /api/category {file, category}  -> { ok: true }
 // 鉴权由 _middleware.js 统一处理。
 import { ensurePrefsSchema } from '../_lib/db.js';
+import { getRole } from '../_lib/auth.js';
 
 const KEY = 'category_overrides';
 const CATEGORIES = ['learn', 'explore', 'play'];
 
 export async function onRequestPost({ request, env }) {
+  // 拖动改分类＝移动课程，仅管理员可操作
+  if ((await getRole(request, env)) !== 'admin') return Response.json({ error: '游客身份不能移动课程' }, { status: 403 });
   await ensurePrefsSchema(env);
   let body;
   try { body = await request.json(); }

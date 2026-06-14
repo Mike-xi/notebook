@@ -5,8 +5,11 @@
 // GET /api/omni -> { models, default }（前端下拉用，与课程内对话共用同一份清单）
 import { ensureCoursesSchema, ensureLogsSchema, getChatMessages, appendChatMessages } from '../_lib/db.js';
 import { CHAT_MODELS, CHAT_MODEL, resolveChatModel, extractAIText, stripThink } from '../_lib/rag.js';
+import { getRole } from '../_lib/auth.js';
 
 const OMNI_SCOPE = 'omni';
+// 首页 AI 的对话历史按角色分库：管理员用 'omni'，游客用 'omni:guest'（两者互不可见）
+const omniScope = (role) => (role === 'admin' ? OMNI_SCOPE : OMNI_SCOPE + ':guest');
 
 const str = (v) => (typeof v === 'string' ? v : v == null ? '' : String(v)).trim();
 const stripText = (html) => String(html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -19,6 +22,7 @@ export function onRequestGet() {
 export async function onRequestPost({ request, env }) {
   if (!env.AI) return Response.json({ error: 'AI 未绑定' }, { status: 503 });
   await ensureCoursesSchema(env);
+  const scope = omniScope(await getRole(request, env));
 
   let b;
   try { b = await request.json(); } catch { return Response.json({ error: '请求格式错误' }, { status: 400 }); }
@@ -88,7 +92,7 @@ export async function onRequestPost({ request, env }) {
   user = user.slice(0, 16000);
 
   // 历史多轮（保留约一个月）
-  const histRows = await getChatMessages(env, OMNI_SCOPE, 40);
+  const histRows = await getChatMessages(env, scope, 40);
   const history = histRows.slice(-8).map((m) => ({
     role: m.role === 'assistant' ? 'assistant' : 'user',
     content: String(m.content).slice(0, 1500),
@@ -110,7 +114,7 @@ export async function onRequestPost({ request, env }) {
     return Response.json({ error: '该模型没有返回内容，换个模型再试试' }, { status: 502 });
   }
 
-  await appendChatMessages(env, OMNI_SCOPE, [
+  await appendChatMessages(env, scope, [
     { role: 'user', content: question },
     { role: 'assistant', content: answer },
   ]);

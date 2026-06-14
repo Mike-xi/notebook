@@ -13,6 +13,14 @@ let searchQ = '';               // 即时搜索词（小写）
 let hasRecent = false;          // 是否存在「最近阅读」
 let totalCourses = 0;           // 课程总数（空状态判断用）
 let ncCat = 'learn';            // 创建课程时选择的分类
+let isAdmin = false;            // 当前账号是否为管理员（游客只能浏览/使用，不能增删改课程）
+
+// 根据角色显隐管理操作：游客隐藏「创建课程」，删除/拖拽手柄由 cardHTML 按 isAdmin 不渲染
+function applyRoleUI() {
+  document.body.classList.toggle('is-guest', !isAdmin);
+  const cb = document.getElementById('create-btn');
+  if (cb) cb.style.display = isAdmin ? '' : 'none';
+}
 
 function detectKind(name) {
   const ext = (name.split('.').pop() || '').toLowerCase();
@@ -24,11 +32,12 @@ function detectKind(name) {
 async function loadAndRender() {
   let staticCourses = [], dynamic = [], progress = [], order = [], hidden = [], categoryOverrides = {};
   try {
-    const [c1, c2, pr, od] = await Promise.all([
+    const [c1, c2, pr, od, me] = await Promise.all([
       fetch('/courses.json').then((r) => (r.ok ? r.json() : [])),
       fetch('/api/courses').then((r) => (r.ok ? r.json() : [])),
       fetch('/api/progress').then((r) => (r.ok ? r.json() : [])),
       fetch('/api/order').then((r) => (r.ok ? r.json() : { order: [] })),
+      fetch('/api/me').then((r) => (r.ok ? r.json() : { role: 'guest' })).catch(() => ({ role: 'guest' })),
     ]);
     staticCourses = c1 || [];
     dynamic = c2 || [];
@@ -36,6 +45,8 @@ async function loadAndRender() {
     order = (od && od.order) || [];
     hidden = (od && od.hidden) || [];
     categoryOverrides = (od && od.categories) || {};
+    isAdmin = (me && me.role) === 'admin';
+    applyRoleUI();
   } catch (e) {
     console.warn('[home] load failed', e);
   }
@@ -866,20 +877,26 @@ function cardHTML(c, deletable = false) {
 
   const ic = (n, s) => (window.NBIcon ? NBIcon(n, { size: s }) : '');
 
-  // 所有课程地位相同，均可删除（静态课删除＝从首页隐藏）
-  const delBtn = deletable
+  // 删除/编辑/拖动排序均为管理操作：游客（isAdmin=false）一律不渲染这些控件
+  const delBtn = (deletable && isAdmin)
     ? `<button class="nb-del" data-file="${escapeAttr(c.file)}" title="删除课程" aria-label="删除课程">${ic('close', 16)}</button>`
     : '';
 
   // 站内创建/上传的 Markdown 课程可直接进编辑器改
-  const editBtn = (deletable && c.dynamic && c.kind === 'md')
+  const editBtn = (deletable && isAdmin && c.dynamic && c.kind === 'md')
     ? `<button class="nb-edit" data-file="${escapeAttr(c.file)}" title="编辑笔记" aria-label="编辑笔记">${ic('edit', 15)}</button>`
     : '';
 
-  // 主网格（deletable=true）的卡片可拖动排序；「最近阅读」不可
-  const dragHandle = deletable
+  // 主网格（deletable=true）的卡片可拖动排序；「最近阅读」不可；游客不可
+  const dragHandle = (deletable && isAdmin)
     ? `<button type="button" class="nb-drag" title="拖动排序" aria-label="拖动排序">${ic('drag', 16)}</button>`
     : '';
+
+  // 图标：支持图片（.svg/.png 等，如三国杀课程）或 emoji
+  const iconStr = c.icon || '📄';
+  const iconHTML = /\.(svg|png|jpe?g|webp)$/i.test(iconStr)
+    ? `<img class="nb-card-icon" src="${escapeAttr(iconStr)}" alt="" style="width:38px;height:38px;object-fit:contain;border-radius:9px">`
+    : `<span class="nb-card-icon">${escapeHTML(iconStr)}</span>`;
 
   return `
     <a class="nb-card" href="/reader.html?file=${encodeURIComponent(c.file)}"
@@ -888,7 +905,7 @@ function cardHTML(c, deletable = false) {
        data-category="${escapeAttr(c.category || 'learn')}"
        data-search="${escapeAttr(searchText)}">
       ${dragHandle}${delBtn}${editBtn}
-      <span class="nb-card-icon">${escapeHTML(c.icon || '📄')}</span>
+      ${iconHTML}
       <div class="nb-card-body">
         <span class="nb-card-subject">${escapeHTML(c.subject || '笔记')}</span>
         <h3 class="nb-card-title">${escapeHTML(c.title)}</h3>

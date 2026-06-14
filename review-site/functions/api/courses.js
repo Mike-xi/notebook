@@ -5,6 +5,11 @@
 // DELETE /api/courses  {file}         -> 删除课程，清理其 R2 对象与进度/书签
 // 鉴权由 _middleware.js 统一处理（只有登录用户能访问 /api/*）
 import { ensureCoursesSchema, ensurePrefsSchema, logEvent } from '../_lib/db.js';
+import { getRole } from '../_lib/auth.js';
+
+// 创建 / 编辑 / 删除课程都是管理操作：游客（只读）一律拒绝
+const requireAdmin = async (request, env) => (await getRole(request, env)) === 'admin';
+const forbidden = () => Response.json({ error: '游客身份不能增删改课程' }, { status: 403 });
 
 const HIDDEN_KEY = 'hidden_courses';   // 静态课程（courses.json，在 git 里无法物理删除）改为隐藏
 
@@ -52,6 +57,7 @@ export async function onRequestGet({ env }) {
 }
 
 export async function onRequestPost({ request, env }) {
+  if (!(await requireAdmin(request, env))) return forbidden();
   await ensureCoursesSchema(env);
 
   const ct = request.headers.get('Content-Type') || '';
@@ -134,6 +140,7 @@ export async function onRequestPost({ request, env }) {
 // PUT /api/courses {file, content?, title?, subject?, description?} —— 站内编辑器保存
 // 仅允许编辑动态 Markdown 课程（u-*.md，正文在 D1）。内容变更后阅读器会按 hash 自动重建 RAG 索引。
 export async function onRequestPut({ request, env }) {
+  if (!(await requireAdmin(request, env))) return forbidden();
   await ensureCoursesSchema(env);
 
   let body;
@@ -165,6 +172,7 @@ export async function onRequestPut({ request, env }) {
 }
 
 export async function onRequestDelete({ request, env }) {
+  if (!(await requireAdmin(request, env))) return forbidden();
   await ensureCoursesSchema(env);
 
   let body;
