@@ -230,7 +230,8 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSetti
 const BAR_REVEAL_KEY = 'nb-bar-reveal';
 const BAR_REVEAL_DEFAULT = 14;
 function syncBarRevealButtons() {
-  const cur = String(parseInt(localStorage.getItem(BAR_REVEAL_KEY), 10) || BAR_REVEAL_DEFAULT);
+  const raw = localStorage.getItem(BAR_REVEAL_KEY);
+  const cur = raw === 'off' ? 'off' : String(parseInt(raw, 10) || BAR_REVEAL_DEFAULT);
   document.querySelectorAll('[data-bar-reveal]').forEach((btn) => {
     const on = btn.getAttribute('data-bar-reveal') === cur;
     btn.classList.toggle('active', on);

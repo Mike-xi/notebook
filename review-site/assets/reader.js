@@ -274,6 +274,7 @@ let hideTimer = null;
 let barHovered = false;
 
 function showBar() {
+  if (localStorage.getItem('nb-bar-reveal') === 'off') return;  // 设置里选了「永不」：工具栏永久隐藏
   clearTimeout(hideTimer);
   bar.classList.remove('hidden');
 }
@@ -297,6 +298,12 @@ hotzone.addEventListener('mouseenter', showBar);
 document.addEventListener('mousemove', (e) => {
   if (e.clientY < 64) showBar();
 }, { passive: true });
+
+// 「永不」：用户在首页设置里彻底关闭工具栏 → 启动即隐藏，且不再被滚动/悬停唤出
+if (localStorage.getItem('nb-bar-reveal') === 'off') {
+  bar.classList.add('hidden');
+  if (hotzone) hotzone.style.display = 'none';
+}
 
 // ========== 书签 ==========
 bookmarkBtn.addEventListener('click', () => { showBookmarkPrompt(); });

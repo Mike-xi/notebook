@@ -78,11 +78,22 @@
   },
   {
     "file": "noname.html",
-    "title": "无名杀 · Noname",
+    "title": "无名杀 · Noname（Vercel）",
     "subject": "桌游",
-    "description": "三国杀开源实现（无名杀）· 单机人机 / 联机对战 · 独立部署在 Vercel，iframe 嵌入",
+    "description": "三国杀开源实现（无名杀）· 单机人机 / 联机对战 · 部署在 Vercel，iframe 嵌入",
     "icon": "🀄",
     "color": "#7A2E2E",
+    "kind": "html",
+    "category": "play",
+    "tags": ["三国杀", "无名杀", "卡牌", "桌游"]
+  },
+  {
+    "file": "noname-cf.html",
+    "title": "无名杀 · Noname（CF Pages）",
+    "subject": "桌游",
+    "description": "三国杀开源实现（无名杀）· 单机人机 / 联机对战 · 部署在 Cloudflare Pages，iframe 嵌入",
+    "icon": "🀄",
+    "color": "#5A6E3E",
     "kind": "html",
     "category": "play",
     "tags": ["三国杀", "无名杀", "卡牌", "桌游"]
