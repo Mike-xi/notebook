@@ -41,10 +41,20 @@
     font:inherit; font-size:13.5px; font-weight:600; cursor:pointer; transition:.15s; white-space:nowrap}
   .seg button:hover{color:var(--fg)}
   .seg button.on{background:var(--accent); color:var(--on-accent)}
-  select{width:100%; padding:11px 13px; border:1px solid var(--line); border-radius:12px; background:var(--bg);
+  select,input.txt{width:100%; padding:11px 13px; border:1px solid var(--line); border-radius:12px; background:var(--bg);
     color:var(--fg); font:inherit; font-size:14px; outline:none}
-  select:focus{border-color:var(--accent)}
+  select:focus,input.txt:focus{border-color:var(--accent)}
   .row{display:flex; gap:8px} .row>*{flex:1}
+  /* 联机 */
+  .countdown{margin-left:8px;font-variant-numeric:tabular-nums;font-weight:800;background:#0003;border-radius:8px;padding:2px 8px;font-size:13px}
+  .seat.empty .cardimg{background:repeating-linear-gradient(45deg,#0000,#0000 6px,#ffffff10 6px,#ffffff10 12px),linear-gradient(160deg,#2a2440,#14101f)}
+  .seat.taken{border-color:var(--good)}
+  .seat .humantag{position:absolute;bottom:6px;left:6px;background:var(--good);color:#fff;font-size:9.5px;font-weight:800;border-radius:6px;padding:1px 5px;z-index:3}
+  .lobby-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding:12px 14px;background:var(--chip);border-radius:12px;font-size:14px}
+  .lobby-bar b{font-family:ui-monospace,Menlo,Consolas,monospace;letter-spacing:2px;font-size:18px;color:var(--accent2)}
+  .mate-pick{font-size:11px;color:var(--wolf);margin-top:3px}
+  .suggest-hint{font-size:12px;color:var(--muted);margin:4px 2px 10px}
+  .suggest-hint b{color:var(--accent2)}
   .switch{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:12px 14px;background:var(--chip);border-radius:12px;font-size:13.5px;font-weight:600}
   .switch input{width:42px;height:24px;-webkit-appearance:none;appearance:none;background:#9994;border-radius:999px;position:relative;cursor:pointer;transition:.2s;outline:none;flex:0 0 auto}
   .switch input:checked{background:var(--accent)}
@@ -146,6 +156,12 @@
     <h1>🐺 狼人杀 · Werewolf</h1>
     <p class="sub">经典 333 / 444 板子 · 人不够 AI 来凑 · 你和 AI 一起推理、跳预言家、投票放逐</p>
     <div class="card">
+      <div class="label">模式</div>
+      <div class="seg" id="mode-seg">
+        <button class="on" data-mode="solo">单人 · 对 AI</button>
+        <button data-mode="online">联机房间 · 和朋友玩</button>
+      </div>
+
       <div class="label">选择板子</div>
       <div class="cfg-cards">
         <button class="cfg on" data-cfg="333">
@@ -156,25 +172,39 @@
         </button>
       </div>
 
-      <div class="label">你的身份</div>
-      <select id="myrole">
-        <option value="random">🎲 随机分配（推荐）</option>
-        <option value="seer">预言家</option>
-        <option value="witch">女巫</option>
-        <option value="hunter">猎人</option>
-        <option value="idiot">白痴（仅 444）</option>
-        <option value="villager">平民</option>
-        <option value="wolf">狼人</option>
-      </select>
+      <div id="solo-only">
+        <div class="label">你的身份</div>
+        <select id="myrole">
+          <option value="random">🎲 随机分配（推荐）</option>
+          <option value="seer">预言家</option>
+          <option value="witch">女巫</option>
+          <option value="hunter">猎人</option>
+          <option value="idiot">白痴（仅 444）</option>
+          <option value="villager">平民</option>
+          <option value="wolf">狼人</option>
+        </select>
 
-      <div class="label">AI 发言</div>
-      <label class="switch">用 Workers AI 生成拟人发言
-        <input type="checkbox" id="useai" checked>
-      </label>
-      <select id="model" style="margin-top:8px"></select>
-      <p class="hint">开启后由所选模型替每位 AI 玩家「润色」出像真人一样的发言；关掉或网络异常时用内置模板，照样能完整玩一局。AI 的<b>策略</b>（查杀、悍跳、投谁）始终由本地逻辑驱动，保证逻辑自洽。</p>
+        <div class="label">AI 发言</div>
+        <label class="switch">用 Workers AI 生成拟人发言
+          <input type="checkbox" id="useai" checked>
+        </label>
+        <select id="model" style="margin-top:8px"></select>
+        <p class="hint">开启后由所选模型替每位 AI 玩家「润色」出像真人一样的发言；关掉或网络异常时用内置模板，照样能完整玩一局。AI 的<b>策略</b>（查杀、悍跳、投谁）始终由本地逻辑驱动，保证逻辑自洽。</p>
 
-      <button class="start" id="startBtn">开始游戏 →</button>
+        <button class="start" id="startBtn">开始游戏 →</button>
+      </div>
+
+      <div id="online-only" class="hide">
+        <div class="label">你的昵称</div>
+        <input class="txt" id="nick" maxlength="12" placeholder="例如：夏熙" autocomplete="off">
+        <div class="label">房间号</div>
+        <input class="txt" id="roomcode" maxlength="8" placeholder="创建留空自动生成 / 加入填房间号" autocomplete="off" style="text-transform:uppercase;letter-spacing:2px">
+        <div class="row" style="margin-top:16px">
+          <button class="start" id="createBtn" style="margin-top:0">创建房间</button>
+          <button class="start" id="joinBtn" style="margin-top:0;background:var(--chip);color:var(--fg)">加入房间</button>
+        </div>
+        <p class="hint">创建后把房间号发给朋友，大家在「加入房间」输入同一房间号即可同桌；<b>没坐满的位置自动由 AI 补齐</b>。开局后每个阶段有倒计时，超时未操作的人由 AI 代为行动。需先登录本站（知道站点密码的人都能进同一房间）。</p>
+      </div>
     </div>
     <p class="hint" style="text-align:center">规则：夜晚狼人刀人、预言家查验、女巫用药；白天轮流发言后投票放逐。<br>胜负采用<b>屠边</b>——狼人杀光所有神 或 所有民即获胜；好人投出全部狼人即获胜。</p>
   </div>
@@ -241,6 +271,28 @@
     document.querySelectorAll('.cfg').forEach(x=>x.classList.remove('on')); b.classList.add('on'); cfgSel=b.dataset.cfg;
   });
   $('startBtn').onclick=()=>startGame();
+
+  // 模式切换：单人 / 联机
+  document.querySelectorAll('#mode-seg button').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('#mode-seg button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+    const online = b.dataset.mode==='online';
+    $('solo-only').classList.toggle('hide', online);
+    $('online-only').classList.toggle('hide', !online);
+  });
+  // 联机入口
+  try{ if(!localStorage.getItem('ww-cid')) localStorage.setItem('ww-cid','c'+Math.random().toString(36).slice(2,10)); }catch(e){}
+  const WWCID = (()=>{ try{ return localStorage.getItem('ww-cid'); }catch(e){ return 'c'+Math.random().toString(36).slice(2,10); } })();
+  $('createBtn').onclick=()=>{
+    const nick=($('nick').value||'').trim()||'玩家'; let room=($('roomcode').value||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+    if(!room) room=genRoom();
+    onlineEnter('create', cfgSel, nick, room);
+  };
+  $('joinBtn').onclick=()=>{
+    const nick=($('nick').value||'').trim()||'玩家'; const room=($('roomcode').value||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+    if(!room){ $('roomcode').focus(); $('roomcode').placeholder='请输入房间号'; return; }
+    onlineEnter('join', cfgSel, nick, room);
+  };
+  function genRoom(){ const s='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let r=''; for(let i=0;i<5;i++) r+=s[Math.floor(Math.random()*s.length)]; return r; }
 
   // ================= 游戏状态 =================
   let S=null;
@@ -811,6 +863,164 @@
     </div>`;
     $('again').onclick=()=>{ gameEl.classList.add('hide'); setupEl.classList.remove('hide'); feedEl.innerHTML=''; };
     feed('sys', `🏁 <b>${S.over==='good'?'好人胜利':'狼人胜利'}</b>。全部身份已亮牌。`);
+  }
+
+  // ==================== 联机模式 ====================
+  let O = null; // {room, view, poll, tick, logLen, panelSig, remain}
+  const PHASE_CN = { lobby:['🛋️ 等待大厅',false], night_wolf:['🌙 狼人行动',true], night_seer:['🔮 预言家查验',true], night_witch:['🧪 女巫用药',true], announce:['☀️ 天亮了',false], hunter:['🔫 猎人开枪',false], speak:['🗣️ 自由发言',false], vote:['🗳️ 投票放逐',false], over:['🏁 游戏结束',false] };
+  const ROLE_CARD = (r)=> r?CARD[r]:null;
+
+  async function wwApi(action, extra){
+    const body=Object.assign({room:O.room, clientId:WWCID, action}, extra||{});
+    const r=await fetch('/api/werewolf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    return r.json();
+  }
+  async function onlineEnter(mode, cfg, nick, room){
+    setupEl.classList.add('hide'); gameEl.classList.remove('hide'); feedEl.innerHTML='';
+    O={ room, logLen:0, panelSig:'', remain:null, view:null, poll:null, tick:null };
+    let v;
+    try{
+      if(mode==='create') v=await wwApi('create',{cfg, name:nick});
+      else v=await wwApi('join',{name:nick});
+    }catch(e){ v={error:'网络错误'}; }
+    if(v && v.notFound){ panelEl.innerHTML=`<div class="prompt">房间 <b>${esc(room)}</b> 不存在或已结束。<br><button class="btn primary" id="bk" style="margin-top:10px">返回</button></div>`; $('bk').onclick=backToSetup; phaseBadge.textContent='🚪 房间不存在'; return; }
+    ingestView(v);
+    startPoll();
+  }
+  function startPoll(){
+    stopPoll();
+    O.poll=setInterval(async()=>{ try{ const r=await fetch('/api/werewolf?room='+encodeURIComponent(O.room)+'&clientId='+encodeURIComponent(WWCID)); ingestView(await r.json()); }catch(e){} }, 1300);
+    O.tick=setInterval(()=>{ if(O&&O.remain!=null&&O.remain>0){ O.remain--; updateCountdown(); } }, 1000);
+  }
+  function stopPoll(){ if(O){ if(O.poll) clearInterval(O.poll); if(O.tick) clearInterval(O.tick); O.poll=O.tick=null; } }
+  function backToSetup(){ stopPoll(); O=null; gameEl.classList.add('hide'); setupEl.classList.remove('hide'); feedEl.innerHTML=''; }
+
+  function ingestView(v){
+    if(!v || v.error){ return; }
+    O.view=v; O.remain=v.remain;
+    renderOnlineTop(v); renderOnlineSeats(v); renderOnlineFeed(v); renderOnlinePanel(v);
+  }
+  function updateCountdown(){
+    const el=document.getElementById('cd'); if(el) el.textContent=O.remain!=null?O.remain+'s':'';
+  }
+  function renderOnlineTop(v){
+    const [txt,night]=PHASE_CN[v.phase]||['进行中',false];
+    phaseBadge.innerHTML=`${txt}${v.phase!=='lobby'&&v.day?(' · 第'+v.day+'天'):''}${v.remain!=null?` <span class="countdown" id="cd">${v.remain}s</span>`:''}`;
+    phaseBadge.classList.toggle('night',!!night);
+    if(v.youRole){ const camp=v.youRole==='wolf'?'wolf':'good'; meChip.innerHTML=`<img src="${CARD[v.youRole]}" alt=""><span>你 · ${ROLE_CN[v.youRole]}<br><span class="camp ${camp}">${camp==='wolf'?'狼人阵营':'好人阵营'}</span></span>`; }
+    else meChip.innerHTML=`<span>房间 <b style="font-family:ui-monospace;letter-spacing:1px">${esc(v.id)}</b></span>`;
+  }
+  function renderOnlineSeats(v){
+    const youWolf=v.youRole==='wolf';
+    seatsEl.innerHTML=v.players.map(p=>{
+      const showCard=!!p.role;
+      const inner=showCard?`<img src="${CARD[p.role]}" alt="">`:`<span class="back">🂠</span>`;
+      const cls=['seat'];
+      if(p.isYou) cls.push('you');
+      if(!p.alive) cls.push('dead');
+      if(v.speakingSeat===p.seat) cls.push('speaking');
+      if(v.phase==='lobby'){ if(p.taken) cls.push('taken'); else cls.push('empty'); }
+      if(youWolf && p.mate && p.alive) cls.push('wolfmate');
+      const tag = p.isYou?'<span class="youtag">你</span>':'';
+      const mate = (youWolf&&p.mate)?'<span class="matetag">狼</span>':'';
+      const human = (v.phase==='lobby'&&p.taken)?'<span class="humantag">玩家</span>':'';
+      const vote = (v.phase==='vote'&&p.voted)?'<span class="votebadge">✓</span>':'';
+      let rl;
+      if(v.phase==='lobby') rl=`<div class="rl">${p.taken?esc(p.name):'空位(AI)'}</div>`;
+      else rl=showCard?`<div class="rl">${ROLE_CN[p.role]}</div>`:`<div class="rl">${p.alive?'未知':'已出局'}</div>`;
+      return `<div class="${cls.join(' ')}"><span class="no">${p.seat+1}</span>${tag}
+        <div class="cardimg">${inner}${mate}${human}${vote}</div>
+        <div class="nm">${esc(p.name)}</div>${rl}</div>`;
+    }).join('');
+  }
+  function renderOnlineFeed(v){
+    if(v.log.length < O.logLen){ feedEl.innerHTML=''; O.logLen=0; } // 重置
+    for(let i=O.logLen;i<v.log.length;i++){
+      const e=v.log[i];
+      if(e.k==='speech'){ const p=v.players[e.seat]; const me=p&&p.isYou; feedEl.insertAdjacentHTML('beforeend',`<div class="ev speech${me?' me':''}"><div class="who">${e.seat+1}号 · ${esc(p?p.name:'')}${me?' (你)':''}</div>${esc(e.text)}</div>`); }
+      else feedEl.insertAdjacentHTML('beforeend',`<div class="ev ${e.k}">${e.text}</div>`);
+    }
+    O.logLen=v.log.length; feedEl.scrollTop=feedEl.scrollHeight;
+  }
+
+  function renderOnlinePanel(v){
+    const m=v.me||{act:'wait'};
+    const sig=`${v.phase}|${m.act}|${v.speakingSeat}|${(m.targets||[]).join(',')}|${m.killed}|${m.antidote}|${m.poison}|${m.suggest}|${v.host===WWCID}|${v.winner}`;
+    if(sig===O.panelSig && v.phase!=='lobby') return; // 内容没变就别重渲染，保住正在输入的发言/选择
+    O.panelSig=sig;
+    const tBtns=(targets,handler,extra)=>`<div class="pickrow">${targets.map(s=>`<button class="chip" data-s="${s}">${seatName(v,s)}</button>`).join('')}${extra||''}</div>`;
+    const wire=(fn)=>{ panelEl.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>fn(+b.dataset.s)); };
+
+    if(v.phase==='over'){ renderOnlineOver(v); return; }
+    if(v.phase==='lobby'){
+      const taken=v.players.filter(p=>p.taken).length;
+      const isHost=v.host===WWCID;
+      panelEl.innerHTML=`<div class="lobby-bar">房间号 <b>${esc(v.id)}</b> <button class="btn" id="cpy">复制</button><span style="margin-left:auto">已加入 ${taken} 人 · 其余 ${v.n-taken} 个位置由 AI 补</span></div>
+        <div class="prompt">${isHost?'你是房主，人到齐了就开始（没满的位置自动 AI 补）。':'等房主开始游戏……'}</div>
+        ${isHost?'<button class="btn primary" id="startO">开始游戏 ▶</button>':''}
+        <button class="btn ghost" id="leaveO" style="margin-top:8px">离开房间</button>`;
+      $('cpy').onclick=()=>{ try{navigator.clipboard.writeText(v.id);}catch(e){} $('cpy').textContent='已复制'; };
+      const so=$('startO'); if(so) so.onclick=async()=>{ so.disabled=true; ingestView(await wwApi('start',{})); };
+      $('leaveO').onclick=async()=>{ try{ await wwApi('leave',{}); }catch(e){} backToSetup(); };
+      return;
+    }
+    if(m.act==='wolf'){
+      const mates=(m.mates||[]).map(x=>`${x.seat+1}号${x.name?'('+x.name+')':''}${x.pick!=null?'→已选'+(x.pick+1)+'号':'·未选'}`).join('，')||'（只剩你）';
+      panelEl.innerHTML=`<div class="prompt">🐺 选择今晚要刀的人<small>狼队友：${esc(mates)}</small></div>${tBtns(m.targets)}`;
+      wire(s=>wwAct('night',{kind:'wolf',target:s}));
+    } else if(m.act==='wolf-wait'){ waitPanel(`🐺 你已选择刀 <b>${(m.myPick!=null?m.myPick+1:'?')}号</b>，等待其他狼 / 天亮……`);
+    } else if(m.act==='seer'){
+      panelEl.innerHTML=`<div class="prompt">🔮 选择今晚要查验的人</div>${tBtns(m.targets)}`;
+      wire(s=>wwAct('night',{kind:'seer',target:s}));
+    } else if(m.act==='seer-done'){ const r=m.result; waitPanel(r?`🔮 查验结果：<b>${r.target+1}号</b> 是 <b style="color:${r.res==='wolf'?'var(--wolf)':'var(--good)'}">${r.res==='wolf'?'狼人(查杀)':'好人(金水)'}</b>。等待天亮……`:'🔮 已查验，等待天亮……');
+    } else if(m.act==='witch'){
+      const killed=m.killed!=null?`今晚 <b>${seatName(v,m.killed)}</b> 倒下了。`:'今晚平安夜，没有人被刀。';
+      let btns='<div class="pickrow">';
+      if(m.antidote && m.killed!=null) btns+=`<button class="chip" id="wsave">💚 用解药救 ${m.killed+1}号</button>`;
+      if(m.poison) btns+=`<button class="chip bad" id="wpoison">☠️ 用毒药毒人</button>`;
+      btns+=`<button class="chip" id="wnone">🌙 不用药</button></div>`;
+      panelEl.innerHTML=`<div class="prompt">🧪 女巫行动<small>${killed}　解药:${m.antidote?'可用':'已用'}　毒药:${m.poison?'可用':'已用'}</small></div>${btns}`;
+      const sv=$('wsave'); if(sv) sv.onclick=()=>wwAct('night',{kind:'witch',save:true});
+      $('wnone').onclick=()=>wwAct('night',{kind:'witch'});
+      const po=$('wpoison'); if(po) po.onclick=()=>{ panelEl.innerHTML=`<div class="prompt">☠️ 选择要毒杀的人</div>${tBtns(m.targets,null,`<button class="chip" id="wcancel">取消</button>`)}`; wire(s=>wwAct('night',{kind:'witch',poison:s})); $('wcancel').onclick=()=>renderOnlinePanel(v); };
+    } else if(m.act==='witch-done'){ waitPanel('🧪 你已行动，等待天亮……');
+    } else if(m.act==='speak'){
+      panelEl.innerHTML=`<div class="prompt">🗣️ 轮到你发言<small>说说你的判断、站边、想投谁（可留空过麦）</small></div>
+        ${m.canClaimSeer?'<label class="toggle-line"><input type="checkbox" id="oclaim"> 公布预言家身份和查验</label>':''}
+        <textarea id="ospk" placeholder="发言……"></textarea>
+        <button class="btn primary" id="ospkok" style="margin-top:10px">发言完毕 ▶</button>`;
+      $('ospkok').onclick=()=>{ const t=$('ospk').value.trim(); const claim=$('oclaim')&&$('oclaim').checked; wwAct('speak',{text:t,claimSeer:!!claim}); };
+    } else if(m.act==='vote'){
+      const sug=(m.suggest!=null)?`<div class="suggest-hint">💡 参考：AI 觉得可以投 <b>${seatName(v,m.suggest)}</b>（仅建议）</div>`:'';
+      panelEl.innerHTML=`<div class="prompt">🗳️ 投票放逐：选择你要投出的人</div>${sug}${tBtns(m.targets,null,`<button class="chip" id="oabstain">弃票</button>`)}`;
+      wire(s=>wwAct('vote',{target:s})); $('oabstain').onclick=()=>wwAct('vote',{target:-1});
+    } else if(m.act==='vote-done'){ waitPanel('🗳️ 你已投票，等待其他人 / 结算……');
+    } else if(m.act==='shoot'){
+      panelEl.innerHTML=`<div class="prompt">🔫 你是猎人，开枪带走一人</div>${tBtns(m.targets,null,`<button class="chip" id="onoshoot">不开枪</button>`)}`;
+      wire(s=>wwAct('shoot',{target:s})); $('onoshoot').onclick=()=>wwAct('shoot',{target:null});
+    } else if(m.act==='dead'){ waitPanel('🪦 你已出局，旁观这局后续……');
+    } else if(m.act==='spectate'){ waitPanel('👀 旁观中……');
+    } else { waitPanel(nightWaitText(v)); }
+  }
+  function nightWaitText(v){
+    const map={night_wolf:'🌙 天黑了，狼人正在行动……',night_seer:'🔮 预言家正在查验……',night_witch:'🧪 女巫正在用药……',announce:'☀️ 天亮了，正在公布……',speak:'🗣️ 等待当前玩家发言……',vote:'🗳️ 等待大家投票……',hunter:'🔫 猎人正在抉择……'};
+    return map[v.phase]||'⏳ 等待中……';
+  }
+  function waitPanel(html){ panelEl.innerHTML=`<div class="prompt">${html}</div>`; }
+  function seatName(v,s){ const p=v.players[s]; return `${s+1}号${p&&p.isYou?'(你)':(p?'('+p.name+')':'')}`; }
+  async function wwAct(action, extra){ try{ ingestView(await wwApi(action, extra)); }catch(e){} }
+
+  function renderOnlineOver(v){
+    const youCamp=v.youRole==='wolf'?'wolf':'good'; const youWin=v.winner===youCamp;
+    const wolves=v.players.filter(p=>p.role==='wolf').map(p=>`${p.seat+1}号${p.name}`).join('、');
+    phaseBadge.classList.remove('night');
+    panelEl.innerHTML=`<div class="result">
+      <div class="crown">${youWin?'🎉':'💀'}</div>
+      <h2 class="${v.winner==='good'?'win-good':'win-wolf'}">${v.winner==='good'?'好人阵营胜利':'狼人阵营胜利'}</h2>
+      <p>${v.youRole?'你是 <b>'+ROLE_CN[v.youRole]+'</b>，':''}${youWin?'恭喜获胜！':'惜败，下把再来。'}<br>本局狼人：${wolves}</p>
+      <button class="btn primary" id="oback">返回大厅</button>
+    </div>`;
+    $('oback').onclick=backToSetup;
   }
 
 })();
