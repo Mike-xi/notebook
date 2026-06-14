@@ -745,19 +745,19 @@ const aiStatus = document.getElementById('nc-ai-status');
 
 function renderIconPicker() {
   iconPicker.innerHTML = ICONS
-    .map((e) => `<button type="button" class="icon-opt" data-icon="${e}">${e}</button>`)
+    .map((e) => `<button type="button" class="icon-opt" data-emoji="${e}">${e}</button>`)
     .join('');
 }
 function selectIcon(emoji) {
   if (!emoji) return;
   iconInput.value = emoji;
   iconPicker.querySelectorAll('.icon-opt').forEach((b) => {
-    b.classList.toggle('selected', b.dataset.icon === emoji);
+    b.classList.toggle('selected', b.dataset.emoji === emoji);
   });
 }
 iconPicker.addEventListener('click', (e) => {
   const b = e.target.closest('.icon-opt');
-  if (b) selectIcon(b.dataset.icon);
+  if (b) selectIcon(b.dataset.emoji);
 });
 
 // 分类选择（创建课程：Learn / Explore / Play）

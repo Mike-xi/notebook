@@ -56,7 +56,9 @@
   }
 
   function hydrate(root) {
-    var nodes = (root || document).querySelectorAll('[data-icon]');
+    // 只 hydrate 明确标了 class="ic" 的图标占位；避免误伤别处用 data-icon 存别的值的元素
+    // （例如创建课程弹窗的 emoji 图标网格 .icon-opt[data-emoji]，否则会被当成未知图标清空）
+    var nodes = (root || document).querySelectorAll('.ic[data-icon]');
     for (var i = 0; i < nodes.length; i++) {
       var el = nodes[i];
       if (el.__nbi) continue;
