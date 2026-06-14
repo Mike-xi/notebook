@@ -211,6 +211,7 @@
     '444': { n:12, roles:['wolf','wolf','wolf','wolf','seer','witch','hunter','idiot','villager','villager','villager','villager'] },
   };
   const isGod = (r)=> r==='seer'||r==='witch'||r==='hunter'||r==='idiot';
+  const PERSONAS = ['稳健理性','激进冲锋','谨慎划水','幽默话痨','阴阳吐槽','沉稳老练']; // 每个 AI 开局分一个性格
 
   // ---------- 主题：剥离阅读器反相 ----------
   const stripInvert=()=>document.documentElement.classList.remove('nb-dark-invert');
@@ -265,7 +266,7 @@
     for(let s=0;s<cfg.n;s++){
       const isYou=(s===youSeat);
       const role = isYou ? youRoleFinal : pool[oi++];
-      players.push({seat:s, name:isYou?'你':namePool[s], role, alive:true, isYou, revealed:false, canVote:true, deathCause:null, _vote:-1});
+      players.push({seat:s, name:isYou?'你':namePool[s], role, alive:true, isYou, revealed:false, canVote:true, deathCause:null, _vote:-1, persona: isYou?null:rand(PERSONAS)});
     }
     S={
       cfg:cfgSel, n:cfg.n, you:youSeat,
@@ -604,41 +605,36 @@
     const speakers = order.filter(s=>s!==S.you);
     const intents = computeVotesAndIntents(speakers);
 
-    // 5) 取 AI 发言
-    let speechMap={};
-    if(speakers.length){
-      panelEl.innerHTML=`<div class="prompt">🗣️ 玩家们正在组织发言…… <div class="typing"><i></i><i></i><i></i></div></div>`;
-      speechMap = await fetchSpeeches(speakers, intents);
-    }
-
-    // 6) 按座位顺序播放发言
+    // 5+6) 逐座位顺序发言：每个 AI 是独立 agent，轮到谁就用谁的角色提示词+性格现场生成，
+    //      后说话的能看到前面已发生的发言（S.log 边发边累积）。
     for(const s of order){
       S.speakingSeat=s; render();
       if(s===S.you){
         await humanSpeak();
       } else {
-        await sleep(120);
-        const text = speechMap[s] || fallbackSpeech(s, intents[s]);
+        const p=P(s);
+        panelEl.innerHTML=`<div class="prompt">🗣️ <b>${s+1}号 ${esc(p.name)}</b>${p.persona?'（'+p.persona+'）':''} 正在发言 <span class="typing"><i></i><i></i><i></i></span></div>`;
+        const text = await fetchOneSpeech(s, intents[s]);
         speechFeed(s, text);
-        await sleep(820);
+        await sleep(450);
       }
     }
     S.speakingSeat=null; render();
   }
 
-  async function fetchSpeeches(speakers, intents){
-    const map={};
+  // 单座位发言：每个 AI 独立调用 /api/werewolf-ai，只把「该座位的真实身份+意图+公开日志」发过去
+  // （不泄露别人的身份给模型）。失败/关 AI 时本地模板兜底。
+  async function fetchOneSpeech(seat, intent){
+    const p=P(seat);
     if(S.useAI){
       try{
-        const players=S.players.map(p=>({seat:p.seat,name:p.name,alive:p.alive,isHuman:p.isYou,role:p.role}));
+        const players=S.players.map(x=>({seat:x.seat,name:x.name,alive:x.alive}));
         const r=await fetch('/api/werewolf-ai',{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({config:S.cfg,day:S.day,players,speakers,intents,log:S.log.slice(-30),model:S.model})});
-        const j=await r.json();
-        (j.speeches||[]).forEach(sp=>{ if(typeof sp.seat==='number'&&sp.text) map[sp.seat]=sp.text; });
+          body:JSON.stringify({config:S.cfg,day:S.day,seat,role:p.role,name:p.name,persona:p.persona,players,intent,log:S.log.slice(-30),model:S.model})});
+        if(r.ok){ const j=await r.json(); if(j&&j.text) return j.text; }
       }catch(e){}
     }
-    for(const s of speakers) if(!map[s]) map[s]=fallbackSpeech(s, intents[s]);
-    return map;
+    return fallbackSpeech(seat, intent);
   }
   function fallbackSpeech(seat, it){
     it=it||{}; const p=P(seat);
