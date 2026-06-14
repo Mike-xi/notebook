@@ -64,5 +64,16 @@
     "kind": "html",
     "category": "play",
     "tags": ["五子棋", "博弈AI", "联机", "Alpha-Beta"]
+  },
+  {
+    "file": "werewolf.html",
+    "title": "狼人杀 · Werewolf",
+    "subject": "社交推理",
+    "description": "标准 333 / 444 板子 · 人不够 AI 来凑 · Workers AI 拟人发言 + 本地策略大脑（查杀/悍跳/投票）· 预言家·女巫·猎人·白痴全机制",
+    "icon": "🐺",
+    "color": "#7A3B3B",
+    "kind": "html",
+    "category": "play",
+    "tags": ["狼人杀", "社交推理", "AI玩家", "预女猎"]
   }
 ]
