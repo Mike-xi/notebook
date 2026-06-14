@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>无名杀 · Noname</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #1c1c1c; color: #c9b48a; }
+    /* 兜底文案：被 iframe 盖住；加载失败时透出来 */
+    .fallback {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 10px; text-align: center; padding: 24px;
+      font: 14px/1.6 system-ui, -apple-system, "Microsoft YaHei", sans-serif;
+    }
+    .fallback a { color: #e0b66b; }
+    #noname-frame { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; background: #1c1c1c; }
+  </style>
+</head>
+<body>
+  <div class="fallback">
+    <div>正在加载《无名杀》…</div>
+    <div>若长时间空白，<a href="https://noname-2qv.pages.dev" target="_blank" rel="noopener">点此在新标签页打开 ↗</a>（首次进入会弹 GPLv3 协议确认，点「确定」即可）</div>
+  </div>
+  <iframe id="noname-frame"
+          src="https://noname-2qv.pages.dev"
+          title="无名杀 · Noname"
+          allow="fullscreen; autoplay; gamepad"
+          referrerpolicy="no-referrer-when-downgrade"></iframe>
+</body>
+</html>
