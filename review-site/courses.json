@@ -77,6 +77,17 @@
     "tags": ["狼人杀", "社交推理", "AI玩家", "预女猎"]
   },
   {
+    "file": "xiangqi.html",
+    "title": "象棋 · Xiangqi",
+    "subject": "对弈",
+    "description": "中国象棋 · 本地 Alpha-Beta 引擎人机对战（三档难度·选红/黑）+ 联机和朋友对战 + Workers AI 关键步点评",
+    "icon": "♟️",
+    "color": "#9A2B2B",
+    "kind": "html",
+    "category": "play",
+    "tags": ["象棋", "博弈AI", "联机", "Alpha-Beta"]
+  },
+  {
     "file": "noname-cf.html",
     "title": "三国杀",
     "subject": "桌游",
