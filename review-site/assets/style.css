@@ -749,6 +749,32 @@ body.reader {
 .rb-btn:hover { background: var(--surface-container-highest); }
 .rb-back { font-size: 20px; }
 
+/* 工具栏设为「隐藏」时的最小化返回键：始终悬浮在左上角、半透明不挡正文，
+   保证没有浏览器返回手势/按钮的人也能退出课程。hover 变实。 */
+.reader-mini-back {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--on-surface);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--surface-container) 80%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: blur(14px) saturate(1.4);
+  border: 1px solid var(--outline-variant);
+  box-shadow: var(--shadow-md);
+  text-decoration: none;
+  opacity: 0.55;
+  transition: opacity 200ms ease, background 200ms ease;
+  z-index: 11;
+}
+.reader-mini-back:hover { opacity: 1; background: var(--surface-container-highest); }
+.reader-mini-back[hidden] { display: none; }
+
 .rb-info {
   display: flex;
   align-items: center;
