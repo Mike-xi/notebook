@@ -242,7 +242,8 @@ const BAR_REVEAL_KEY = 'nb-bar-reveal';
 const BAR_REVEAL_DEFAULT = 14;
 function syncBarRevealButtons() {
   const raw = localStorage.getItem(BAR_REVEAL_KEY);
-  const cur = raw === 'off' ? 'off' : String(parseInt(raw, 10) || BAR_REVEAL_DEFAULT);
+  // 'off'=永久（全关）、'min'=隐藏（收起+返回键）为非数值档，原样匹配；其余按数值阈值
+  const cur = (raw === 'off' || raw === 'min') ? raw : String(parseInt(raw, 10) || BAR_REVEAL_DEFAULT);
   document.querySelectorAll('[data-bar-reveal]').forEach((btn) => {
     const on = btn.getAttribute('data-bar-reveal') === cur;
     btn.classList.toggle('active', on);

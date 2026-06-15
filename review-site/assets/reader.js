@@ -213,7 +213,8 @@ function restoreScroll(pct) {
 }
 
 let lastScrollY = 0;
-// 上滑唤出工具栏所需的阈值（px）；由首页设置写入 localStorage，4=灵敏 / 14=适中 / 36=迟钝
+// 上滑唤出工具栏所需的阈值（px）；由首页设置写入 localStorage，4=灵敏 / 14=适中。
+// 另有两个非数值档：'min'=隐藏（收起工具栏，只留最小化返回键）、'off'=永久（彻底关闭），见下方。
 function barRevealThreshold() {
   const v = parseInt(localStorage.getItem('nb-bar-reveal'), 10);
   return Number.isFinite(v) && v > 0 ? v : 14;
@@ -274,7 +275,8 @@ let hideTimer = null;
 let barHovered = false;
 
 function showBar() {
-  if (localStorage.getItem('nb-bar-reveal') === 'off') return;  // 设置里选了「隐藏」：完整工具栏不唤出（只留最小化返回键）
+  const r = localStorage.getItem('nb-bar-reveal');
+  if (r === 'off' || r === 'min') return;  // 「永久」/「隐藏」都不自动唤出完整工具栏
   clearTimeout(hideTimer);
   bar.classList.remove('hidden');
 }
@@ -299,14 +301,18 @@ document.addEventListener('mousemove', (e) => {
   if (e.clientY < 64) showBar();
 }, { passive: true });
 
-// 「隐藏」：用户在首页设置里把工具栏收起到最小化 → 完整工具栏不再被滚动/悬停唤出，
-// 但保留一个最小化的返回键（有些人的浏览器没有返回手势/按钮，否则进了课程就出不去）。
+// 「隐藏」(min) 与「永久」(off) 都把完整工具栏收起、不再被滚动/悬停唤出。区别只在返回键：
+//   · 「隐藏」额外保留一个最小化返回键——有些人的浏览器没有返回手势/按钮，否则进了课程出不去；
+//   · 「永久」彻底关闭，什么都不留（靠浏览器返回）。
 // 分享只读模式不显示返回键（访客不应跳回书架，与 .rb-back 一致）。
-if (localStorage.getItem('nb-bar-reveal') === 'off') {
+const _barReveal = localStorage.getItem('nb-bar-reveal');
+if (_barReveal === 'off' || _barReveal === 'min') {
   bar.classList.add('hidden');
   if (hotzone) hotzone.style.display = 'none';
-  const miniBack = document.getElementById('reader-mini-back');
-  if (miniBack && !shareMode) miniBack.hidden = false;
+  if (_barReveal === 'min') {
+    const miniBack = document.getElementById('reader-mini-back');
+    if (miniBack && !shareMode) miniBack.hidden = false;
+  }
 }
 
 // ========== 书签 ==========
