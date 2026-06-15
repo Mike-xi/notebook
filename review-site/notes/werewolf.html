@@ -318,7 +318,7 @@
     for(let s=0;s<cfg.n;s++){
       const isYou=(s===youSeat);
       const role = isYou ? youRoleFinal : pool[oi++];
-      players.push({seat:s, name:isYou?'你':namePool[s], role, alive:true, isYou, revealed:false, canVote:true, deathCause:null, _vote:-1, persona: isYou?null:rand(PERSONAS)});
+      players.push({seat:s, name:isYou?'你':namePool[s], role, alive:true, isYou, revealed:false, canVote:true, deathCause:null, _vote:-1, persona: isYou?null:rand(PERSONAS), memory:''});
     }
     S={
       cfg:cfgSel, n:cfg.n, you:youSeat,
@@ -382,8 +382,10 @@
   function speechFeed(seat,text){
     const p=P(seat);
     feed('speech'+(p.isYou?' me':''), `<div class="who">${seat+1}号 · ${esc(p.name)}${p.isYou?' (你)':''}</div>${esc(text)}`);
-    S.log.push(`${seat+1}号(${p.name})：${text}`);
+    pub(`${seat+1}号(${p.name})：${text}`);
   }
+  // 公开记录：喂给每个 AI 的「公开发生过的事」纯文本流（发言+死亡+跳预言家+放逐+投票），让 AI 读得到全场（含你的发言）。
+  function pub(t){ if(!t) return; S.log.push(String(t)); if(S.log.length>140) S.log=S.log.slice(-140); }
 
   // ---------- 交互原语 ----------
   function btnContinue(label){ return new Promise(res=>{ panelEl.innerHTML=`<button class="btn primary" id="ctab">${label||'继续 ▶'}</button>`; $('ctab').onclick=()=>res(); }); }
@@ -546,9 +548,11 @@
     const deaths=S.lastNightDeaths;
     if(!deaths.length){
       feed('sys', `🌅 <b>天亮了</b>，昨晚是 <b>平安夜</b>，无人死亡。`);
+      pub(`🌅 第${S.day}天天亮，昨晚平安夜，无人死亡。`);
     } else {
       const names=deaths.map(s=>seatLabel(s)).join('、');
       feed('dead', `🌅 天亮了，昨晚 <b>${names}</b> 倒牌出局。`);
+      pub(`🌅 第${S.day}天天亮，昨晚 ${deaths.map(s=>seatLabel(s)).join('、')} 出局。`);
     }
     await btnContinue('继续 ▶');
 
@@ -589,6 +593,7 @@
   async function hunterShoot(seat){
     const p=P(seat); p.revealed=true; render();
     feed('claim', `🔫 <b>${seat+1}号(${p.name})</b> 是猎人，翻牌开枪！`);
+    pub(`🔫 ${seatLabel(seat)} 翻牌是猎人，开枪！`);
     const cands=aliveSeats().filter(s=>s!==seat);
     if(!cands.length) return;
     let target;
@@ -601,6 +606,7 @@
     if(target==null) return;
     P(target).alive=false; P(target).deathCause='shot'; render();
     feed('dead', `🔫 ${seatLabel(seat)} 开枪带走了 <b>${seatLabel(target)}</b>。`);
+    pub(`🔫 ${seatLabel(seat)} 开枪带走了 ${seatLabel(target)}。`);
     if(P(target).role==='hunter'){ /* 被枪杀的猎人不再开枪 */ }
     await lastWords(target, false);
   }
@@ -638,7 +644,7 @@
 
   async function daySpeeches(){
     setPhase(`☀️ 第 ${S.day} 天 · 发言`, false);
-    // 1) 真预言家是否公布
+    // 1) 真预言家是否公布（人类弹窗 / AI 真预言家自动注册——保证好人始终有预言家信息，避免退化局）
     const seer=P(S.seerSeat);
     if(seer.alive){
       if(seer.isYou){ await humanSeerClaimPrompt(); }
@@ -647,46 +653,88 @@
     // 2) 人类狼悍跳（可选）
     const me=S.players[S.you];
     if(me.role==='wolf' && me.alive){ await humanWolfClaimPrompt(); }
-    // 3) AI 狼悍跳
-    maybeWolfFakeClaim();
-    // 公布所有 claim 到 feed（去重，仅新出现的 AI 假跳）
-    S.claims.forEach(c=>{ if(!c._announced){ c._announced=true; const p=P(c.seat); const t=claimWolfTarget(c); if(!p.isYou) feed('claim', `🔮 <b>${c.seat+1}号(${p.name})</b> ${c.real?'':'也'}跳预言家${t!=null?'，查杀 '+(t+1)+'号':''}${c.real?'':'（对跳）'}。`); } });
+    // 3) AI 狼悍跳：开 AI 时由各狼在自己发言回合里「自己决定」是否悍跳（aiTurn 内处理）；
+    //    关 AI（离线）时退回旧的随机启发式。
+    if(!S.useAI) maybeWolfFakeClaim();
+    announceNewClaims();
 
-    // 4) 计算 AI 投票 & 意图
+    // 4) 启发式基线票（兜底）：保证每个 AI 永远有一张合法默认票，LLM 决策会覆盖它
     const order = aliveSeats(); // 座位升序发言
     const speakers = order.filter(s=>s!==S.you);
-    const intents = computeVotesAndIntents(speakers);
+    computeVotesAndIntents(speakers);
 
-    // 5+6) 逐座位顺序发言：每个 AI 是独立 agent，轮到谁就用谁的角色提示词+性格现场生成，
-    //      后说话的能看到前面已发生的发言（S.log 边发边累积）。
+    // 5) 逐座位顺序发言：每个 AI 是独立 agent，轮到谁就读【全场公开发言(含你的) + 自己私有信息 + 记忆】现场决策。
+    //    后说话的能看到前面已发生的发言（S.log 边发边累积）。
     for(const s of order){
       S.speakingSeat=s; render();
       if(s===S.you){
         await humanSpeak();
       } else {
-        const p=P(s);
-        panelEl.innerHTML=`<div class="prompt">🗣️ <b>${s+1}号 ${esc(p.name)}</b>${p.persona?'（'+p.persona+'）':''} 正在发言 <span class="typing"><i></i><i></i><i></i></span></div>`;
-        const text = await fetchOneSpeech(s, intents[s]);
-        speechFeed(s, text);
-        await sleep(450);
+        await aiTurn(s);
+        await sleep(350);
       }
     }
     S.speakingSeat=null; render();
   }
 
-  // 单座位发言：每个 AI 独立调用 /api/werewolf-ai，只把「该座位的真实身份+意图+公开日志」发过去
-  // （不泄露别人的身份给模型）。失败/关 AI 时本地模板兜底。
-  async function fetchOneSpeech(seat, intent){
+  // 公布此刻新出现的 claim（真预言家 + 离线模式假跳）到 feed 与公开记录
+  function announceNewClaims(){
+    S.claims.forEach(c=>{ if(!c._announced){ c._announced=true; const p=P(c.seat); const t=claimWolfTarget(c);
+      if(!p.isYou){
+        feed('claim', `🔮 <b>${c.seat+1}号(${p.name})</b> ${c.real?'':'也'}跳预言家${t!=null?'，查杀 '+(t+1)+'号':''}${c.real?'':'（对跳）'}。`);
+        pub(`🔮 ${seatLabel(c.seat)} ${c.real?'':'也'}跳预言家${t!=null?'，查杀'+(t+1)+'号':''}。`);
+      }
+    } });
+  }
+
+  // 私有视图：只给该座位合法可知的信息（solo 客户端虽有全部身份，必须严格筛选，绝不泄露别人身份给模型）
+  function privFor(seat){
+    const p=P(seat); const priv={};
+    if(p.role==='wolf'){
+      priv.mates = S.players.filter(x=>x.role==='wolf').map(x=>x.seat);
+      if(S.night && S.night.wolfTarget!=null) priv.nightKill = S.night.wolfTarget;
+    } else if(p.role==='seer'){
+      priv.seerChecks = S.seerChecks.slice();
+      priv.claimed = S.claims.some(c=>c.real && c.seat===seat);
+    } else if(p.role==='witch'){
+      priv.antidote = S.witch.antidote; priv.poison = S.witch.poison;
+    }
+    return priv;
+  }
+  // 公开的跳预言家声明（不含 real 真假标记，让模型自己判断）
+  function publicClaims(){ return S.claims.map(c=>({seat:c.seat, reports:(c.reports||[]).map(r=>({target:r.target,res:r.res}))})); }
+
+  // 单座位「回合决策」：每个 AI 独立调用 /api/werewolf-ai(kind=turn)，读全场后自己决定发言/投票/悍跳。
+  // 失败 / 关 AI 时本地启发式兜底（发言走模板，投票保留发言阶段的基线 _vote）。
+  async function aiTurn(seat){
     const p=P(seat);
+    panelEl.innerHTML=`<div class="prompt">🗣️ <b>${seat+1}号 ${esc(p.name)}</b>${p.persona?'（'+p.persona+'）':''} 正在发言 <span class="typing"><i></i><i></i><i></i></span></div>`;
+    let dec=null;
     if(S.useAI){
       try{
         const players=S.players.map(x=>({seat:x.seat,name:x.name,alive:x.alive}));
         const r=await fetch('/api/werewolf-ai',{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({config:S.cfg,day:S.day,seat,role:p.role,name:p.name,persona:p.persona,players,intent,log:S.log.slice(-30),model:S.model})});
-        if(r.ok){ const j=await r.json(); if(j&&j.text) return j.text; }
+          body:JSON.stringify({kind:'turn',config:S.cfg,day:S.day,seat,role:p.role,name:p.name,persona:p.persona,
+            players,log:S.log.slice(-40),claims:publicClaims(),priv:privFor(seat),memory:p.memory||'',model:S.model})});
+        if(r.ok){ const j=await r.json(); if(j&&j.text) dec=j; }
       }catch(e){}
     }
-    return fallbackSpeech(seat, intent);
+    if(dec){
+      // 狼悍跳：AI 狼自己决定（仅当此刻还没有人对跳时才悍跳，避免一堆假预言家）
+      if(p.role==='wolf' && dec.claimSeer && dec.frame!=null && !S.claims.some(c=>!c.real)){
+        S.claims.push({seat, reports:[{target:dec.frame,res:'wolf'}], real:false, _announced:true});
+        feed('claim', `🔮 <b>${seat+1}号(${p.name})</b> 也跳预言家，查杀 ${dec.frame+1}号（对跳）。`);
+        pub(`🔮 ${seatLabel(seat)} 也跳预言家，查杀${dec.frame+1}号。`);
+      }
+      if(typeof dec.vote==='number' && dec.vote>=0) p._vote=dec.vote;
+      if(typeof dec.notes==='string') p.memory=dec.notes;
+      speechFeed(seat, dec.text);
+    } else {
+      // 兜底：离线/失败。用模板发言，_vote 保持基线启发式票。
+      const my=S.claims.find(c=>c.seat===seat);
+      const it={accuse:p._vote, claimSeer: !!my, seerReports: my?my.reports:null};
+      speechFeed(seat, fallbackSpeech(seat, it));
+    }
   }
   function fallbackSpeech(seat, it){
     it=it||{}; const p=P(seat);
@@ -793,6 +841,25 @@
     }
   }
 
+  // AI 最终定票：存活 AI 读完当天全部发言后并行决策（投票互不可见，可并行，~2s）。
+  // 失败/关 AI → 保留发言阶段的启发式基线 _vote。
+  async function aiFinalizeVotes(){
+    if(!S.useAI) return;
+    const voters=S.players.filter(p=>p.alive&&p.canVote&&!p.isYou);
+    if(!voters.length) return;
+    panelEl.innerHTML=`<div class="prompt">🗳️ 大家正在思考要投谁…… <span class="typing"><i></i><i></i><i></i></span></div>`;
+    const players=S.players.map(x=>({seat:x.seat,name:x.name,alive:x.alive}));
+    const claims=publicClaims();
+    await Promise.all(voters.map(async p=>{
+      try{
+        const r=await fetch('/api/werewolf-ai',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({kind:'vote',config:S.cfg,day:S.day,seat:p.seat,role:p.role,name:p.name,persona:p.persona,
+            players,log:S.log.slice(-40),claims,priv:privFor(p.seat),memory:p.memory||'',model:S.model})});
+        if(r.ok){ const j=await r.json(); if(j && typeof j.vote==='number'){ p._vote=j.vote; if(typeof j.notes==='string'&&j.notes) p.memory=j.notes; } }
+      }catch(e){}
+    }));
+  }
+
   // ================= 白天：投票 =================
   async function dayVote(){
     setPhase(`☀️ 第 ${S.day} 天 · 投票`, false);
@@ -805,6 +872,8 @@
       youVote = (t===null?-1:t);
       S.players[S.you]._vote=youVote;
     }
+    // AI 最终定票：每个存活 AI 读完当天全部发言（含你的）后并行决策，覆盖发言阶段的倾向票
+    await aiFinalizeVotes();
     // 统计
     const count={}; const detail=[];
     for(const v of voters){
@@ -814,6 +883,7 @@
     }
     S.voteCount=count; render();
     feed('sys', `🗳️ 投票：${detail.join('，')}`);
+    pub(`🗳️ 第${S.day}天投票结果：${detail.join('，')}`);
     await sleep(500);
     // 找最高票
     let max=0, tied=[];
@@ -835,11 +905,13 @@
     if(p.role==='idiot' && !p.revealed){
       p.revealed=true; p.canVote=false; render();
       feed('claim', `🤪 <b>${seatLabel(seat)}</b> 被投出——翻牌是 <b>白痴</b>！免疫放逐，但从此失去投票权。`);
+      pub(`🤪 ${seatLabel(seat)} 被投出，翻牌白痴，免疫放逐、失去投票权。`);
       await btnContinue('进入夜晚 ▶');
       return;
     }
     p.alive=false; p.deathCause='vote'; render();
     feed('dead', `⚖️ <b>${seatLabel(seat)}</b> 被投票放逐出局。`);
+    pub(`⚖️ ${seatLabel(seat)} 被投票放逐出局。`);
     // 遗言
     await lastWords(seat, false);
     // 猎人被投出可开枪

@@ -7,7 +7,7 @@
 //                night{kind:'wolf'|'seer'|'witch',target,save,poison} / speak{text,claimSeer} /
 //                vote{target} / shoot{target}
 // 鉴权由 _middleware.js 处理（仅登录用户）。并发用乐观锁 tick 做 CAS，避免重复推进。
-import { genSpeech, PERSONAS } from '../_lib/wwai.js';
+import { genTurn, genVote, PERSONAS } from '../_lib/wwai.js';
 
 const json = (o, s = 200) => Response.json(o, { status: s });
 const clean = (s, n = 40) => (typeof s === 'string' ? s : '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, n);
@@ -43,7 +43,7 @@ function freshState(id, cfg, host) {
   const c = CONFIGS[cfg];
   const players = [];
   for (let s = 0; s < c.n; s++) {
-    players.push({ seat: s, name: `席位${s + 1}`, clientId: null, isAI: true, role: null, alive: true, revealed: false, canVote: true, persona: rand(PERSONAS), deathCause: null, _vote: -1 });
+    players.push({ seat: s, name: `席位${s + 1}`, clientId: null, isAI: true, role: null, alive: true, revealed: false, canVote: true, persona: rand(PERSONAS), deathCause: null, _vote: -1, memory: '' });
   }
   return {
     id, cfg, n: c.n, host, phase: 'lobby', day: 0, deadline: null,
@@ -217,17 +217,24 @@ function computeAIVotesAndIntents(st) {
     else p._vote = goodVote(st, p);
   }
 }
-function intentFor(st, seat) {
-  const p = P(st, seat); const it = { accuse: p._vote };
-  const my = st.claims.find((c) => c.seat === seat);
-  if (my) { it.claimSeer = true; it.seerReports = my.reports; if (!my.real) it.note = '你在悍跳预言家，伪装成真预言家，想把真预言家投出局'; }
-  return it;
-}
 
 // ================= 投票结算 =================
+// AI 最终定票：存活 AI 读完当天全部发言后并行决策（投票互不可见，可并行）。失败回退启发式基线。
+async function finalizeAIVotes(st, env) {
+  computeAIVotesAndIntents(st); // 启发式基线
+  if (!env || !env.AI) return;
+  const voters = st.players.filter((p) => p.alive && p.canVote && p.isAI);
+  if (!voters.length) return;
+  const players = st.players.map((x) => ({ seat: x.seat, name: x.name, alive: x.alive }));
+  const claims = publicClaimsServer(st); const log = aiLog(st);
+  await Promise.all(voters.map(async (p) => {
+    const v = await genVote(env, { config: st.cfg, day: st.day, seat: p.seat, role: p.role, name: p.name, persona: p.persona, players, log, claims, priv: privForServer(st, p.seat), memory: p.memory || '' });
+    if (typeof v.vote === 'number') { p._vote = v.vote; if (typeof v.notes === 'string' && v.notes) p.memory = v.notes; }
+  }));
+}
+
 function tallyAndResolve(st, now) {
-  // 收齐所有存活可投票者（人类已提交 votes[seat]，AI 用 _vote）
-  computeAIVotesAndIntents(st);
+  // 收齐所有存活可投票者（人类已提交 votes[seat]，AI 用 _vote）。_vote 已由 finalizeAIVotes 设置。
   const count = {}; const detail = [];
   for (const v of st.players) {
     if (!v.alive || !v.canVote) continue;
@@ -303,16 +310,32 @@ function afterAnnounce(st, now) {
   enterSpeak(st, now);
 }
 function enterSpeak(st, now) {
-  // 真预言家（AI）自动跳；AI 狼可能悍跳；公布 claim
+  // 真预言家（AI）自动跳（保证好人有信息）；AI 狼的悍跳改由各狼在自己发言回合里 LLM 自己决定（见 advance 的 speak 分支）。
   const seer = st.players.find((p) => p.role === 'seer');
   if (seer && seer.alive && seer.isAI) registerRealClaim(st, seer.seat);
-  maybeWolfFakeClaim(st);
   st.claims.forEach((c) => { if (!c.announced) { c.announced = true; const t = claimWolfTarget(st, c); logPush(st, 'claim', `🔮 ${nm(st, c.seat)} ${c.real ? '' : '也'}跳预言家${t != null ? '，查杀 ' + (t + 1) + '号' : ''}${c.real ? '' : '（对跳）'}。`, c.seat); } });
-  computeAIVotesAndIntents(st);
+  computeAIVotesAndIntents(st); // 启发式基线票（兜底）；LLM 决策会逐个覆盖
   st.phase = 'speak';
   st.speak = { order: aliveSeats(st), idx: 0 };
   armSpeaker(st, now);
 }
+// 服务端构造单座位的合法私有视图（不泄露他人身份给模型）
+function privForServer(st, seat) {
+  const p = P(st, seat); const priv = {};
+  if (p.role === 'wolf') {
+    priv.mates = st.players.filter((x) => x.role === 'wolf').map((x) => x.seat);
+    if (st.night && st.night.wolfTarget != null) priv.nightKill = st.night.wolfTarget;
+  } else if (p.role === 'seer') {
+    priv.seerChecks = st.seerChecks.slice();
+    priv.claimed = st.claims.some((c) => c.real && c.seat === seat);
+  } else if (p.role === 'witch') {
+    priv.antidote = st.witch.antidote; priv.poison = st.witch.poison;
+  }
+  return priv;
+}
+const publicClaimsServer = (st) => st.claims.map((c) => ({ seat: c.seat, reports: (c.reports || []).map((r) => ({ target: r.target, res: r.res })) }));
+const aiLog = (st) => st.log.filter((e) => e.k === 'speech' || e.k === 'claim' || e.k === 'dead' || e.k === 'sys').slice(-30)
+  .map((e) => (e.seat != null && e.k === 'speech') ? `${e.seat + 1}号(${P(st, e.seat).name})：${e.text}` : e.text);
 function armSpeaker(st, now) {
   const sp = st.speak;
   if (sp.idx >= sp.order.length) { enterVote(st, now); return; }
@@ -377,13 +400,25 @@ async function advance(st, now, env) {
         if (expired) { logPush(st, 'sys', `${nm(st, cur)} 超时未发言，过麦。`, cur); sp.idx++; armSpeaker(st, now); continue; }
         break; // 等人类发言
       }
-      // AI 发言：现场生成一条（含前面已发生的发言），每次推进只出一个，保证请求有界
-      const it = intentFor(st, cur);
+      // AI 发言：每个 AI 是独立 agent，读【全场公开记录(含真人发言) + 自己私有信息 + 记忆】现场决策。
+      // 每次推进只出一个，保证请求有界。
       const players = st.players.map((x) => ({ seat: x.seat, name: x.name, alive: x.alive }));
-      const log = st.log.filter((e) => e.k === 'speech' || e.k === 'claim' || e.k === 'dead' || e.k === 'sys').slice(-26).map((e) => e.seat != null && e.k === 'speech' ? `${e.seat + 1}号(${P(st, e.seat).name})：${e.text}` : e.text);
-      const { text } = await genSpeech(env, { config: st.cfg, day: st.day, seat: cur, role: p.role, name: p.name, persona: p.persona, players, log, intent: it });
+      const dec = await genTurn(env, {
+        config: st.cfg, day: st.day, seat: cur, role: p.role, name: p.name, persona: p.persona,
+        players, log: aiLog(st), claims: publicClaimsServer(st), priv: privForServer(st, cur), memory: p.memory || '',
+      });
       didLLM = true;
-      logPush(st, 'speech', text, cur);
+      // 狼悍跳：AI 狼自己决定（仅当此刻还没有人对跳时）
+      if (p.role === 'wolf' && dec.claimSeer && dec.frame != null && !st.claims.some((c) => !c.real)) {
+        st.claims.push({ seat: cur, reports: [{ target: dec.frame, res: 'wolf' }], real: false, announced: true });
+        logPush(st, 'claim', `🔮 ${nm(st, cur)} 也跳预言家，查杀 ${dec.frame + 1}号（对跳）。`, cur);
+      } else if (dec.source === 'heuristic' && p.role === 'wolf' && !st.claims.some((c) => !c.real)) {
+        maybeWolfFakeClaim(st); // LLM 不可用时的悍跳兜底
+        st.claims.forEach((c) => { if (!c.announced) { c.announced = true; const t = claimWolfTarget(st, c); logPush(st, 'claim', `🔮 ${nm(st, c.seat)} 也跳预言家${t != null ? '，查杀 ' + (t + 1) + '号' : ''}（对跳）。`, c.seat); } });
+      }
+      if (typeof dec.vote === 'number' && dec.vote >= 0) p._vote = dec.vote;
+      if (typeof dec.notes === 'string') p.memory = dec.notes;
+      logPush(st, 'speech', dec.text, cur);
       sp.idx++; armSpeaker(st, now);
       break; // 一次只出一个 AI 发言（客户端下次轮询再出下一个，形成节奏）
     }
@@ -391,6 +426,7 @@ async function advance(st, now, env) {
       const voters = st.players.filter((p) => p.alive && p.canVote && !p.isAI);
       const allVoted = voters.every((p) => p.seat in st.votes);
       if (voters.length && !allVoted && !expired) break;
+      await finalizeAIVotes(st, env); didLLM = true;
       tallyAndResolve(st, now); continue;
     }
     break;
