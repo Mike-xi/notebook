@@ -13,10 +13,12 @@ export async function onRequestGet({ request, env }) {
   const path = normPath(url.searchParams.get('path') || '');
   if (!path) return new Response('bad path', { status: 400 });
 
-  const node = await env.DB.prepare('SELECT name, is_dir, r2_key, mime, visible FROM drive_nodes WHERE path = ?').bind(path).first();
+  const node = await env.DB.prepare('SELECT name, is_dir, r2_key, mime, visible, status FROM drive_nodes WHERE path = ?').bind(path).first();
   if (!node || node.is_dir) return new Response('not found', { status: 404 });
-  // 非管理员只能取「对外可见」的文件
-  if (!node.visible && (await getRole(request, env)) !== 'admin') return new Response('not found', { status: 404 });
+  // 非管理员只能取「对外可见」且已通过审核的文件（待审核 pending 仅管理员可预览）
+  if ((await getRole(request, env)) !== 'admin' && (!node.visible || node.status !== 'approved')) {
+    return new Response('not found', { status: 404 });
+  }
 
   const rangeHeader = request.headers.get('Range');
   const parsed = rangeHeader ? parseRange(rangeHeader) : null;

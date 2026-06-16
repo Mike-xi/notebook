@@ -74,12 +74,15 @@ export async function ensureDriveSchema(env) {
        mime       TEXT NOT NULL DEFAULT '',
        r2_key     TEXT NOT NULL DEFAULT '',
        visible    INTEGER NOT NULL DEFAULT 0,
+       status     TEXT NOT NULL DEFAULT 'approved',
        created_at INTEGER NOT NULL
      )`
   ).run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_drive_parent ON drive_nodes(parent)').run();
   // visible：0=仅管理员可见、1=对外（一二级）可见。新上传默认 0。历史表懒迁移加列
   try { await env.DB.prepare('ALTER TABLE drive_nodes ADD COLUMN visible INTEGER NOT NULL DEFAULT 0').run(); } catch {}
+  // status：approved=正常文件、pending=一二级（guest）上传待管理员审核。历史数据默认 approved
+  try { await env.DB.prepare("ALTER TABLE drive_nodes ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'").run(); } catch {}
   driveReady = true;
 }
 

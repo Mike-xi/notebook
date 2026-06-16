@@ -8,7 +8,7 @@
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
   </script>
   <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613d">
-  <link rel="stylesheet" href="/assets/style.css?v=20260616c">
+  <link rel="stylesheet" href="/assets/style.css?v=20260617a">
 </head>
 <body class="drive-page">
   <header class="topbar">
@@ -40,6 +40,7 @@
           <button id="drive-sort-dir" class="di-btn" title="升序 / 降序" aria-label="切换升降序"><span class="ic" data-icon="arrowup" data-icon-size="16"></span></button>
         </div>
         <div class="drive-actions" id="drive-actions" hidden>
+          <button class="pill-btn" id="review-btn" hidden title="内容审核"><span class="ic" data-icon="tray" data-icon-size="16"></span><span class="pill-label">内容审核</span><span class="sm-badge" id="review-badge" hidden>0</span></button>
           <button class="pill-btn" id="shares-btn" title="管理分享链接"><span class="ic" data-icon="link" data-icon-size="16"></span><span class="pill-label">管理分享</span></button>
           <button class="pill-btn" id="mkdir-btn"><span class="ic" data-icon="folderplus" data-icon-size="16"></span><span class="pill-label">新建文件夹</span></button>
           <button class="pill-btn pill-primary" id="upload-btn"><span class="ic" data-icon="upload" data-icon-size="16"></span><span class="pill-label">上传</span></button>
@@ -108,6 +109,18 @@
     </div>
   </div>
 
+  <!-- 内容审核（仅管理员）：一二级上传的待审文件 -->
+  <div class="modal-overlay" id="review-modal" hidden>
+    <div class="modal review-modal-box">
+      <div class="rv-head">
+        <h3><span class="ic" data-icon="tray" data-icon-size="18"></span> 内容审核</h3>
+        <button class="icon-btn" id="review-close" title="关闭"><span class="ic" data-icon="close" data-icon-size="18"></span></button>
+      </div>
+      <p class="rv-tip">一二级账号上传的文件会先进入这里，通过后才会出现在云盘并对一二级开放。</p>
+      <div class="rv-body" id="review-body"></div>
+    </div>
+  </div>
+
   <!-- 文件预览 -->
   <div class="modal-overlay" id="preview-modal" hidden>
     <div class="preview-box">
@@ -124,6 +137,6 @@
 
   <script src="/assets/icons.js?v=20260616b"></script>
   <script src="/assets/theme.js?v=20260608a"></script>
-  <script src="/assets/drive.js?v=20260616c"></script>
+  <script src="/assets/drive.js?v=20260617a"></script>
 </body>
 </html>

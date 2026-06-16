@@ -7,9 +7,12 @@ import { normPath, cleanName, joinPath, guessMime, newR2Key } from '../../_lib/d
 const MAX_BYTES = 100 * 1024 * 1024;   // 单文件上限 100MB（平台请求体上限附近）
 
 export async function onRequestPost({ request, env }) {
-  if ((await getRole(request, env)) !== 'admin') {
-    return Response.json({ error: '只有管理员（三级）可以上传到云盘' }, { status: 403 });
+  // 管理员（三级）上传直接上线；一二级（guest）上传进审核队列（status=pending），通过后才公开。
+  const role = await getRole(request, env);
+  if (role !== 'admin' && role !== 'guest') {
+    return Response.json({ error: '请先登录' }, { status: 401 });
   }
+  const isAdmin = role === 'admin';
   if (!env.FILES) return Response.json({ error: 'R2 未配置' }, { status: 500 });
   await ensureDriveSchema(env);
 
@@ -19,10 +22,11 @@ export async function onRequestPost({ request, env }) {
   const name = cleanName(url.searchParams.get('name') || '');
   if (!name) return Response.json({ error: '非法的文件名' }, { status: 400 });
 
-  // 目标文件夹须存在
+  // 目标文件夹须存在；非管理员只能上传到自己看得到（对外可见）的文件夹
   if (parent) {
-    const dir = await env.DB.prepare('SELECT is_dir FROM drive_nodes WHERE path = ?').bind(parent).first();
+    const dir = await env.DB.prepare('SELECT is_dir, visible FROM drive_nodes WHERE path = ?').bind(parent).first();
     if (!dir || !dir.is_dir) return Response.json({ error: '目标文件夹不存在' }, { status: 404 });
+    if (!isAdmin && !dir.visible) return Response.json({ error: '无权上传到该文件夹' }, { status: 403 });
   }
 
   const path = joinPath(parent, name);
@@ -49,10 +53,11 @@ export async function onRequestPost({ request, env }) {
     return Response.json({ error: '文件太大，上限 100 MB' }, { status: 413 });
   }
 
+  const status = isAdmin ? 'approved' : 'pending';
   await env.DB.prepare(
-    `INSERT INTO drive_nodes (parent, name, path, is_dir, size, mime, r2_key, created_at)
-     VALUES (?, ?, ?, 0, ?, ?, ?, ?)`
-  ).bind(parent, name, path, size, mime, r2Key, Date.now()).run();
+    `INSERT INTO drive_nodes (parent, name, path, is_dir, size, mime, r2_key, visible, status, created_at)
+     VALUES (?, ?, ?, 0, ?, ?, ?, 0, ?, ?)`
+  ).bind(parent, name, path, size, mime, r2Key, status, Date.now()).run();
 
-  return Response.json({ ok: true, path, size });
+  return Response.json({ ok: true, path, size, pending: status === 'pending' });
 }

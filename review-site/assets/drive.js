@@ -4,6 +4,7 @@
   'use strict';
 
   let isAdmin = false;
+  let canUpload = false;          // 任何已登录用户都能上传（一二级走审核）
   let currentPath = '';
   let rawItems = [];
   let usage = { total: 0, files: 0 };
@@ -63,14 +64,26 @@
 
   // ----- 预览类型判断 -----
   function extOf(name) { return (name.split('.').pop() || '').toLowerCase(); }
+  const CODE_EXTS = [
+    'py', 'pyw', 'js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx', 'json', 'jsonc', 'ipynb',
+    'xml', 'svg', 'vue', 'css', 'scss', 'sass', 'less', 'yml', 'yaml', 'toml', 'ini',
+    'cfg', 'conf', 'properties', 'sh', 'bash', 'zsh', 'ps1', 'bat', 'cmd', 'sql',
+    'c', 'h', 'cpp', 'cc', 'cxx', 'hpp', 'hh', 'cs', 'java', 'go', 'rs', 'rb', 'php',
+    'swift', 'kt', 'kts', 'scala', 'lua', 'pl', 'pm', 'r', 'dart', 'm', 'mm', 'tex',
+    'gradle', 'mk', 'txt', 'log', 'csv', 'tsv',
+  ];
+  const OFFICE_EXTS = ['ppt', 'pptx', 'doc', 'docx', 'xls', 'xlsx', 'odt', 'odp', 'ods'];
   function previewKind(name) {
     const e = extOf(name);
-    if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico'].includes(e)) return 'image';
-    if (e === 'svg') return 'image';
+    const base = name.toLowerCase();
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'svg'].includes(e)) return 'image';
     if (['mp4', 'webm', 'ogg', 'mov'].includes(e)) return 'video';
     if (['mp3', 'wav', 'm4a', 'flac', 'aac'].includes(e)) return 'audio';
     if (e === 'pdf') return 'pdf';
-    if (['html', 'htm', 'txt', 'md', 'markdown', 'json', 'csv', 'log', 'xml'].includes(e)) return 'doc';
+    if (['html', 'htm'].includes(e)) return 'html';
+    if (['md', 'markdown'].includes(e)) return 'markdown';
+    if (CODE_EXTS.includes(e) || base === 'dockerfile' || base === 'makefile') return 'code';
+    if (OFFICE_EXTS.includes(e)) return 'office';
     return null;
   }
 
@@ -127,7 +140,7 @@
         actions += `<button class="di-btn di-del" data-act="delete" data-path="${escapeAttr(it.path)}" data-dir="${it.is_dir ? 1 : 0}" title="删除" aria-label="删除">${ic('trash', 16)}</button>`;
       }
       return `
-        <li class="drive-item ${it.is_dir ? 'is-dir' : 'is-file'} ${isAdmin && !it.visible ? 'is-private' : ''}" data-path="${escapeAttr(it.path)}" data-dir="${it.is_dir ? 1 : 0}" ${isAdmin ? 'draggable="true"' : ''}>
+        <li class="drive-item ${it.is_dir ? 'is-dir' : 'is-file'}" data-path="${escapeAttr(it.path)}" data-dir="${it.is_dir ? 1 : 0}" ${isAdmin ? 'draggable="true"' : ''}>
           <span class="di-icon">${icon}</span>
           <div class="di-main">${nameCell}<span class="di-meta">${meta}</span></div>
           <div class="di-actions">${actions}</div>
@@ -197,14 +210,16 @@
   }
 
   // ----- 上传（XHR 带进度） -----
+  // 管理员上传直接上线；一二级（guest）上传进审核队列，管理员通过后才会出现在云盘。
   function uploadFiles(files) {
-    if (!isAdmin || !files || !files.length) return;
+    if (!canUpload || !files || !files.length) return;
     uploadsEl.hidden = false;
     const queue = Array.from(files);
-    let idx = 0;
+    let idx = 0, pendingCount = 0;
     const next = () => {
       if (idx >= queue.length) {
-        setTimeout(() => { uploadsEl.hidden = true; uploadsEl.innerHTML = ''; }, 1200);
+        setTimeout(() => { uploadsEl.hidden = true; uploadsEl.innerHTML = ''; }, 1600);
+        if (pendingCount) toast('已提交，等待管理员审核');
         load(currentPath);
         return;
       }
@@ -219,8 +234,11 @@
       xhr.upload.onprogress = (e) => { if (e.lengthComputable) { const p = Math.round(e.loaded / e.total * 100); bar.style.width = p + '%'; pct.textContent = p + '%'; } };
       xhr.onload = () => {
         let d = {}; try { d = JSON.parse(xhr.responseText); } catch {}
-        if (xhr.status >= 200 && xhr.status < 300) { bar.style.width = '100%'; pct.textContent = '✓'; row.classList.add('done'); }
-        else { row.classList.add('err'); pct.textContent = '✗'; row.querySelector('.up-name').textContent = file.name + ' — ' + (d.error || '失败'); }
+        if (xhr.status >= 200 && xhr.status < 300) {
+          bar.style.width = '100%';
+          if (d.pending) { pct.textContent = '待审核'; row.classList.add('done', 'pending'); pendingCount++; }
+          else { pct.textContent = '✓'; row.classList.add('done'); }
+        } else { row.classList.add('err'); pct.textContent = '✗'; row.querySelector('.up-name').textContent = file.name + ' — ' + (d.error || '失败'); }
         next();
       };
       xhr.onerror = () => { row.classList.add('err'); pct.textContent = '✗'; next(); };
@@ -237,11 +255,15 @@
     $('preview-name').textContent = name;
     $('preview-dl').href = fileUrl(path, true);
     const url = fileUrl(path, false);
+    const dlUrl = fileUrl(path, true);
     if (kind === 'image') body.innerHTML = `<img src="${escapeAttr(url)}" alt="${escapeAttr(name)}">`;
     else if (kind === 'video') body.innerHTML = `<video src="${escapeAttr(url)}" controls autoplay></video>`;
-    else if (kind === 'audio') body.innerHTML = `<audio src="${escapeAttr(url)}" controls autoplay></audio>`;
-    else if (kind === 'pdf' || kind === 'doc') body.innerHTML = `<iframe src="${escapeAttr(url)}" title="${escapeAttr(name)}"></iframe>`;
-    else body.innerHTML = `<div class="preview-none">该类型暂不支持预览。<br><a href="${escapeAttr(fileUrl(path, true))}">点此下载</a></div>`;
+    else if (kind === 'audio') body.innerHTML = `<div class="preview-audio"><audio src="${escapeAttr(url)}" controls autoplay></audio></div>`;
+    else if (kind === 'pdf' || kind === 'html') body.innerHTML = `<iframe src="${escapeAttr(url)}" title="${escapeAttr(name)}"></iframe>`;
+    else if (kind === 'markdown') body.innerHTML = `<iframe src="/viewer-md.html?src=${encodeURIComponent(url)}" title="${escapeAttr(name)}"></iframe>`;
+    else if (kind === 'code') body.innerHTML = `<iframe src="/viewer-code.html?src=${encodeURIComponent(url)}&name=${encodeURIComponent(name)}" title="${escapeAttr(name)}"></iframe>`;
+    else if (kind === 'office') body.innerHTML = `<div class="preview-none">Office 文档（${escapeHTML(extOf(name).toUpperCase())}）暂不支持在线预览。<br>为保护隐私不外传第三方查看器，请下载后用本地软件打开。<br><br><a class="btn-confirm" href="${escapeAttr(dlUrl)}">下载文件</a></div>`;
+    else body.innerHTML = `<div class="preview-none">该类型暂不支持预览。<br><br><a class="btn-confirm" href="${escapeAttr(dlUrl)}">下载文件</a></div>`;
     previewModal.hidden = false;
   }
   function closePreview() { previewModal.hidden = true; $('preview-body').innerHTML = ''; }
@@ -335,6 +357,69 @@
   $('shares-close').addEventListener('click', () => { sharesModal.hidden = true; });
   sharesModal.addEventListener('click', (e) => { if (e.target === sharesModal) sharesModal.hidden = true; });
 
+  // ----- 内容审核（仅管理员）：一二级上传的待审文件，通过 / 拒绝 / 预览 -----
+  const reviewModal = $('review-modal');
+  const reviewBody = $('review-body');
+  const reviewBadge = $('review-badge');
+  async function refreshReviewBadge() {
+    if (!reviewBadge) return;
+    try {
+      const r = await fetch('/api/drive/review');
+      if (!r.ok) return;
+      const d = await r.json();
+      const n = (d.pending || []).length;
+      reviewBadge.textContent = n > 99 ? '99+' : String(n);
+      reviewBadge.hidden = n === 0;
+    } catch {}
+  }
+  function openReview() { reviewModal.hidden = false; loadReview(); }
+  async function loadReview() {
+    reviewBody.innerHTML = '<p class="rv-loading">加载中…</p>';
+    let data;
+    try { const r = await fetch('/api/drive/review'); data = await r.json(); if (!r.ok) throw new Error(data.error || '加载失败'); }
+    catch (e) { reviewBody.innerHTML = `<p class="rv-empty">⚠️ ${escapeHTML(e.message || '加载失败')}</p>`; return; }
+    const list = data.pending || [];
+    if (!list.length) { reviewBody.innerHTML = '<p class="rv-empty">暂无待审核的内容 🎉</p>'; return; }
+    reviewBody.innerHTML = list.map((f) => {
+      const loc = f.parent ? f.parent : '云盘根目录';
+      return `
+        <div class="rv-card" data-path="${escapeAttr(f.path)}">
+          <span class="rv-icon">📄</span>
+          <div class="rv-info">
+            <h4>${escapeHTML(f.name)}</h4>
+            <p class="rv-meta">${fmtSize(f.size)} · 位置：${escapeHTML(loc)} · ${escapeHTML(fmtDate(f.created_at))}</p>
+          </div>
+          <div class="rv-actions">
+            <button class="rv-btn rv-preview" data-path="${escapeAttr(f.path)}" data-name="${escapeAttr(f.name)}">预览</button>
+            <button class="rv-btn rv-approve" data-path="${escapeAttr(f.path)}">通过</button>
+            <button class="rv-btn rv-reject" data-path="${escapeAttr(f.path)}">拒绝</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+  async function reviewAction(path, action) {
+    try {
+      const r = await fetch('/api/drive/review', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path, action }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || '操作失败');
+      toast(action === 'approve' ? '已通过，已对外开放' : '已拒绝');
+      loadReview(); refreshReviewBadge();
+      if (action === 'approve') load(currentPath);
+    } catch (e) { alert(e.message || '操作失败'); }
+  }
+  if (reviewModal && reviewBody) {
+    reviewBody.addEventListener('click', (e) => {
+      const pv = e.target.closest('.rv-preview');
+      if (pv) return openPreview(pv.dataset.path, pv.dataset.name);
+      const ap = e.target.closest('.rv-approve');
+      if (ap) return reviewAction(ap.dataset.path, 'approve');
+      const rj = e.target.closest('.rv-reject');
+      if (rj) { if (confirm('拒绝并删除这个文件？此操作不可恢复。')) reviewAction(rj.dataset.path, 'reject'); }
+    });
+    $('review-close').addEventListener('click', () => { reviewModal.hidden = true; });
+    reviewModal.addEventListener('click', (e) => { if (e.target === reviewModal) reviewModal.hidden = true; });
+  }
+
   // ----- 列表点击委托 -----
   listEl.addEventListener('click', (e) => {
     const t = e.target.closest('[data-act]');
@@ -364,6 +449,7 @@
   $('mkdir-btn').addEventListener('click', mkdir);
   $('upload-btn').addEventListener('click', () => fileInput.click());
   $('shares-btn').addEventListener('click', openSharesManage);
+  { const rb = $('review-btn'); if (rb) rb.addEventListener('click', openReview); }
   fileInput.addEventListener('change', () => { uploadFiles(fileInput.files); fileInput.value = ''; });
 
   // ----- 拖拽：内部移动 + 外部上传 -----
@@ -412,20 +498,20 @@
     }
   });
 
-  // 外部文件拖入上传（仅管理员，且非内部拖拽时）
+  // 外部文件拖入上传（任何已登录用户，且非内部拖拽时）
   let dragDepth = 0;
   dropzone.addEventListener('dragenter', (e) => {
-    if (!isAdmin || draggingPath) return;
+    if (!canUpload || draggingPath) return;
     e.preventDefault(); dragDepth++; dropzone.classList.add('dragover');
   });
-  dropzone.addEventListener('dragover', (e) => { if (isAdmin && !draggingPath) e.preventDefault(); });
+  dropzone.addEventListener('dragover', (e) => { if (canUpload && !draggingPath) e.preventDefault(); });
   dropzone.addEventListener('dragleave', () => {
-    if (!isAdmin || draggingPath) return;
+    if (!canUpload || draggingPath) return;
     dragDepth = Math.max(0, dragDepth - 1);
     if (dragDepth === 0) dropzone.classList.remove('dragover');
   });
   dropzone.addEventListener('drop', (e) => {
-    if (!isAdmin) return;
+    if (!canUpload) return;
     dragDepth = 0; dropzone.classList.remove('dragover');
     if (draggingPath) return;                 // 内部移动由专门的 handler 处理
     const files = e.dataTransfer && e.dataTransfer.files;
@@ -437,6 +523,7 @@
     if (!previewModal.hidden) closePreview();
     else if (!shareModal.hidden) closeShareCreate();
     else if (!sharesModal.hidden) sharesModal.hidden = true;
+    else if (reviewModal && !reviewModal.hidden) reviewModal.hidden = true;
   });
   window.addEventListener('hashchange', () => load(pathFromHash()));
 
@@ -446,12 +533,16 @@
       const me = await fetch('/api/me').then((r) => (r.ok ? r.json() : { role: 'guest' }));
       isAdmin = (me && me.role) === 'admin';
     } catch {}
-    actionsEl.hidden = !isAdmin;
+    canUpload = true;                 // 在 drive.html 上即已登录；一二级上传走审核
+    actionsEl.hidden = false;         // 上传按钮对所有登录用户开放
+    // 仅管理员：新建文件夹 / 管理分享 / 内容审核
+    ['mkdir-btn', 'shares-btn', 'review-btn'].forEach((id) => { const b = $(id); if (b) b.hidden = !isAdmin; });
     if (roleBadge) {
       roleBadge.hidden = false;
-      roleBadge.textContent = isAdmin ? '管理员 · 可上传' : '只读 · 可下载';
+      roleBadge.textContent = isAdmin ? '管理员 · 可上传' : '可上传 · 需审核';
       roleBadge.classList.toggle('admin', isAdmin);
     }
+    if (isAdmin) refreshReviewBadge();
     load(pathFromHash());
   })();
 })();

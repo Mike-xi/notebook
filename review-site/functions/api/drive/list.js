@@ -18,11 +18,12 @@ export async function onRequestGet({ request, env }) {
     if (!dir.is_dir) return Response.json({ error: '不是文件夹' }, { status: 400 });
   }
 
-  // 非管理员只看到 visible=1 的项；管理员看到全部
+  // 待审核（pending）文件不进正常浏览（连管理员也只在「内容审核」面板里看）；
+  // 非管理员另外只看到 visible=1 的项。
   const visFilter = isAdmin ? '' : ' AND visible = 1';
   const { results } = await env.DB.prepare(
     `SELECT name, path, is_dir, size, mime, visible, created_at
-     FROM drive_nodes WHERE parent = ?${visFilter}
+     FROM drive_nodes WHERE parent = ? AND status = 'approved'${visFilter}
      ORDER BY is_dir DESC, name COLLATE NOCASE ASC`
   ).bind(path).all();
 

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>代码 / 文本预览</title>
+  <link id="hljs-light" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css">
+  <link id="hljs-dark" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" disabled>
+  <style>
+    :root { --c-bg:#fff; --c-fg:#24292f; --c-muted:#8a93a0; --c-gutter:#f6f8fa; --c-border:#e6eaf0; }
+    body.dark { --c-bg:#15171c; --c-fg:#d7d3da; --c-muted:#6b7280; --c-gutter:#1b1e24; --c-border:#2c2f36; }
+    * { box-sizing:border-box; }
+    [hidden] { display:none !important; }
+    html, body { margin:0; padding:0; height:100%; }
+    body {
+      background:var(--c-bg); color:var(--c-fg);
+      font-family:"SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      transition:background-color .2s ease, color .2s ease;
+    }
+    #code-wrap { height:100%; overflow:auto; display:flex; align-items:flex-start; font-size:13px; line-height:1.55; }
+    #code-gutter {
+      flex:0 0 auto; text-align:right; padding:14px 10px 60px; color:var(--c-muted);
+      background:var(--c-gutter); border-right:1px solid var(--c-border);
+      user-select:none; white-space:pre; position:sticky; left:0; z-index:1;
+      font-variant-numeric:tabular-nums;
+    }
+    #code-pre { flex:1 1 auto; margin:0; padding:14px 16px 60px; overflow:visible; min-width:0; }
+    #code-pre code { white-space:pre; background:none; padding:0; font:inherit; }
+    #code-loading { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; gap:10px; color:var(--c-muted); font-size:14px; }
+    .c-spin { width:18px; height:18px; border:2px solid currentColor; border-top-color:transparent; border-radius:50%; animation:cspin .8s linear infinite; }
+    @keyframes cspin { to { transform:rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="code-wrap" hidden>
+    <div id="code-gutter"></div>
+    <pre id="code-pre"><code id="code-content" class="hljs"></code></pre>
+  </div>
+  <div id="code-loading"><span class="c-spin"></span><span>加载中…</span></div>
+
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+  <script src="/assets/code-viewer.js?v=20260617a"></script>
+</body>
+</html>
