@@ -22,8 +22,27 @@ export async function onRequestPost({ request, env }) {
   if (action === 'mkdir') return mkdir(env, body);
   if (action === 'rename') return rename(env, body);
   if (action === 'move') return move(env, body);
+  if (action === 'visible') return setVisible(env, body);
   if (action === 'delete') return remove(env, body);
   return bad('未知操作');
+}
+
+// 设置「对外（一二级）可见」。文件夹连同其全部子孙一并设置，便于一键放开/收回整个文件夹
+async function setVisible(env, body) {
+  const path = normPath(body?.path || '');
+  if (!path) return bad('非法路径');
+  const vis = body?.visible ? 1 : 0;
+  const node = await env.DB.prepare('SELECT id, is_dir FROM drive_nodes WHERE path = ?').bind(path).first();
+  if (!node) return bad('对象不存在', 404);
+
+  if (!node.is_dir) {
+    await env.DB.prepare('UPDATE drive_nodes SET visible = ? WHERE id = ?').bind(vis, node.id).run();
+  } else {
+    const prefix = path + '/';
+    await env.DB.prepare('UPDATE drive_nodes SET visible = ? WHERE path = ? OR substr(path, 1, ?) = ?')
+      .bind(vis, path, prefix.length, prefix).run();
+  }
+  return Response.json({ ok: true, visible: !!vis });
 }
 
 // 把某节点（及其子孙）从 oldPath 迁到 newPath（重命名/移动共用）。node={id,is_dir}。

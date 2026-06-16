@@ -73,10 +73,13 @@ export async function ensureDriveSchema(env) {
        size       INTEGER NOT NULL DEFAULT 0,
        mime       TEXT NOT NULL DEFAULT '',
        r2_key     TEXT NOT NULL DEFAULT '',
+       visible    INTEGER NOT NULL DEFAULT 0,
        created_at INTEGER NOT NULL
      )`
   ).run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_drive_parent ON drive_nodes(parent)').run();
+  // visible：0=仅管理员可见、1=对外（一二级）可见。新上传默认 0。历史表懒迁移加列
+  try { await env.DB.prepare('ALTER TABLE drive_nodes ADD COLUMN visible INTEGER NOT NULL DEFAULT 0').run(); } catch {}
   driveReady = true;
 }
 

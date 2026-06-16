@@ -2155,7 +2155,24 @@ body.login .eyebrow { display: block; text-align: center; margin: 0 0 26px; }
 }
 #drive-sort-dir .nbi { transition: transform 150ms; }
 #drive-sort-dir.desc .nbi { transform: rotate(180deg); }
-.drive-foot { margin-top: 16px; font-size: 12px; color: var(--on-surface-variant); text-align: right; }
+.drive-foot { margin-top: 18px; font-size: 12px; color: var(--on-surface-variant); }
+.quota-head { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+.quota-bar { height: 8px; border-radius: var(--radius-full); background: var(--surface-container-highest); overflow: hidden; }
+.quota-bar i { display: block; height: 100%; background: var(--primary); border-radius: var(--radius-full); transition: width 200ms; }
+
+/* 对外可见开关 + 仅管理员可见的暗显 */
+.drive-item .di-actions { opacity: 1; }
+.di-vis {
+  font-size: 11px; font-weight: 600; padding: 3px 9px; flex-shrink: 0;
+  border-radius: var(--radius-full); border: 1px solid var(--outline-variant);
+  background: var(--surface-container-high); color: var(--on-surface-variant); cursor: pointer;
+}
+.di-vis.on {
+  background: color-mix(in srgb, var(--primary) 16%, var(--surface-container-lowest));
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent); color: var(--primary);
+}
+.drive-item.is-private { opacity: .6; }
+.drive-item.is-private:hover { opacity: 1; }
 
 /* 拖拽移动：高亮目标文件夹 / 面包屑 */
 .drive-item.drag-target { outline: 2px solid var(--primary); outline-offset: -2px; background: color-mix(in srgb, var(--primary) 10%, transparent); border-radius: var(--radius-md); }

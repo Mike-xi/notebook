@@ -2,6 +2,7 @@
 //   dl=1 时作为附件下载（Content-Disposition: attachment），否则尽量内联预览。
 //   支持 Range（视频/PDF 分段加载）。
 import { ensureDriveSchema } from '../../_lib/db.js';
+import { getRole } from '../../_lib/auth.js';
 import { normPath, guessMime } from '../../_lib/drive.js';
 
 export async function onRequestGet({ request, env }) {
@@ -12,8 +13,10 @@ export async function onRequestGet({ request, env }) {
   const path = normPath(url.searchParams.get('path') || '');
   if (!path) return new Response('bad path', { status: 400 });
 
-  const node = await env.DB.prepare('SELECT name, is_dir, r2_key, mime FROM drive_nodes WHERE path = ?').bind(path).first();
+  const node = await env.DB.prepare('SELECT name, is_dir, r2_key, mime, visible FROM drive_nodes WHERE path = ?').bind(path).first();
   if (!node || node.is_dir) return new Response('not found', { status: 404 });
+  // 非管理员只能取「对外可见」的文件
+  if (!node.visible && (await getRole(request, env)) !== 'admin') return new Response('not found', { status: 404 });
 
   const rangeHeader = request.headers.get('Range');
   const parsed = rangeHeader ? parseRange(rangeHeader) : null;

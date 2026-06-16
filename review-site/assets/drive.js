@@ -11,6 +11,7 @@
   let sortDir = parseInt(localStorage.getItem('nb-drive-dir'), 10) || 1;  // 1 升序 / -1 降序
   let searchTerm = '';
   let draggingPath = null;      // 内部拖拽（移动）中的源路径
+  const TOTAL_QUOTA = 10 * 1024 * 1024 * 1024;   // 网盘总空间：R2 免费额度 10 GB
 
   const $ = (id) => document.getElementById(id);
   const listEl = $('drive-list');
@@ -114,14 +115,19 @@
         ? `<button class="di-name" data-act="open" data-path="${escapeAttr(it.path)}">${escapeHTML(it.name)}</button>`
         : `<button class="di-name" data-act="preview" data-path="${escapeAttr(it.path)}" data-name="${escapeAttr(it.name)}">${escapeHTML(it.name)}</button>`;
       let actions = '';
+      // 管理员：对外可见开关（点一下切换；文件夹会连子项一起放开/收回）
+      const visChip = isAdmin
+        ? `<button class="di-vis ${it.visible ? 'on' : ''}" data-act="visible" data-path="${escapeAttr(it.path)}" data-vis="${it.visible ? 1 : 0}" title="${it.visible ? '一二级可见，点击改为仅自己' : '仅管理员可见，点击对外开放'}">${it.visible ? '对外' : '仅自己'}</button>`
+        : '';
       if (!it.is_dir) actions += `<a class="di-btn" href="${fileUrl(it.path, true)}" title="下载" aria-label="下载">${ic('download', 17)}</a>`;
       if (isAdmin) {
+        actions = visChip + actions;
         actions += `<button class="di-btn" data-act="share" data-path="${escapeAttr(it.path)}" data-name="${escapeAttr(it.name)}" title="分享" aria-label="分享">${ic('share', 16)}</button>`;
         actions += `<button class="di-btn" data-act="rename" data-path="${escapeAttr(it.path)}" data-name="${escapeAttr(it.name)}" title="重命名" aria-label="重命名">${ic('edit', 16)}</button>`;
         actions += `<button class="di-btn di-del" data-act="delete" data-path="${escapeAttr(it.path)}" data-dir="${it.is_dir ? 1 : 0}" title="删除" aria-label="删除">${ic('trash', 16)}</button>`;
       }
       return `
-        <li class="drive-item ${it.is_dir ? 'is-dir' : 'is-file'}" data-path="${escapeAttr(it.path)}" data-dir="${it.is_dir ? 1 : 0}" ${isAdmin ? 'draggable="true"' : ''}>
+        <li class="drive-item ${it.is_dir ? 'is-dir' : 'is-file'} ${isAdmin && !it.visible ? 'is-private' : ''}" data-path="${escapeAttr(it.path)}" data-dir="${it.is_dir ? 1 : 0}" ${isAdmin ? 'draggable="true"' : ''}>
           <span class="di-icon">${icon}</span>
           <div class="di-main">${nameCell}<span class="di-meta">${meta}</span></div>
           <div class="di-actions">${actions}</div>
@@ -130,7 +136,10 @@
   }
 
   function renderFoot() {
-    footEl.textContent = `已用 ${fmtSize(usage.total)} · ${usage.files} 个文件`;
+    const pct = Math.min(100, usage.total / TOTAL_QUOTA * 100);
+    footEl.innerHTML = `
+      <div class="quota-head"><span>存储空间</span><span>已用 ${fmtSize(usage.total)} / ${fmtSize(TOTAL_QUOTA)} · ${usage.files} 个文件</span></div>
+      <div class="quota-bar"><i style="width:${pct.toFixed(2)}%"></i></div>`;
   }
 
   // ----- 数据 -----
@@ -332,6 +341,7 @@
     if (!t) return;
     const act = t.dataset.act;
     if (act === 'open') go(t.dataset.path);
+    else if (act === 'visible') op({ action: 'visible', path: t.dataset.path, visible: t.dataset.vis !== '1' }, t.dataset.vis !== '1' ? '已对外开放' : '已设为仅自己');
     else if (act === 'preview') openPreview(t.dataset.path, t.dataset.name);
     else if (act === 'share') openShareCreate(t.dataset.path, t.dataset.name);
     else if (act === 'rename') renameItem(t.dataset.path, t.dataset.name);
