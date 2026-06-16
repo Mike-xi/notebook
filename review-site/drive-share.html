@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>分享 · Xi Notebook</title>
+  <script>
+    (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
+  </script>
+  <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613d">
+  <link rel="stylesheet" href="/assets/style.css?v=20260616b">
+</head>
+<body class="drive-page">
+  <header class="topbar">
+    <span class="brand drive-back">
+      <img class="brand-logo" src="/assets/brand-xinotebook.png?v=20260613d" alt="Xi Notebook">
+    </span>
+    <div class="topbar-right">
+      <span class="drive-title"><span class="ic" data-icon="link" data-icon-size="18"></span> <span id="ds-title">分享</span></span>
+    </div>
+  </header>
+
+  <main class="drive-main">
+    <p class="drive-empty" id="ds-error" hidden></p>
+
+    <!-- 密码门 -->
+    <div class="ds-gate" id="ds-gate" hidden>
+      <div class="ds-gate-card">
+        <span class="ds-gate-ic ic" data-icon="link" data-icon-size="28"></span>
+        <h3>此分享需要访问密码</h3>
+        <input type="password" id="ds-pw" placeholder="请输入密码" autocomplete="off">
+        <p class="ds-gate-err" id="ds-pw-err" hidden>密码不正确</p>
+        <button class="btn-confirm" id="ds-pw-go" type="button">进入</button>
+      </div>
+    </div>
+
+    <!-- 内容 -->
+    <div id="ds-content" hidden>
+      <nav class="drive-crumbs" id="ds-crumbs" aria-label="路径"></nav>
+      <!-- 文件分享：单文件视图 -->
+      <div class="ds-file" id="ds-file" hidden></div>
+      <!-- 文件夹分享：列表 -->
+      <ul class="drive-list" id="ds-list" hidden></ul>
+      <p class="drive-empty" id="ds-empty" hidden>这个文件夹是空的。</p>
+    </div>
+  </main>
+
+  <script src="/assets/icons.js?v=20260616b"></script>
+  <script src="/assets/theme.js?v=20260608a"></script>
+  <script src="/assets/drive-share.js?v=20260616b"></script>
+</body>
+</html>

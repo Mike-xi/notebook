@@ -3,7 +3,7 @@
 // GET /api/shared?token=...&raw=1  -> 正文原始流：html→text/html、md→text/markdown、pdf→application/pdf
 //                                    （供分享模式的阅读器 iframe / viewer 同源加载，享完整阅读功能）
 import { hmacSign } from '../_lib/auth.js';
-import { ensureCoursesSchema } from '../_lib/db.js';
+import { ensureCoursesSchema, loadCourseText } from '../_lib/db.js';
 
 function b64urlDecode(s) {
   const b64 = s.replace(/-/g, '+').replace(/_/g, '/');
@@ -71,7 +71,7 @@ export async function onRequestGet({ request, env }) {
     if (isDynamic) {
       await ensureCoursesSchema(env);
       const row = await env.DB.prepare('SELECT html FROM courses WHERE file = ?').bind(file).first();
-      content = row ? row.html : null;
+      content = row ? await loadCourseText(env, file, row.html) : null;
     } else {
       const r = await env.ASSETS.fetch(new Request(url.origin + '/notes/' + encodeURIComponent(file)));
       content = r.ok ? await r.text() : null;
@@ -91,7 +91,7 @@ export async function onRequestGet({ request, env }) {
     return Response.json({
       kind: row.kind || kind, file,
       title: row.title || file, subject: row.subject || '',
-      content: row.kind === 'pdf' ? undefined : row.html,
+      content: row.kind === 'pdf' ? undefined : await loadCourseText(env, file, row.html),
     });
   }
 

@@ -9,6 +9,8 @@ const PUBLIC_PATHS = new Set([
   '/api/shared',                     // 只读分享取数（凭 token 自鉴权）
   '/viewer-md.html', '/viewer-md',   // md/pdf viewer 是空壳，正文由各自 src（分享时为 /api/shared）鉴权
   '/viewer-pdf.html', '/viewer-pdf',
+  '/drive-share.html', '/drive-share', // 云盘公开分享页（页面壳，正文由 /api/drive/shared 的 token 鉴权）
+  '/api/drive/shared',                 // 云盘分享取数（凭 token + 可选密码自鉴权）
 ]);
 
 export async function onRequest(context) {

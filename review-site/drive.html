@@ -8,7 +8,7 @@
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
   </script>
   <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613d">
-  <link rel="stylesheet" href="/assets/style.css?v=20260616a">
+  <link rel="stylesheet" href="/assets/style.css?v=20260616b">
 </head>
 <body class="drive-page">
   <header class="topbar">
@@ -25,10 +25,26 @@
   <main class="drive-main">
     <div class="drive-bar">
       <nav class="drive-crumbs" id="drive-crumbs" aria-label="路径"></nav>
-      <div class="drive-actions" id="drive-actions" hidden>
-        <button class="pill-btn" id="mkdir-btn"><span class="ic" data-icon="folderplus" data-icon-size="16"></span><span class="pill-label">新建文件夹</span></button>
-        <button class="pill-btn pill-primary" id="upload-btn"><span class="ic" data-icon="upload" data-icon-size="16"></span><span class="pill-label">上传</span></button>
-        <input type="file" id="file-input" multiple hidden>
+      <div class="drive-tools">
+        <div class="drive-search">
+          <span class="ic" data-icon="search" data-icon-size="16"></span>
+          <input type="search" id="drive-search-input" placeholder="搜索当前文件夹" autocomplete="off">
+        </div>
+        <div class="drive-sort">
+          <label for="drive-sort-key" class="sr-only">排序</label>
+          <select id="drive-sort-key" title="排序方式">
+            <option value="name">名称</option>
+            <option value="size">大小</option>
+            <option value="time">时间</option>
+          </select>
+          <button id="drive-sort-dir" class="di-btn" title="升序 / 降序" aria-label="切换升降序"><span class="ic" data-icon="arrowup" data-icon-size="16"></span></button>
+        </div>
+        <div class="drive-actions" id="drive-actions" hidden>
+          <button class="pill-btn" id="shares-btn" title="管理分享链接"><span class="ic" data-icon="link" data-icon-size="16"></span><span class="pill-label">管理分享</span></button>
+          <button class="pill-btn" id="mkdir-btn"><span class="ic" data-icon="folderplus" data-icon-size="16"></span><span class="pill-label">新建文件夹</span></button>
+          <button class="pill-btn pill-primary" id="upload-btn"><span class="ic" data-icon="upload" data-icon-size="16"></span><span class="pill-label">上传</span></button>
+          <input type="file" id="file-input" multiple hidden>
+        </div>
       </div>
     </div>
 
@@ -38,12 +54,76 @@
       <div class="drive-drop-hint" id="drive-drop-hint">松开鼠标即可上传到当前文件夹</div>
     </div>
 
-    <!-- 上传进度 -->
+    <div class="drive-foot" id="drive-foot"></div>
     <div class="drive-uploads" id="drive-uploads" hidden></div>
   </main>
 
-  <script src="/assets/icons.js?v=20260616a"></script>
+  <!-- 创建分享链接 -->
+  <div class="modal-overlay" id="share-modal" hidden>
+    <div class="modal">
+      <h3>创建分享链接</h3>
+      <p class="modal-hint" id="share-target"></p>
+      <div class="share-form" id="share-form">
+        <label class="field">
+          <span>有效期</span>
+          <select id="share-days">
+            <option value="7">7 天</option>
+            <option value="30" selected>30 天</option>
+            <option value="90">90 天</option>
+            <option value="365">365 天</option>
+            <option value="0">永不过期</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>访问密码（可选）</span>
+          <input type="text" id="share-pwd" placeholder="留空则无需密码" maxlength="40" autocomplete="off">
+        </label>
+        <label class="field">
+          <span>下载次数上限（可选）</span>
+          <input type="number" id="share-maxdl" placeholder="0 或留空 = 不限" min="0" max="100000" autocomplete="off">
+        </label>
+      </div>
+      <div class="share-result" id="share-result" hidden>
+        <span>分享链接已生成：</span>
+        <div class="share-link-row">
+          <input type="text" id="share-link" readonly>
+          <button class="btn-confirm" id="share-copy" type="button">复制</button>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-cancel" id="share-cancel" type="button">关闭</button>
+        <button class="btn-confirm" id="share-create" type="button">生成链接</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 管理分享 -->
+  <div class="modal-overlay" id="shares-modal" hidden>
+    <div class="modal review-modal-box">
+      <div class="rv-head">
+        <h3><span class="ic" data-icon="link" data-icon-size="18"></span> 已分享的链接</h3>
+        <button class="icon-btn" id="shares-close" title="关闭"><span class="ic" data-icon="close" data-icon-size="18"></span></button>
+      </div>
+      <div class="rv-body" id="shares-body"></div>
+    </div>
+  </div>
+
+  <!-- 文件预览 -->
+  <div class="modal-overlay" id="preview-modal" hidden>
+    <div class="preview-box">
+      <div class="preview-head">
+        <span class="preview-name" id="preview-name"></span>
+        <span class="preview-actions">
+          <a class="di-btn" id="preview-dl" title="下载"><span class="ic" data-icon="download" data-icon-size="18"></span></a>
+          <button class="icon-btn" id="preview-close" title="关闭"><span class="ic" data-icon="close" data-icon-size="18"></span></button>
+        </span>
+      </div>
+      <div class="preview-body" id="preview-body"></div>
+    </div>
+  </div>
+
+  <script src="/assets/icons.js?v=20260616b"></script>
   <script src="/assets/theme.js?v=20260608a"></script>
-  <script src="/assets/drive.js?v=20260616a"></script>
+  <script src="/assets/drive.js?v=20260616b"></script>
 </body>
 </html>

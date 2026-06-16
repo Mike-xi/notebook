@@ -1,7 +1,7 @@
 // 首页：加载课程（静态 courses.json + 用户创建的 /api/courses）+ 进度，渲染卡片
 // 并提供「创建课程」（上传 HTML 存入 D1）与删除动态课程的能力。
 
-const MAX_TEXT_BYTES = 1_500_000;   // html / md 存 D1
+const MAX_TEXT_BYTES = 25_000_000;   // html / md：≤1.4MB 存 D1，超过自动转存 R2，整体上限 25MB
 const MAX_PDF_BYTES = 20_000_000;   // pdf 存 R2
 const KIND_ICON = { html: '📘', md: '📝', pdf: '📕' };
 
@@ -749,7 +749,7 @@ function resetForm() {
   selectIcon('📘');
   selectCat('learn');
   setAIStatus('');
-  hint.textContent = '支持 HTML / Markdown（≤1.5 MB）或 PDF（≤20 MB）。选好文件后可让 AI 自动填充。';
+  hint.textContent = '支持 HTML / Markdown（≤25 MB，大网页自动转存）或 PDF（≤20 MB）。选好文件后可让 AI 自动填充。';
   hint.classList.remove('err');
 }
 function setHint(msg, isErr) { hint.textContent = msg; hint.classList.toggle('err', !!isErr); }

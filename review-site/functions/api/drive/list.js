@@ -22,9 +22,15 @@ export async function onRequestGet({ request, env }) {
      ORDER BY is_dir DESC, name COLLATE NOCASE ASC`
   ).bind(path).all();
 
+  // 全盘已用容量与文件数（个人规模，单次聚合即可）
+  const usage = await env.DB.prepare(
+    'SELECT COALESCE(SUM(size), 0) AS total, COUNT(*) AS files FROM drive_nodes WHERE is_dir = 0'
+  ).first();
+
   return Response.json({
     path,
     breadcrumb: breadcrumb(path),
+    usage: { total: usage?.total || 0, files: usage?.files || 0 },
     items: (results || []).map((r) => ({
       name: r.name,
       path: r.path,

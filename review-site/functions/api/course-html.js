@@ -2,7 +2,7 @@
 //   html：text/html（供 reader 的 iframe 直接加载）
 //   md  ：text/markdown（供 viewer-md 取回后客户端渲染）
 // pdf 不走这里（正文在 R2，用 /api/file）。鉴权由 _middleware.js 处理。
-import { ensureCoursesSchema } from '../_lib/db.js';
+import { ensureCoursesSchema, loadCourseText } from '../_lib/db.js';
 import { getRole } from '../_lib/auth.js';
 
 export async function onRequestGet({ request, env }) {
@@ -25,7 +25,8 @@ export async function onRequestGet({ request, env }) {
   }
 
   const isMd = row.kind === 'md';
-  return new Response(row.html, {
+  const content = await loadCourseText(env, file, row.html);
+  return new Response(content, {
     headers: {
       'Content-Type': isMd ? 'text/markdown; charset=utf-8' : 'text/html; charset=utf-8',
       'Cache-Control': 'private, max-age=0, must-revalidate',

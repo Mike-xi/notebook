@@ -34,6 +34,30 @@ export async function ensureCoursesSchema(env) {
   schemaReady = true;
 }
 
+// 课程正文（html/md）存储：小文本存 D1 courses.html 列；超过阈值改存 R2（key=file slug），
+// 列留空作为「正文在 R2」的标记。D1 单值上限 ~2MB，故大网页（自包含 HTML 等）必须走 R2。
+export const D1_TEXT_MAX = 1_400_000;
+
+// 写：返回应存入 courses.html 列的值（小文本=原文；大文本=''，正文已写 R2）。
+export async function storeCourseText(env, file, text) {
+  const bytes = new TextEncoder().encode(text).length;
+  if (bytes > D1_TEXT_MAX) {
+    const ctype = file.endsWith('.md') ? 'text/markdown; charset=utf-8' : 'text/html; charset=utf-8';
+    await env.FILES.put(file, text, { httpMetadata: { contentType: ctype } });
+    return '';
+  }
+  // 小文本入 D1；顺手清掉可能存在的旧 R2 副本（编辑后变小的情况）
+  try { await env.FILES.delete(file); } catch {}
+  return text;
+}
+
+// 读：列非空=正文在 D1；列为空=正文在 R2（按 file slug 取）。
+export async function loadCourseText(env, file, htmlCol) {
+  if (htmlCol && htmlCol.length) return htmlCol;
+  try { const obj = await env.FILES.get(file); return obj ? await obj.text() : ''; }
+  catch { return ''; }
+}
+
 // 云盘目录树：R2 存文件字节（drive/<随机key>），D1 记录目录结构与元数据。
 // path 为全路径（如 docs/sub/file.pdf），parent 为所在文件夹（'' 表示根），便于列目录与重命名/移动。
 let driveReady = false;
@@ -54,6 +78,26 @@ export async function ensureDriveSchema(env) {
   ).run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_drive_parent ON drive_nodes(parent)').run();
   driveReady = true;
+}
+
+// 云盘分享链接（有状态，可撤销/计数）：token 指向某个文件或文件夹，可设过期/密码/下载上限。
+let driveSharesReady = false;
+export async function ensureDriveSharesSchema(env) {
+  if (driveSharesReady) return;
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS drive_shares (
+       token       TEXT PRIMARY KEY,
+       path        TEXT NOT NULL,
+       is_dir      INTEGER NOT NULL DEFAULT 0,
+       name        TEXT NOT NULL,
+       pwd         TEXT NOT NULL DEFAULT '',
+       expires_at  INTEGER NOT NULL DEFAULT 0,
+       max_dl      INTEGER NOT NULL DEFAULT 0,
+       downloads   INTEGER NOT NULL DEFAULT 0,
+       created_at  INTEGER NOT NULL
+     )`
+  ).run();
+  driveSharesReady = true;
 }
 
 // 通用键值偏好表（单用户）。目前用于存课程显示顺序（key=course_order）。
