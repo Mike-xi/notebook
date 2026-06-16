@@ -251,6 +251,14 @@
         const res = await fetch('/api/courses', { method: 'POST', body: fd });
         const d = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(d.error || '创建失败');
+        if (d.pending) {
+          // 游客提交：进入审核队列，不再继续在线编辑（后续 PUT 编辑仅管理员可用）
+          localStorage.removeItem(DRAFT_KEY);
+          dirty = false;
+          setStatus('已提交，等待管理员审核');
+          setTimeout(() => { location.href = '/'; }, 1200);
+          return;
+        }
         file = d.file;
         history.replaceState(null, '', `/editor.html?file=${encodeURIComponent(file)}`);
         localStorage.removeItem(DRAFT_KEY);

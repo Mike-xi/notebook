@@ -9,7 +9,7 @@
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
   </script>
   <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613d">
-  <link rel="stylesheet" href="/assets/style.css?v=20260615a">
+  <link rel="stylesheet" href="/assets/style.css?v=20260616a">
 </head>
 <body class="home">
   <header class="topbar">
@@ -63,6 +63,7 @@
             </div>
           </div>
           <div class="sm-divider"></div>
+          <button class="sm-item" id="review-item" role="menuitem" style="display:none"><span class="sm-ic ic" data-icon="tray" data-icon-size="18"></span><span>内容审核</span><span class="sm-badge" id="review-badge" hidden>0</span></button>
           <button class="sm-item" id="about-btn" role="menuitem"><span class="sm-ic ic" data-icon="sparkle" data-icon-size="18"></span><span>关于</span></button>
           <button class="sm-item sm-danger" id="logout-btn" role="menuitem"><span class="sm-ic ic" data-icon="signout" data-icon-size="18"></span><span>退出登录</span></button>
         </div>
@@ -211,9 +212,21 @@
     </div>
   </div>
 
-  <script src="/assets/icons.js?v=20260614a"></script>
+  <!-- 内容审核（仅管理员可见入口）：通过/拒绝游客上传的待审稿件 -->
+  <div class="modal-overlay" id="review-modal" hidden>
+    <div class="modal review-modal-box">
+      <div class="rv-head">
+        <h3><span class="ic" data-icon="tray" data-icon-size="18"></span> 内容审核</h3>
+        <button class="icon-btn" id="review-close" title="关闭"><span class="ic" data-icon="close" data-icon-size="18"></span></button>
+      </div>
+      <p class="rv-tip">游客（一级 / 二级）上传的内容会先到这里。通过后进入课程列表，拒绝则删除。</p>
+      <div class="rv-body" id="review-body"></div>
+    </div>
+  </div>
+
+  <script src="/assets/icons.js?v=20260616a"></script>
   <script src="/assets/theme.js?v=20260608a"></script>
   <script src="/assets/md.js?v=20260608d"></script>
-  <script src="/assets/app.js?v=20260615b"></script>
+  <script src="/assets/app.js?v=20260616a"></script>
 </body>
 </html>

@@ -15,11 +15,17 @@ let totalCourses = 0;           // 课程总数（空状态判断用）
 let ncCat = 'learn';            // 创建课程时选择的分类
 let isAdmin = false;            // 当前账号是否为管理员（游客只能浏览/使用，不能增删改课程）
 
-// 根据角色显隐管理操作：游客隐藏「创建课程」，删除/拖拽手柄由 cardHTML 按 isAdmin 不渲染
+// 根据角色显隐管理操作：
+// - 「创建/上传」对所有登录用户开放（游客上传进审核队列）
+// - 删除/拖拽/编辑手柄仍由 cardHTML 按 isAdmin 不渲染（仅管理员）
+// - 「内容审核」入口仅管理员可见
 function applyRoleUI() {
   document.body.classList.toggle('is-guest', !isAdmin);
   const cb = document.getElementById('create-btn');
-  if (cb) cb.style.display = isAdmin ? '' : 'none';
+  if (cb) cb.style.display = '';
+  const rv = document.getElementById('review-item');
+  if (rv) rv.style.display = isAdmin ? '' : 'none';
+  if (isAdmin) loadPendingCount();
 }
 
 function detectKind(name) {
@@ -265,6 +271,97 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
   try { await fetch('/api/logout', { method: 'POST' }); } catch {}
   location.href = '/login.html';
 });
+
+// ========== 内容审核（仅管理员 / 三级） ==========
+const reviewModal = document.getElementById('review-modal');
+const reviewBody = document.getElementById('review-body');
+const reviewItem = document.getElementById('review-item');
+const reviewBadge = document.getElementById('review-badge');
+
+// 拉取待审数量，更新设置菜单上的角标
+async function loadPendingCount() {
+  if (!reviewBadge) return;
+  try {
+    const r = await fetch('/api/review');
+    if (!r.ok) return;
+    const d = await r.json();
+    const n = (d.pending || []).length;
+    reviewBadge.textContent = n > 99 ? '99+' : String(n);
+    reviewBadge.hidden = n === 0;
+  } catch {}
+}
+
+function openReview() {
+  closeSettings();
+  reviewModal.hidden = false;
+  loadReview();
+}
+
+async function loadReview() {
+  reviewBody.innerHTML = '<p class="rv-loading">加载中…</p>';
+  let data;
+  try {
+    const r = await fetch('/api/review');
+    data = await r.json();
+    if (!r.ok) throw new Error(data.error || '加载失败');
+  } catch (e) {
+    reviewBody.innerHTML = `<p class="rv-empty">⚠️ ${escapeHTML(e.message || '加载失败')}</p>`;
+    return;
+  }
+  const list = data.pending || [];
+  if (!list.length) {
+    reviewBody.innerHTML = '<p class="rv-empty">暂无待审核的内容 🎉</p>';
+    return;
+  }
+  const kindLabel = (k) => ({ html: 'HTML', md: 'Markdown', pdf: 'PDF' }[k] || k);
+  reviewBody.innerHTML = list.map((c) => {
+    const when = c.created_at ? new Date(c.created_at).toLocaleString('zh-CN', { hour12: false }) : '';
+    return `
+      <div class="rv-card" data-file="${escapeAttr(c.file)}">
+        <span class="rv-icon">${escapeHTML(c.icon || '📄')}</span>
+        <div class="rv-info">
+          <h4>${escapeHTML(c.title)}</h4>
+          <p class="rv-meta">${escapeHTML(c.subject || '未填学科')} · ${kindLabel(c.kind)} · ${escapeHTML(when)}</p>
+          ${c.description ? `<p class="rv-desc">${escapeHTML(c.description)}</p>` : ''}
+        </div>
+        <div class="rv-actions">
+          <a class="rv-btn rv-preview" href="/reader.html?file=${encodeURIComponent(c.file)}" target="_blank" rel="noopener">预览</a>
+          <button class="rv-btn rv-approve" data-file="${escapeAttr(c.file)}">通过</button>
+          <button class="rv-btn rv-reject" data-file="${escapeAttr(c.file)}">拒绝</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function reviewAction(file, action) {
+  try {
+    const r = await fetch('/api/review', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file, action }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || '操作失败');
+    toast(action === 'approve' ? '已通过，已加入课程' : '已拒绝并删除');
+    await loadReview();
+    await loadPendingCount();
+    if (action === 'approve') await loadAndRender();
+  } catch (e) {
+    alert(e.message || '操作失败，请重试');
+  }
+}
+
+if (reviewItem) reviewItem.addEventListener('click', openReview);
+if (reviewModal) {
+  reviewBody.addEventListener('click', (e) => {
+    const ap = e.target.closest('.rv-approve');
+    const rj = e.target.closest('.rv-reject');
+    if (ap) return reviewAction(ap.dataset.file, 'approve');
+    if (rj) { if (confirm('拒绝并删除这个提交？此操作不可恢复。')) reviewAction(rj.dataset.file, 'reject'); }
+  });
+  document.getElementById('review-close').addEventListener('click', () => { reviewModal.hidden = true; });
+  reviewModal.addEventListener('click', (e) => { if (e.target === reviewModal) reviewModal.hidden = true; });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !reviewModal.hidden) reviewModal.hidden = true; });
+}
 
 // ========== 全能问答（基于全部课程 + 日志，布局沿用课程内对话） ==========
 const omniPanel = document.getElementById('omni-panel');
@@ -637,6 +734,10 @@ const submitBtn = document.getElementById('nc-submit');
 
 function openModal() {
   resetForm();
+  // 游客上传需经管理员审核，提前告知
+  if (!isAdmin) {
+    hint.textContent = '游客上传的内容会进入审核队列，管理员（三级）通过后才会公开显示。';
+  }
   modal.hidden = false;
   document.getElementById('nc-title').focus();
 }
@@ -713,7 +814,12 @@ submitBtn.addEventListener('click', async () => {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || '创建失败');
     closeModal();
-    await loadAndRender();
+    if (data.pending) {
+      // 游客上传：进入审核队列，不会立即出现在列表，给出提示即可
+      toast('已提交，等待管理员审核');
+    } else {
+      await loadAndRender();
+    }
   } catch (e) {
     setHint(e.message || '创建失败，请重试', true);
   } finally {
@@ -878,8 +984,11 @@ function cardHTML(c, deletable = false) {
 
   const ic = (n, s) => (window.NBIcon ? NBIcon(n, { size: s }) : '');
 
+  // link 卡（如「云盘」）是固定入口，不提供删除/编辑，避免误隐藏
+  const isLinkCard = !!c.link;
+
   // 删除/编辑/拖动排序均为管理操作：游客（isAdmin=false）一律不渲染这些控件
-  const delBtn = (deletable && isAdmin)
+  const delBtn = (deletable && isAdmin && !isLinkCard)
     ? `<button class="nb-del" data-file="${escapeAttr(c.file)}" title="删除课程" aria-label="删除课程">${ic('close', 16)}</button>`
     : '';
 
@@ -899,8 +1008,11 @@ function cardHTML(c, deletable = false) {
     ? `<img class="nb-card-icon" src="${escapeAttr(iconStr)}" alt="" style="width:38px;height:38px;object-fit:contain;border-radius:9px">`
     : `<span class="nb-card-icon">${escapeHTML(iconStr)}</span>`;
 
+  // 普通课程进阅读器；link 卡（云盘）直接跳到目标页面
+  const href = c.link ? c.link : `/reader.html?file=${encodeURIComponent(c.file)}`;
+
   return `
-    <a class="nb-card" href="/reader.html?file=${encodeURIComponent(c.file)}"
+    <a class="nb-card" href="${escapeAttr(href)}"
        style="--accent: ${c.color || '#6750A4'}"
        data-file="${escapeAttr(c.file)}"
        data-category="${escapeAttr(c.category || 'learn')}"

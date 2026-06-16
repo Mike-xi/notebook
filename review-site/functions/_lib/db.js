@@ -16,17 +16,44 @@ export async function ensureCoursesSchema(env) {
        html        TEXT NOT NULL DEFAULT '',
        kind        TEXT NOT NULL DEFAULT 'html',
        category    TEXT NOT NULL DEFAULT 'learn',
+       status      TEXT NOT NULL DEFAULT 'approved',
        created_at  INTEGER NOT NULL
      )`
   ).run();
-  // 给历史表补 kind / category 列；若已存在会抛 duplicate column，忽略即可
+  // 给历史表补 kind / category / status 列；若已存在会抛 duplicate column，忽略即可
   try {
     await env.DB.prepare("ALTER TABLE courses ADD COLUMN kind TEXT NOT NULL DEFAULT 'html'").run();
   } catch {}
   try {
     await env.DB.prepare("ALTER TABLE courses ADD COLUMN category TEXT NOT NULL DEFAULT 'learn'").run();
   } catch {}
+  // status：approved=公开可见、pending=游客上传待管理员审核。历史数据默认 approved，不受影响
+  try {
+    await env.DB.prepare("ALTER TABLE courses ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'").run();
+  } catch {}
   schemaReady = true;
+}
+
+// 云盘目录树：R2 存文件字节（drive/<随机key>），D1 记录目录结构与元数据。
+// path 为全路径（如 docs/sub/file.pdf），parent 为所在文件夹（'' 表示根），便于列目录与重命名/移动。
+let driveReady = false;
+export async function ensureDriveSchema(env) {
+  if (driveReady) return;
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS drive_nodes (
+       id         INTEGER PRIMARY KEY AUTOINCREMENT,
+       parent     TEXT NOT NULL DEFAULT '',
+       name       TEXT NOT NULL,
+       path       TEXT NOT NULL UNIQUE,
+       is_dir     INTEGER NOT NULL DEFAULT 0,
+       size       INTEGER NOT NULL DEFAULT 0,
+       mime       TEXT NOT NULL DEFAULT '',
+       r2_key     TEXT NOT NULL DEFAULT '',
+       created_at INTEGER NOT NULL
+     )`
+  ).run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_drive_parent ON drive_nodes(parent)').run();
+  driveReady = true;
 }
 
 // 通用键值偏好表（单用户）。目前用于存课程显示顺序（key=course_order）。

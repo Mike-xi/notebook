@@ -7,7 +7,8 @@
 import { ensureCoursesSchema, ensurePrefsSchema, logEvent } from '../_lib/db.js';
 import { getRole } from '../_lib/auth.js';
 
-// 创建 / 编辑 / 删除课程都是管理操作：游客（只读）一律拒绝
+// 编辑 / 删除课程是管理操作：游客（只读）一律拒绝。
+// 上传创建则对所有登录用户开放——管理员（三级）直接上线，游客（一二级）进审核队列。
 const requireAdmin = async (request, env) => (await getRole(request, env)) === 'admin';
 const forbidden = () => Response.json({ error: '游客身份不能增删改课程' }, { status: 403 });
 
@@ -36,9 +37,10 @@ function detectKind(name, explicit) {
 
 export async function onRequestGet({ env }) {
   await ensureCoursesSchema(env);
+  // 仅返回已审核通过的课程；待审核（pending，游客上传）不出现在公开列表里
   const { results } = await env.DB.prepare(
     `SELECT file, title, subject, description, icon, color, tags, kind, category, created_at
-     FROM courses ORDER BY created_at DESC`
+     FROM courses WHERE status = 'approved' ORDER BY created_at DESC`
   ).all();
   const courses = (results || []).map((r) => ({
     file: r.file,
@@ -57,7 +59,9 @@ export async function onRequestGet({ env }) {
 }
 
 export async function onRequestPost({ request, env }) {
-  if (!(await requireAdmin(request, env))) return forbidden();
+  // 登录由中间件保证；管理员上传直接通过，游客上传进审核队列（pending）
+  const role = await getRole(request, env);
+  const status = role === 'admin' ? 'approved' : 'pending';
   await ensureCoursesSchema(env);
 
   const ct = request.headers.get('Content-Type') || '';
@@ -129,12 +133,12 @@ export async function onRequestPost({ request, env }) {
   const finalCategory = CATEGORIES.includes(meta.category) ? meta.category : 'learn';
 
   await env.DB.prepare(
-    `INSERT INTO courses (file, title, subject, description, icon, color, tags, html, kind, category, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).bind(file, title.slice(0, 80), finalSubject, finalDesc, finalIcon, finalColor, finalTags, contentText, kind, finalCategory, Date.now()).run();
+    `INSERT INTO courses (file, title, subject, description, icon, color, tags, html, kind, category, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(file, title.slice(0, 80), finalSubject, finalDesc, finalIcon, finalColor, finalTags, contentText, kind, finalCategory, status, Date.now()).run();
 
-  await logEvent(env, 'upload', `${kind} · ${title.slice(0, 60)}`);
-  return Response.json({ ok: true, file, kind });
+  await logEvent(env, status === 'pending' ? 'submit' : 'upload', `${kind} · ${title.slice(0, 60)}`);
+  return Response.json({ ok: true, file, kind, pending: status === 'pending' });
 }
 
 // PUT /api/courses {file, content?, title?, subject?, description?} —— 站内编辑器保存

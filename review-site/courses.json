@@ -97,5 +97,17 @@
     "kind": "html",
     "category": "play",
     "tags": ["三国杀", "卡牌", "桌游", "联机"]
+  },
+  {
+    "file": "drive",
+    "title": "云盘",
+    "subject": "资料库",
+    "description": "课程资料与共享文件 · 三级可上传/建文件夹/删除，一二级可浏览下载",
+    "icon": "🗂️",
+    "color": "#0EA5E9",
+    "kind": "html",
+    "category": "explore",
+    "link": "/drive.html",
+    "tags": ["云盘", "资料", "下载"]
   }
 ]

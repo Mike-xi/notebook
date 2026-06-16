@@ -3,6 +3,7 @@
 //   md  ：text/markdown（供 viewer-md 取回后客户端渲染）
 // pdf 不走这里（正文在 R2，用 /api/file）。鉴权由 _middleware.js 处理。
 import { ensureCoursesSchema } from '../_lib/db.js';
+import { getRole } from '../_lib/auth.js';
 
 export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
@@ -13,11 +14,15 @@ export async function onRequestGet({ request, env }) {
 
   let row;
   try {
-    row = await env.DB.prepare('SELECT html, kind FROM courses WHERE file = ?').bind(file).first();
+    row = await env.DB.prepare('SELECT html, kind, status FROM courses WHERE file = ?').bind(file).first();
   } catch {
     return new Response('not found', { status: 404 });
   }
   if (!row) return new Response('not found', { status: 404 });
+  // 待审核稿件只对管理员可见（供审核预览），游客即便拿到随机 slug 也读不到
+  if (row.status === 'pending' && (await getRole(request, env)) !== 'admin') {
+    return new Response('not found', { status: 404 });
+  }
 
   const isMd = row.kind === 'md';
   return new Response(row.html, {
