@@ -27,6 +27,8 @@ export async function onRequest(context) {
   if ((path === '/reader.html' || path === '/reader') && url.searchParams.has('share')) return next();
   // 私人云盘 WebDAV：/dav 由其函数自行做 Basic/管理员鉴权（外部客户端无法走登录页 Cookie 流程）。
   if (path === '/dav' || path.startsWith('/dav/')) return next();
+  // 公共云盘 Agent API：由其函数用 X-API-Key 自鉴权（脚本/agent 无登录 Cookie）。
+  if (path === '/api/drive/agent') return next();
 
   if (await isAuthenticated(request, env)) return next();
 

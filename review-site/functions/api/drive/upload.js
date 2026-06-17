@@ -5,7 +5,7 @@ import { getRole } from '../../_lib/auth.js';
 import { normPath, cleanName, joinPath, guessMime, newR2Key } from '../../_lib/drive.js';
 
 const MAX_BYTES = 100 * 1024 * 1024;        // 单文件上限 100MB（平台请求体上限附近）
-const DRIVE_QUOTA = 2 * 1024 * 1024 * 1024; // 公共云盘总空间上限 2GB（与前端 TOTAL_QUOTA 一致）
+const DRIVE_QUOTA = 8 * 1024 * 1024 * 1024; // 公共云盘总空间上限 8GB（与前端 TOTAL_QUOTA 一致）
 
 async function driveUsage(env) {
   const r = await env.DB.prepare('SELECT COALESCE(SUM(size),0) AS total FROM drive_nodes WHERE is_dir = 0').first();
@@ -43,10 +43,10 @@ export async function onRequestPost({ request, env }) {
   if (declaredLen && declaredLen > MAX_BYTES) {
     return Response.json({ error: `文件太大（${(declaredLen / 1e6).toFixed(1)} MB），上限 100 MB` }, { status: 413 });
   }
-  // 公共云盘 2GB 总容量限制（按已用 + 本次声明大小预判）
+  // 公共云盘 8GB 总容量限制（按已用 + 本次声明大小预判）
   const used = await driveUsage(env);
   if (declaredLen && used + declaredLen > DRIVE_QUOTA) {
-    return Response.json({ error: `公共云盘空间不足（已用 ${(used / 1073741824).toFixed(2)} GB / 上限 2 GB）` }, { status: 413 });
+    return Response.json({ error: `公共云盘空间不足（已用 ${(used / 1073741824).toFixed(2)} GB / 上限 8 GB）` }, { status: 413 });
   }
   if (!request.body) return Response.json({ error: '没有文件内容' }, { status: 400 });
 
@@ -65,7 +65,7 @@ export async function onRequestPost({ request, env }) {
   }
   if (used + size > DRIVE_QUOTA) {
     try { await env.FILES.delete(r2Key); } catch {}
-    return Response.json({ error: `公共云盘空间不足（已用 ${(used / 1073741824).toFixed(2)} GB / 上限 2 GB）` }, { status: 413 });
+    return Response.json({ error: `公共云盘空间不足（已用 ${(used / 1073741824).toFixed(2)} GB / 上限 8 GB）` }, { status: 413 });
   }
 
   const status = isAdmin ? 'approved' : 'pending';

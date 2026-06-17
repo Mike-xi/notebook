@@ -8,6 +8,7 @@
 import { getRole } from '../_lib/auth.js';
 
 const ROOT = 'xipan/';
+const XIPAN_QUOTA = 2 * 1024 * 1024 * 1024;   // Xi Pan 私人云盘总空间上限：2 GB
 const DAV = 'DAV: 1, 2';
 const ALLOW = 'OPTIONS, GET, HEAD, PUT, DELETE, PROPFIND, PROPPATCH, MKCOL, MOVE, COPY, LOCK, UNLOCK';
 
@@ -52,6 +53,10 @@ export async function onRequest(context) {
 }
 
 async function authed(request, env) {
+  // API 密钥（供 agent/脚本直接调用）：X-API-Key 或 Authorization: Bearer
+  const apiKey = request.headers.get('X-API-Key') ||
+    (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+  if (apiKey && env.XIPAN_API_KEY && apiKey === env.XIPAN_API_KEY) return true;
   // 站点管理员 Cookie
   try { if ((await getRole(request, env)) === 'admin') return true; } catch {}
   // HTTP Basic
@@ -151,14 +156,31 @@ async function getFile(env, rel, headOnly) {
   return new Response(headOnly ? null : obj.body, { status: 200, headers });
 }
 
+async function xipanUsage(env) {
+  let total = 0, cursor;
+  do {
+    const out = await env.FILES.list({ prefix: ROOT, cursor, limit: 1000 });
+    for (const o of (out.objects || [])) total += o.size || 0;   // 目录标记是 0 字节
+    cursor = out.truncated ? out.cursor : undefined;
+  } while (cursor);
+  return total;
+}
+
 async function putFile(env, request, rel) {
   if (!rel) return new Response('Bad target', { status: 400 });
   // 目标父目录如果是个文件则拒绝；同名目录存在也拒绝
   if (await env.FILES.head(dirKey(rel))) return new Response('Conflict: is a directory', { status: 409 });
   const existed = await env.FILES.head(keyOf(rel));
   // R2.put 需要已知长度：带 Content-Length 时直接流式直传（高效）；分块编码（无长度）时先缓冲。
-  const hasLen = request.headers.get('Content-Length') != null;
+  const clen = request.headers.get('Content-Length');
+  const hasLen = clen != null;
   const body = hasLen ? request.body : await request.arrayBuffer();
+  const newSize = hasLen ? (parseInt(clen, 10) || 0) : body.byteLength;
+  // 2GB 配额（覆盖同名文件时按差额计）
+  const usage = await xipanUsage(env);
+  if (usage - (existed?.size || 0) + newSize > XIPAN_QUOTA) {
+    return new Response('Insufficient Storage: Xi Pan 已满（上限 2 GB）', { status: 507 });
+  }
   await env.FILES.put(keyOf(rel), body, {
     httpMetadata: { contentType: request.headers.get('Content-Type') || 'application/octet-stream' },
   });

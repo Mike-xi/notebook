@@ -12,7 +12,7 @@
   let sortDir = parseInt(localStorage.getItem('nb-drive-dir'), 10) || 1;  // 1 升序 / -1 降序
   let searchTerm = '';
   let draggingPath = null;      // 内部拖拽（移动）中的源路径
-  const TOTAL_QUOTA = 2 * 1024 * 1024 * 1024;    // 公共云盘总空间上限：2 GB（私人云盘 Xi Pan 另算）
+  const TOTAL_QUOTA = 8 * 1024 * 1024 * 1024;    // 公共云盘总空间上限：8 GB（私人云盘 Xi Pan 另算，限 2 GB）
 
   const $ = (id) => document.getElementById(id);
   const listEl = $('drive-list');
