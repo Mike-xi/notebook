@@ -109,5 +109,17 @@
     "category": "explore",
     "link": "/drive.html",
     "tags": ["云盘", "资料", "下载"]
+  },
+  {
+    "file": "chatroom",
+    "title": "课程群聊",
+    "subject": "实时讨论",
+    "description": "和正在复习的同学一起聊天答疑 · 按设备区分身份，进来就能说话",
+    "icon": "💬",
+    "color": "#10B981",
+    "kind": "html",
+    "category": "explore",
+    "link": "/chat.html",
+    "tags": ["群聊", "讨论", "聊天室"]
   }
 ]

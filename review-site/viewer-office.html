@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Office 预览</title>
+  <!-- PPTX 渲染所需的样式（仅 pptx 时用得上，加载失败不影响 docx/xlsx） -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/meshesha/PPTXjs@master/css/pptxjs.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/meshesha/PPTXjs@master/css/nv.d3.min.css">
+  <style>
+    :root {
+      --of-bg:#f5f5f7; --of-fg:#1c1b1f; --of-muted:#5c5c66; --of-border:#d9d9e0;
+      --of-card:#fff; --of-accent:#6750A4;
+    }
+    body.dark {
+      --of-bg:#15171c; --of-fg:#e6e1e5; --of-muted:#9aa0a6; --of-border:#2c2f36;
+      --of-card:#1d2026; --of-accent:#D0BCFF;
+    }
+    * { box-sizing:border-box; }
+    [hidden] { display:none !important; }
+    html, body { margin:0; padding:0; }
+    body {
+      background:var(--of-bg); color:var(--of-fg);
+      font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height:1.7; transition:background-color .2s ease, color .2s ease;
+    }
+
+    /* docx：仿 Word 纸张 */
+    #docx-wrap { max-width:860px; margin:0 auto; padding:40px 24px 120px; }
+    #docx-paper {
+      background:var(--of-card); color:#222;
+      padding:56px 64px; border-radius:6px;
+      box-shadow:0 2px 14px rgba(0,0,0,.12);
+    }
+    body.dark #docx-paper { color:#222; }   /* Word 内容保持浅底黑字，护眼靠外层留白 */
+    #docx-paper img { max-width:100%; height:auto; }
+    #docx-paper table { border-collapse:collapse; }
+    #docx-paper td, #docx-paper th { border:1px solid #bbb; padding:4px 8px; }
+
+    /* xlsx：表格 + 工作表切换 */
+    #xlsx-wrap { padding:16px; }
+    #xlsx-tabs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; position:sticky; top:0; background:var(--of-bg); padding:8px 0; z-index:2; }
+    .xlsx-tab {
+      padding:6px 14px; border:1px solid var(--of-border); border-radius:999px;
+      background:var(--of-card); color:var(--of-fg); font-size:13px; cursor:pointer;
+    }
+    .xlsx-tab.active { background:var(--of-accent); color:#fff; border-color:transparent; }
+    #xlsx-sheet { overflow:auto; background:var(--of-card); border:1px solid var(--of-border); border-radius:8px; }
+    #xlsx-sheet table { border-collapse:collapse; font-size:13px; width:100%; }
+    #xlsx-sheet td, #xlsx-sheet th { border:1px solid var(--of-border); padding:5px 10px; white-space:nowrap; }
+    #xlsx-sheet tr:first-child td { background:color-mix(in srgb, var(--of-accent) 12%, var(--of-card)); font-weight:600; }
+
+    /* pptx：PPTXjs 渲染容器 */
+    #pptx-wrap { padding:24px 12px 120px; display:flex; flex-direction:column; align-items:center; gap:18px; }
+    #pptx-result { width:100%; max-width:1000px; }
+    /* PPTXjs 默认绝对定位每页，这里让各页之间垂直堆叠 */
+    #pptx-result .slide { margin:0 auto 18px; box-shadow:0 2px 12px rgba(0,0,0,.18); background:#fff; }
+
+    #of-loading {
+      position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+      flex-direction:column; gap:14px; color:var(--of-muted); font-size:14px; padding:24px; text-align:center;
+    }
+    .of-spin { width:20px; height:20px; border:2px solid currentColor; border-top-color:transparent; border-radius:50%; animation:ofspin .8s linear infinite; }
+    @keyframes ofspin { to { transform:rotate(360deg); } }
+    #of-fallback { display:none; flex-direction:column; align-items:center; gap:14px; }
+    #of-fallback a {
+      padding:10px 22px; border-radius:999px; background:var(--of-accent); color:#fff;
+      font-size:14px; font-weight:600; text-decoration:none;
+    }
+    .of-dim { font-size:12.5px; color:var(--of-muted); max-width:340px; line-height:1.6; }
+  </style>
+</head>
+<body>
+  <div id="docx-wrap" hidden><article id="docx-paper"></article></div>
+  <div id="xlsx-wrap" hidden><div id="xlsx-tabs"></div><div id="xlsx-sheet"></div></div>
+  <div id="pptx-wrap" hidden><div id="pptx-result"></div></div>
+
+  <div id="of-loading">
+    <div id="of-spinner" style="display:flex;flex-direction:column;align-items:center;gap:12px;">
+      <span class="of-spin"></span><span id="of-loading-text">正在解析文档…</span>
+    </div>
+    <div id="of-fallback">
+      <div>😕 这个文件没法在浏览器里直接预览</div>
+      <a id="of-download" href="#" download>下载原文件</a>
+      <div class="of-dim">复杂的排版/图表可能超出网页渲染器的能力，下载后用 Word / PowerPoint / WPS 打开效果最好。</div>
+    </div>
+  </div>
+
+  <script src="/assets/office-viewer.js?v=20260617a"></script>
+</body>
+</html>

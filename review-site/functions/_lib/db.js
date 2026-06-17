@@ -235,3 +235,36 @@ export async function ensureHighlightsSchema(env) {
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_highlights_file ON highlights(file)').run();
   hlReady = true;
 }
+
+// 大群聊：所有登录用户共用一个房间。按 client_id（客户端生成）区分用户，
+// ip_tag 是 IP 的短哈希（仅用于同网标识与配色，不存明文 IP）。保留约 7 天。
+let roomReady = false;
+export async function ensureChatRoomSchema(env) {
+  if (roomReady) return;
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS chat_room (
+       id         INTEGER PRIMARY KEY AUTOINCREMENT,
+       client_id  TEXT NOT NULL,
+       nick       TEXT NOT NULL DEFAULT '',
+       ip_tag     TEXT NOT NULL DEFAULT '',
+       text       TEXT NOT NULL,
+       created_at INTEGER NOT NULL
+     )`
+  ).run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_room_id ON chat_room(id)').run();
+  roomReady = true;
+}
+
+const ROOM_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;   // 保留约 7 天
+const ROOM_MAX_ROWS = 800;                            // 兜底总量上限
+// 以一定概率顺手清理过期/超量的群聊消息（serverless 友好，无需 cron）。失败吞掉。
+export async function pruneChatRoom(env) {
+  try {
+    if (Math.random() >= 0.12) return;
+    const now = Date.now();
+    await env.DB.prepare('DELETE FROM chat_room WHERE created_at < ?').bind(now - ROOM_RETENTION_MS).run();
+    await env.DB.prepare(
+      'DELETE FROM chat_room WHERE id NOT IN (SELECT id FROM chat_room ORDER BY id DESC LIMIT ?)'
+    ).bind(ROOM_MAX_ROWS).run();
+  } catch {}
+}

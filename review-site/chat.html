@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>课程群聊 · Xi Notebook</title>
+  <script>
+    (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
+  </script>
+  <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613d">
+  <link rel="stylesheet" href="/assets/style.css?v=20260617a">
+</head>
+<body class="room">
+  <header class="room-bar">
+    <a class="room-back" href="/" title="返回主页">←</a>
+    <div class="room-head">
+      <span class="room-title">💬 课程群聊</span>
+      <span class="room-sub" id="room-sub">大家一起讨论 · 按设备区分身份</span>
+    </div>
+    <button class="ghost-btn" id="room-nick-btn" title="设置我的昵称">🙂 我的昵称</button>
+  </header>
+
+  <main class="room-main" id="room-main">
+    <div class="room-empty" id="room-empty" hidden>还没有人发言，来说第一句吧 👋</div>
+    <div id="room-msgs"></div>
+  </main>
+
+  <form class="room-form" id="room-form">
+    <textarea id="room-input" rows="1" placeholder="说点什么…（Enter 发送，Shift+Enter 换行）" maxlength="800" autocomplete="off"></textarea>
+    <button type="submit" id="room-send" title="发送">↑</button>
+  </form>
+
+  <script src="/assets/theme.js?v=20260608a"></script>
+  <script src="/assets/chat.js?v=20260617a"></script>
+</body>
+</html>
