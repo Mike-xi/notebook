@@ -121,5 +121,17 @@
     "category": "explore",
     "link": "/chat.html",
     "tags": ["群聊", "讨论", "聊天室"]
+  },
+  {
+    "file": "live-room",
+    "title": "实时房间",
+    "subject": "点对点即时聊天",
+    "description": "P2P 实时聊天 · 开个房间把邀请链接发给同学就能聊，消息直连不经服务器、不留历史",
+    "icon": "📡",
+    "color": "#6750A4",
+    "kind": "html",
+    "category": "explore",
+    "link": "/chatroom-live.html",
+    "tags": ["实时", "P2P", "房间"]
   }
 ]
