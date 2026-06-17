@@ -111,27 +111,15 @@
     "tags": ["云盘", "资料", "下载"]
   },
   {
-    "file": "chatroom",
-    "title": "课程群聊",
-    "subject": "实时讨论",
-    "description": "和正在复习的同学一起聊天答疑 · 按设备区分身份，进来就能说话",
-    "icon": "💬",
-    "color": "#10B981",
+    "file": "board",
+    "title": "留言板",
+    "subject": "公共论坛",
+    "description": "自选昵称留言 · 人人可发、人人可见，像个小论坛。复习吐槽/答疑/找搭子都行",
+    "icon": "📝",
+    "color": "#F59E0B",
     "kind": "html",
     "category": "explore",
-    "link": "/chat.html",
-    "tags": ["群聊", "讨论", "聊天室"]
-  },
-  {
-    "file": "live-room",
-    "title": "实时房间",
-    "subject": "点对点即时聊天",
-    "description": "P2P 实时聊天 · 开个房间把邀请链接发给同学就能聊，消息直连不经服务器、不留历史",
-    "icon": "📡",
-    "color": "#6750A4",
-    "kind": "html",
-    "category": "explore",
-    "link": "/chatroom-live.html",
-    "tags": ["实时", "P2P", "房间"]
+    "link": "/board.html",
+    "tags": ["留言", "论坛", "讨论"]
   }
 ]

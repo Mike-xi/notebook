@@ -236,35 +236,32 @@ export async function ensureHighlightsSchema(env) {
   hlReady = true;
 }
 
-// 大群聊：所有登录用户共用一个房间。按 client_id（客户端生成）区分用户，
-// ip_tag 是 IP 的短哈希（仅用于同网标识与配色，不存明文 IP）。保留约 7 天。
-let roomReady = false;
-export async function ensureChatRoomSchema(env) {
-  if (roomReady) return;
+// 留言板（公共论坛）：所有登录用户共用一个版面，自选昵称留言、人人可见。
+// 存明文 IP + user-agent，仅管理员能看（前端按角色显隐，接口按角色返回）。
+let boardReady = false;
+export async function ensureBoardSchema(env) {
+  if (boardReady) return;
   await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS chat_room (
+    `CREATE TABLE IF NOT EXISTS board_messages (
        id         INTEGER PRIMARY KEY AUTOINCREMENT,
-       client_id  TEXT NOT NULL,
        nick       TEXT NOT NULL DEFAULT '',
-       ip_tag     TEXT NOT NULL DEFAULT '',
-       text       TEXT NOT NULL,
+       body       TEXT NOT NULL,
+       ip         TEXT NOT NULL DEFAULT '',
+       ua         TEXT NOT NULL DEFAULT '',
        created_at INTEGER NOT NULL
      )`
   ).run();
-  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_room_id ON chat_room(id)').run();
-  roomReady = true;
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_board_id ON board_messages(id)').run();
+  boardReady = true;
 }
 
-const ROOM_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;   // 保留约 7 天
-const ROOM_MAX_ROWS = 800;                            // 兜底总量上限
-// 以一定概率顺手清理过期/超量的群聊消息（serverless 友好，无需 cron）。失败吞掉。
-export async function pruneChatRoom(env) {
+const BOARD_MAX_ROWS = 5000;   // 论坛保留历史，仅设兜底总量上限防 D1 无限增长
+// 以一定概率顺手清理超量留言（serverless 友好，无需 cron）。失败吞掉。
+export async function pruneBoard(env) {
   try {
-    if (Math.random() >= 0.12) return;
-    const now = Date.now();
-    await env.DB.prepare('DELETE FROM chat_room WHERE created_at < ?').bind(now - ROOM_RETENTION_MS).run();
+    if (Math.random() >= 0.05) return;
     await env.DB.prepare(
-      'DELETE FROM chat_room WHERE id NOT IN (SELECT id FROM chat_room ORDER BY id DESC LIMIT ?)'
-    ).bind(ROOM_MAX_ROWS).run();
+      'DELETE FROM board_messages WHERE id NOT IN (SELECT id FROM board_messages ORDER BY id DESC LIMIT ?)'
+    ).bind(BOARD_MAX_ROWS).run();
   } catch {}
 }
