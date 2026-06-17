@@ -60,7 +60,8 @@ async function loadAndRender() {
   // 被删除的静态课程（courses.json 无法物理删除，按隐藏列表过滤）
   const hiddenSet = new Set(hidden);
   const courses = applyOrder([...staticCourses, ...dynamic], order)
-    .filter((c) => !hiddenSet.has(c.file));
+    .filter((c) => !hiddenSet.has(c.file))
+    .filter((c) => isAdmin || !c.adminOnly);   // 管理员专属课程（如 Xi Pan）对游客隐藏
 
   // 叠加「拖拽改分类」的覆盖（统一作用于静态/动态课程）
   for (const c of courses) {

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xi Pan · 私人云盘</title>
+  <style>
+    :root { --bg:#f3f4f6; --fg:#1c1b1f; --muted:#6b7280; --card:#fff; --border:#e3e6eb; --accent:#6750A4; --chip:#eef0f4; --danger:#dc2626; }
+    body.dark { --bg:#0f1115; --fg:#e6e1e5; --muted:#9aa0a6; --card:#1a1d23; --border:#2a2e36; --accent:#D0BCFF; --chip:#23262e; --danger:#f87171; }
+    * { box-sizing:border-box; }
+    [hidden] { display:none !important; }
+    html, body { margin:0; height:100%; }
+    body { background:var(--bg); color:var(--fg); display:flex; flex-direction:column; height:100vh;
+      font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
+    header { flex:0 0 auto; display:flex; align-items:center; gap:10px; padding:11px 14px; background:var(--card); border-bottom:1px solid var(--border); flex-wrap:wrap; }
+    header .back { text-decoration:none; color:var(--fg); font-size:20px; padding:4px 6px; border-radius:8px; }
+    header .back:hover { background:var(--chip); }
+    header .title { font-weight:700; font-size:16px; }
+    header .title small { font-weight:500; color:var(--muted); font-size:12px; margin-left:6px; }
+    header .sp { flex:1 1 auto; }
+    .btn { border:1px solid var(--border); background:var(--bg); color:var(--fg); border-radius:9px; padding:6px 12px; font-size:13px; cursor:pointer; }
+    .btn:hover { border-color:var(--accent); }
+    .btn.primary { background:var(--accent); color:#fff; border-color:transparent; }
+    .crumbs { flex:0 0 auto; display:flex; flex-wrap:wrap; gap:4px; align-items:center; padding:8px 14px; font-size:13px; color:var(--muted); background:var(--card); border-bottom:1px solid var(--border); }
+    .crumbs button { border:none; background:none; color:var(--accent); cursor:pointer; font-size:13px; padding:2px 4px; }
+    .crumbs .sep { color:var(--muted); }
+    #list { flex:1 1 auto; overflow-y:auto; padding:6px 0; }
+    .row { display:flex; align-items:center; gap:12px; padding:11px 16px; border-bottom:1px solid var(--border); }
+    .row:hover { background:var(--card); }
+    .row .ic { font-size:20px; width:24px; text-align:center; }
+    .row .nm { flex:1 1 auto; min-width:0; }
+    .row .nm button, .row .nm a { background:none; border:none; color:var(--fg); font-size:14.5px; cursor:pointer; text-decoration:none; padding:0; text-align:left; word-break:break-all; }
+    .row .nm .meta { display:block; font-size:11.5px; color:var(--muted); margin-top:2px; }
+    .row .acts { flex:0 0 auto; display:flex; gap:6px; }
+    .row .acts button { border:1px solid var(--border); background:none; color:var(--muted); border-radius:8px; padding:3px 9px; font-size:12px; cursor:pointer; }
+    .row .acts .del:hover { color:var(--danger); border-color:var(--danger); }
+    .empty, .loading { color:var(--muted); text-align:center; margin-top:48px; font-size:14px; padding:0 20px; line-height:1.7; }
+    footer { flex:0 0 auto; padding:8px 14px; background:var(--card); border-top:1px solid var(--border); font-size:11.5px; color:var(--muted); }
+    footer code { background:var(--chip); padding:1px 6px; border-radius:6px; font-size:11.5px; }
+    #drop-hint { position:fixed; inset:0; background:rgba(103,80,164,.12); border:3px dashed var(--accent); display:none; align-items:center; justify-content:center; font-size:18px; color:var(--accent); z-index:30; }
+    body.dragging #drop-hint { display:flex; }
+    .toast { position:fixed; left:50%; bottom:60px; transform:translateX(-50%); background:#111; color:#fff; padding:8px 16px; border-radius:999px; font-size:13px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:40; }
+    .toast.show { opacity:.92; }
+    #up-bar { position:fixed; left:50%; bottom:60px; transform:translateX(-50%); background:var(--card); border:1px solid var(--border); border-radius:10px; padding:8px 16px; font-size:13px; display:none; z-index:35; }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="back" href="/" title="返回">‹</a>
+    <div class="title">Xi Pan <small>私人云盘 · 仅管理员</small></div>
+    <span class="sp"></span>
+    <button class="btn" id="mkdir">新建文件夹</button>
+    <button class="btn primary" id="upload">上传</button>
+    <input type="file" id="file-input" multiple hidden>
+  </header>
+  <div class="crumbs" id="crumbs"></div>
+  <div id="list"><div class="loading" id="loading">加载中…</div></div>
+  <footer>多端挂载（仅管理员）：Windows「映射网络驱动器」到 <code id="dav-url">…/dav/</code>；iPhone 用 WebDAV App。用户名随意，密码=管理员密码。</footer>
+
+  <div id="drop-hint">松开以上传到当前文件夹</div>
+  <div id="up-bar"></div>
+  <div class="toast" id="toast"></div>
+
+  <script src="/assets/xipan.js?v=20260617c"></script>
+</body>
+</html>

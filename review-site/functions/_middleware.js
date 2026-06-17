@@ -25,6 +25,8 @@ export async function onRequest(context) {
   if (path.startsWith('/assets/') || path === '/favicon.ico') return next();
   // 只读分享：带 share token 的阅读器页面公开（仅是页面壳，正文由 /api/shared 的 token 鉴权）。
   if ((path === '/reader.html' || path === '/reader') && url.searchParams.has('share')) return next();
+  // 私人云盘 WebDAV：/dav 由其函数自行做 Basic/管理员鉴权（外部客户端无法走登录页 Cookie 流程）。
+  if (path === '/dav' || path.startsWith('/dav/')) return next();
 
   if (await isAuthenticated(request, env)) return next();
 

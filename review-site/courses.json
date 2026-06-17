@@ -121,5 +121,18 @@
     "category": "explore",
     "link": "/board.html",
     "tags": ["留言", "论坛", "讨论"]
+  },
+  {
+    "file": "xipan",
+    "title": "Xi Pan",
+    "subject": "私人云盘",
+    "description": "仅管理员可见的私人多端同步云盘 · 浏览器直接管理，Windows/iPhone 可走 WebDAV 挂载",
+    "icon": "🗄️",
+    "color": "#475569",
+    "kind": "html",
+    "category": "explore",
+    "link": "/xipan.html",
+    "adminOnly": true,
+    "tags": ["私人", "云盘", "WebDAV"]
   }
 ]
