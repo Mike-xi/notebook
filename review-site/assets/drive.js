@@ -262,16 +262,7 @@
     else if (kind === 'pdf' || kind === 'html') body.innerHTML = `<iframe src="${escapeAttr(url)}" title="${escapeAttr(name)}"></iframe>`;
     else if (kind === 'markdown') body.innerHTML = `<iframe src="/viewer-md.html?src=${encodeURIComponent(url)}" title="${escapeAttr(name)}"></iframe>`;
     else if (kind === 'code') body.innerHTML = `<iframe src="/viewer-code.html?src=${encodeURIComponent(url)}&name=${encodeURIComponent(name)}" title="${escapeAttr(name)}"></iframe>`;
-    else if (kind === 'office') {
-      // docx/pptx/xlsx 用本地前端渲染器（mammoth/SheetJS/PPTXjs），不外传任何第三方查看器；
-      // 旧式 .doc/.ppt/.xls 与 ODF(.odt/.odp/.ods) 浏览器无法可靠解析，仍走下载。
-      const e = extOf(name);
-      if (e === 'docx' || e === 'pptx' || e === 'xlsx') {
-        body.innerHTML = `<iframe src="/viewer-office.html?kind=${e}&src=${encodeURIComponent(url)}" title="${escapeAttr(name)}"></iframe>`;
-      } else {
-        body.innerHTML = `<div class="preview-none">旧版 / ODF 格式（${escapeHTML(e.toUpperCase())}）无法在浏览器里可靠渲染，建议另存为 .docx/.pptx/.xlsx 再上传，或下载后用本地软件打开。<br><br><a class="btn-confirm" href="${escapeAttr(dlUrl)}">下载文件</a></div>`;
-      }
-    }
+    else if (kind === 'office') body.innerHTML = `<iframe src="/viewer-office.html?src=${encodeURIComponent(url)}&name=${encodeURIComponent(name)}" title="${escapeAttr(name)}"></iframe>`;
     else body.innerHTML = `<div class="preview-none">该类型暂不支持预览。<br><br><a class="btn-confirm" href="${escapeAttr(dlUrl)}">下载文件</a></div>`;
     previewModal.hidden = false;
   }

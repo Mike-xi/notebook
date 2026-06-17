@@ -33,6 +33,7 @@
     if (['mp3', 'wav', 'm4a', 'flac', 'aac'].includes(e)) return 'audio';
     if (e === 'pdf') return 'pdf';
     if (['html', 'htm', 'txt', 'md', 'markdown', 'json', 'csv', 'log', 'xml'].includes(e)) return 'doc';
+    if (['docx', 'pptx', 'xlsx', 'xls', 'ods', 'xlsb', 'xlsm', 'ppt', 'doc', 'odt', 'odp'].includes(e)) return 'office';
     return null;
   }
 
@@ -96,6 +97,7 @@
     else if (kind === 'video') preview = `<video class="ds-prev" src="${escapeAttr(inlineUrl(''))}" controls></video>`;
     else if (kind === 'audio') preview = `<audio src="${escapeAttr(inlineUrl(''))}" controls></audio>`;
     else if (kind === 'pdf' || kind === 'doc') preview = `<iframe class="ds-prev" src="${escapeAttr(inlineUrl(''))}" title="预览"></iframe>`;
+    else if (kind === 'office') preview = `<iframe class="ds-prev" src="/viewer-office.html?src=${encodeURIComponent(inlineUrl(''))}&name=${encodeURIComponent(shareName)}" title="预览"></iframe>`;
     box.innerHTML = `
       <div class="ds-file-head">
         <span class="di-icon">${ic('file', 28)}</span>
