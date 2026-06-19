@@ -1,0 +1,8 @@
+(()=>{"use strict";
+/*!
+ *  電脳麻将: 牌画入力 v2.5.1
+ *
+ *  Copyright(C) 2017 Satoshi Kobayashi
+ *  Released under the MIT license
+ *  https://github.com/kobalab/Majiang/blob/master/LICENSE
+ */const e="https://kobalab.github.io/paiga/2/";function t(t,a,i){return t.replace(/\\.|{(.+?)}/g,(t,s)=>"\\"==t[0]?t.slice(1):function(t,a,i){let s,p='<span style="white-space:pre;">';for(let l of t.match(/[mpsz](?:\d\d\=|\d\-|\d)+|[ _]|.+/g)||[])if(" "==l)p+="&nbsp;";else if("_"==l)s=e+"pai.png",p+=`<img src="${s}" width="${a}" height="${i}" alt="${l}">`;else if(l.match(/^[mpsz](?:\d\d\=|\d\-|\d)+$/)){let t=l[0];for(let s of l.match(/\d\d\=|\d\-|\d/g)){let l,n,c=e;"="==s.slice(-1)?(c+=t+s.slice(0,2)+"_.png",l=i,n=2*a):"-"==s.slice(-1)?(c+=t+s.slice(0,1)+"_.png",l=i,n=a):(c+=t+s+".png",l=a,n=i),p+=`<img src="${c}" width="${l}" height="${n}" alt="${t+s}">`}}else p+=`<span style="color:red;">${l}</span>`;return p+="</span>",p}(s,a,i))}$(function(){$('textarea[name="text"]').val("このような記述ができます。\n{s067z1 z1}(ツモ) {p2-13} {z666=6} {_z77_} {  }(ドラ){m1}").focus(),$("form").on("submit",()=>{let[,e,a]=$('input[name="size"]:checked').val().match(/^(\d+)x(\d+)$/),i=t($('textarea[name="text"]').val(),e,a);return $(".paiga div").empty().append($(`<p  style="white-space:pre-line">${i}</p>`)),$(".paiga textarea").val(i).select(),!1}),$("form").on("reset",()=>{$(".paiga div").empty(),$(".paiga textarea").val(""),$('textarea[name="text"]').focus()})})})();

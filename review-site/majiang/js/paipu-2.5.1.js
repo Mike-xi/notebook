@@ -1,0 +1,8 @@
+(()=>{"use strict";
+/*!
+ *  電脳麻将: 牌譜ビューア v2.5.1
+ *
+ *  Copyright(C) 2017 Satoshi Kobayashi
+ *  Released under the MIT license
+ *  https://github.com/kobalab/Majiang/blob/master/LICENSE
+ */const{hide:a,show:e,fadeIn:o,scale:i}=Majiang.UI.Util;$(function(){const a="https://kobalab.net/majiang/tenhou-log/",e=Majiang.UI.pai($("#loaddata")),t=Majiang.UI.audio($("#loaddata")),l=Majiang.rule(JSON.parse(localStorage.getItem("Majiang.rule")||"{}"));let n,r;const s=a=>($("body").addClass("analyzer"),new Majiang.UI.Analyzer($("#board > .analyzer"),a,e,()=>$("body").removeClass("analyzer"))),d=a=>($("#board .controller").addClass("paipu"),$("body").attr("class","board"),i($("#board"),$("#space")),r=new Majiang.UI.Paipu($("#board"),a,e,t,"Majiang.pref",()=>{o($("body").attr("class","file")),r=null},s),r),c=a=>(o($("body").attr("class","stat")),new Majiang.UI.PaipuStat($("#stat"),a,()=>o($("body").attr("class","file")))),p=a=>($("#board .controller").addClass("paipu"),$("body").attr("class","board"),i($("#board"),$("#space")),r=new Majiang.UI.Paipu($("#board"),a,e,t,"Majiang.pref",()=>{o($("body").attr("class","editor")),r=null},s),delete r._view.dummy_name,r),b=(a,i)=>{new Majiang.UI.PaipuEditor($("#editor"),a,l,e,()=>{n.storage(!0),o($("body").attr("class","file"))},i,p),o($("body").attr("class","editor"))};n=location.search?new Majiang.UI.PaipuFile($("#file"),"Majiang.paipu",d,c,b,a,location.search.replace(/^\?/,""),location.hash.replace(/^#/,"")):new Majiang.UI.PaipuFile($("#file"),"Majiang.paipu",d,c,b,a),n.redraw(),$(window).on("resize",()=>i($("#board"),$("#space")))})})();
