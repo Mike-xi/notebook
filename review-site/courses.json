@@ -33,6 +33,18 @@
     "tags": ["物理", "大纲", "期末"]
   },
   {
+    "file": "dict",
+    "title": "英汉词典",
+    "subject": "英语",
+    "description": "收录 76 万词 · 牛津/柯林斯星级 · 音标发音 · 查词历史 + 单词本云端同步 · AI 词汇深度解析",
+    "icon": "📖",
+    "color": "#2563EB",
+    "kind": "html",
+    "category": "learn",
+    "link": "/dict.html",
+    "tags": ["英语", "词典", "查词", "单词本", "AI"]
+  },
+  {
     "file": "osiris.html",
     "title": "OSIRIS 全球情报大屏",
     "subject": "OSINT",

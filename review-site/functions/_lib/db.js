@@ -265,3 +265,46 @@ export async function pruneBoard(env) {
     ).bind(BOARD_MAX_ROWS).run();
   } catch {}
 }
+
+// 英汉词典：单词本（收藏）与查词历史，云端同步。owner=角色（admin/guest），各自一份。
+// 收藏存释义快照（音标 p / 简短中文 t），列表页无需再拉分片即可渲染。
+let dictReady = false;
+export async function ensureDictSchema(env) {
+  if (dictReady) return;
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS dict_favorites (
+       id         INTEGER PRIMARY KEY AUTOINCREMENT,
+       owner      TEXT NOT NULL DEFAULT 'guest',
+       word       TEXT NOT NULL,
+       p          TEXT NOT NULL DEFAULT '',
+       t          TEXT NOT NULL DEFAULT '',
+       created_at INTEGER NOT NULL,
+       UNIQUE(owner, word)
+     )`
+  ).run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_fav_owner ON dict_favorites(owner, created_at DESC)').run();
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS dict_history (
+       id         INTEGER PRIMARY KEY AUTOINCREMENT,
+       owner      TEXT NOT NULL DEFAULT 'guest',
+       word       TEXT NOT NULL,
+       created_at INTEGER NOT NULL,
+       UNIQUE(owner, word)
+     )`
+  ).run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_hist_owner ON dict_history(owner, created_at DESC)').run();
+  dictReady = true;
+}
+
+const HISTORY_MAX = 200;   // 每个 owner 仅保留最近 200 条查词历史
+// 以一定概率顺手裁剪超量历史。失败吞掉。
+export async function pruneDictHistory(env, owner) {
+  try {
+    if (Math.random() >= 0.1) return;
+    await env.DB.prepare(
+      `DELETE FROM dict_history WHERE owner = ? AND id NOT IN (
+         SELECT id FROM dict_history WHERE owner = ? ORDER BY created_at DESC LIMIT ?
+       )`
+    ).bind(owner, owner, HISTORY_MAX).run();
+  } catch {}
+}

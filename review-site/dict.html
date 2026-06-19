@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>英汉词典</title>
+  <style>
+    :root {
+      --bg:#f3f4f6; --fg:#1c1b1f; --muted:#6b7280; --card:#ffffff; --border:#e3e6eb;
+      --accent:#6750A4; --chip:#eef0f4; --danger:#dc2626; --gold:#e0a106; --green:#0a8f4f;
+    }
+    body.dark {
+      --bg:#0f1115; --fg:#e6e1e5; --muted:#9aa0a6; --card:#1a1d23; --border:#2a2e36;
+      --accent:#D0BCFF; --chip:#23262e; --danger:#f87171; --gold:#f0c64a; --green:#34d399;
+    }
+    * { box-sizing:border-box; }
+    [hidden] { display:none !important; }
+    html, body { margin:0; height:100%; }
+    body {
+      background:var(--bg); color:var(--fg); display:flex; flex-direction:column; height:100vh;
+      font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    }
+    header {
+      flex:0 0 auto; display:flex; align-items:center; gap:10px; padding:11px 14px;
+      background:var(--card); border-bottom:1px solid var(--border);
+    }
+    header .back { text-decoration:none; color:var(--fg); font-size:22px; line-height:1; padding:2px 8px; border-radius:8px; }
+    header .back:hover { background:var(--chip); }
+    header .title { font-weight:700; font-size:16px; flex:1 1 auto; }
+    header .title small { font-weight:500; color:var(--muted); font-size:12px; margin-left:6px; }
+
+    /* 搜索区 */
+    .search-wrap { flex:0 0 auto; background:var(--card); border-bottom:1px solid var(--border); padding:12px 14px; position:relative; z-index:30; }
+    .search-box { display:flex; gap:8px; align-items:center; max-width:760px; margin:0 auto; position:relative; }
+    #q {
+      flex:1 1 auto; border:1.5px solid var(--border); border-radius:14px; padding:12px 40px 12px 16px;
+      font-size:17px; background:var(--bg); color:var(--fg); font-family:inherit;
+    }
+    #q:focus { outline:none; border-color:var(--accent); }
+    .clear-q { position:absolute; right:74px; top:50%; transform:translateY(-50%); border:none; background:none; color:var(--muted); font-size:20px; cursor:pointer; padding:4px; line-height:1; }
+    #go {
+      flex:0 0 auto; border:none; border-radius:14px; padding:0 20px; height:46px; background:var(--accent);
+      color:#fff; font-size:16px; font-weight:600; cursor:pointer; font-family:inherit;
+    }
+    /* 联想下拉 */
+    .suggest {
+      position:absolute; left:0; right:0; top:calc(100% + 6px); background:var(--card);
+      border:1px solid var(--border); border-radius:14px; box-shadow:0 12px 32px rgba(0,0,0,.16);
+      max-height:min(56vh,420px); overflow-y:auto; padding:6px;
+    }
+    .suggest .s-item { display:flex; gap:10px; align-items:baseline; padding:9px 12px; border-radius:10px; cursor:pointer; }
+    .suggest .s-item:hover, .suggest .s-item.active { background:var(--chip); }
+    .suggest .s-w { font-weight:600; font-size:15px; flex:0 0 auto; }
+    .suggest .s-t { color:var(--muted); font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+    /* 选项卡 */
+    .tabs { flex:0 0 auto; display:flex; gap:4px; padding:8px 14px 0; background:var(--card); border-bottom:1px solid var(--border); max-width:760px; margin:0 auto; width:100%; }
+    .tab { border:none; background:none; color:var(--muted); font-size:14px; font-weight:600; padding:8px 12px 10px; cursor:pointer; border-bottom:2.5px solid transparent; font-family:inherit; }
+    .tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+    .tab .cnt { font-size:11px; color:var(--muted); margin-left:3px; }
+
+    /* 内容区 */
+    main { flex:1 1 auto; overflow-y:auto; }
+    .panel { max-width:760px; margin:0 auto; padding:16px 14px 40px; }
+    .placeholder { color:var(--muted); text-align:center; margin-top:48px; font-size:15px; line-height:1.9; }
+    .placeholder .big { font-size:40px; }
+    .quick-chips { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:14px; }
+    .quick-chips .qc { background:var(--chip); border:1px solid var(--border); border-radius:999px; padding:5px 13px; font-size:13px; cursor:pointer; color:var(--fg); }
+
+    /* 释义卡 */
+    .entry { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:18px 18px 16px; margin-bottom:14px; }
+    .entry .hw { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .entry .word { font-size:30px; font-weight:700; letter-spacing:.3px; }
+    .fav-btn { border:none; background:none; cursor:pointer; font-size:26px; line-height:1; color:var(--muted); padding:2px; }
+    .fav-btn.on { color:var(--gold); }
+    .phon { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:8px 0 4px; color:var(--muted); font-size:15px; }
+    .phon .ipa { font-family:"Times New Roman", "Cambria Math", serif; }
+    .spk { border:1px solid var(--border); background:var(--bg); border-radius:999px; padding:3px 11px; font-size:12.5px; cursor:pointer; color:var(--fg); display:inline-flex; gap:4px; align-items:center; }
+    .spk:hover { border-color:var(--accent); }
+    .badges { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0; align-items:center; }
+    .stars { color:var(--gold); font-size:15px; letter-spacing:1px; }
+    .badge { font-size:11.5px; border-radius:999px; padding:2px 9px; border:1px solid var(--border); color:var(--muted); }
+    .badge.exam { color:var(--accent); border-color:var(--accent); }
+    .badge.oxf { color:var(--green); border-color:var(--green); }
+    .badge.frq { color:var(--muted); }
+    .sense { margin-top:10px; }
+    .sense h4 { margin:0 0 5px; font-size:12.5px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+    .trans { font-size:16px; line-height:1.7; white-space:pre-wrap; word-break:break-word; }
+    .endef { font-size:14px; line-height:1.65; white-space:pre-wrap; color:var(--fg); opacity:.92; }
+    .forms { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+    .form { background:var(--chip); border-radius:8px; padding:4px 10px; font-size:12.5px; }
+    .form b { font-weight:600; color:var(--muted); margin-right:4px; font-weight:500; }
+    .form a { color:var(--accent); text-decoration:none; cursor:pointer; }
+    .multi-note { font-size:12.5px; color:var(--muted); margin:6px 0 0; }
+
+    /* AI 面板 */
+    .ai-bar { margin-top:6px; }
+    .ai-btn { border:1px solid var(--accent); color:var(--accent); background:none; border-radius:10px; padding:7px 14px; font-size:13.5px; font-weight:600; cursor:pointer; font-family:inherit; display:inline-flex; gap:6px; align-items:center; }
+    .ai-btn:hover { background:var(--chip); }
+    .ai-btn:disabled { opacity:.55; cursor:default; }
+    .ai-panel { margin-top:12px; border:1px solid var(--border); border-radius:14px; padding:4px 16px 12px; background:var(--bg); }
+    .ai-panel h2 { font-size:14px; color:var(--accent); margin:14px 0 6px; }
+    .ai-panel p { font-size:14px; line-height:1.7; margin:6px 0; }
+    .ai-panel li { font-size:14px; line-height:1.7; }
+    .ai-panel code { background:var(--chip); padding:1px 5px; border-radius:5px; font-size:13px; }
+    .spin { display:inline-block; width:14px; height:14px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* 列表（历史/单词本） */
+    .list-head { display:flex; align-items:center; margin-bottom:10px; }
+    .list-head .t { font-weight:600; font-size:14px; flex:1 1 auto; color:var(--muted); }
+    .list-head .clr { border:1px solid var(--border); background:none; color:var(--danger); border-radius:8px; padding:3px 12px; font-size:12.5px; cursor:pointer; font-family:inherit; }
+    .litem { display:flex; align-items:center; gap:10px; background:var(--card); border:1px solid var(--border); border-radius:12px; padding:11px 14px; margin-bottom:8px; cursor:pointer; }
+    .litem:hover { border-color:var(--accent); }
+    .litem .lw { font-weight:600; font-size:15.5px; }
+    .litem .lp { color:var(--muted); font-size:12.5px; font-family:serif; }
+    .litem .lt { color:var(--muted); font-size:13px; flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .litem .ltime { color:var(--muted); font-size:11.5px; flex:0 0 auto; }
+    .litem .rm { border:none; background:none; color:var(--muted); font-size:18px; cursor:pointer; padding:2px 4px; flex:0 0 auto; }
+    .litem .rm:hover { color:var(--danger); }
+    .list-empty { color:var(--muted); text-align:center; margin-top:40px; font-size:14px; }
+
+    .toast { position:fixed; left:50%; bottom:40px; transform:translateX(-50%); background:#111; color:#fff; padding:9px 18px; border-radius:999px; font-size:13.5px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:50; }
+    .toast.show { opacity:.94; }
+
+    @media (max-width:520px) {
+      .entry .word { font-size:26px; }
+      #q { font-size:16px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="back" href="/" title="返回">‹</a>
+    <div class="title">英汉词典 <small id="sub">牛津·柯林斯星级 · 收录全量词汇</small></div>
+  </header>
+
+  <div class="search-wrap">
+    <div class="search-box">
+      <input id="q" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+             placeholder="输入英文单词，如 comprehensive">
+      <button class="clear-q" id="clearq" hidden>×</button>
+      <button id="go">查词</button>
+      <div class="suggest" id="suggest" hidden></div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="result">释义</button>
+    <button class="tab" data-tab="history">历史<span class="cnt" id="hcnt"></span></button>
+    <button class="tab" data-tab="wordbook">单词本<span class="cnt" id="fcnt"></span></button>
+  </div>
+
+  <main>
+    <div class="panel" id="panel-result">
+      <div class="placeholder" id="welcome">
+        <div class="big">📖</div>
+        输入一个英文单词开始查询<br>
+        点 ★ 收藏到单词本，查词记录自动云端同步
+        <div class="quick-chips" id="quick"></div>
+      </div>
+      <div id="result"></div>
+    </div>
+
+    <div class="panel" id="panel-history" hidden>
+      <div class="list-head">
+        <div class="t">查词历史（最近 200 条 · 云端同步）</div>
+        <button class="clr" id="clrhist">清空</button>
+      </div>
+      <div id="histlist"></div>
+      <div class="list-empty" id="histempty" hidden>还没有查词记录</div>
+    </div>
+
+    <div class="panel" id="panel-wordbook" hidden>
+      <div class="list-head">
+        <div class="t">我的单词本（云端同步）</div>
+      </div>
+      <div id="favlist"></div>
+      <div class="list-empty" id="favempty" hidden>单词本还是空的，查词后点 ★ 收藏吧</div>
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/assets/dict.js?v=20260619b"></script>
+</body>
+</html>
