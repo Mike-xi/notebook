@@ -5,13 +5,8 @@
   const qEl = $('q'), goEl = $('go'), clearqEl = $('clearq'), suggestEl = $('suggest');
   const resultEl = $('result'), welcomeEl = $('welcome');
 
-  // 主题跟随站点
-  (function theme() {
-    let t = 'auto';
-    try { t = localStorage.getItem('nb-theme') || 'auto'; } catch {}
-    const dark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
-    document.body.classList.toggle('dark', dark);
-  })();
+  // 主题由全站 theme.js 统一管理（<html data-theme>），本页只需用一致的令牌即可。
+  const ICON = (n, s) => (window.NBIcon ? window.NBIcon(n, { size: s || 20 }) : '');
 
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   function toast(t) { const e = $('toast'); e.textContent = t; e.classList.add('show'); clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove('show'), 1800); }
@@ -82,7 +77,11 @@
   const TAG_LABEL = { zk: '中考', gk: '高考', cet4: '四级', cet6: '六级', ky: '考研', toefl: '托福', ielts: '雅思', gre: 'GRE' };
   function renderBadges(e) {
     const out = [];
-    if (e.c) out.push(`<span class="stars" title="柯林斯星级 ${e.c}/5">${'★'.repeat(e.c)}${'☆'.repeat(5 - e.c)}</span>`);
+    if (e.c) {
+      const filled = ICON('starfill', 15).repeat(e.c);
+      const empty = `<span class="empty">${ICON('star', 15).repeat(5 - e.c)}</span>`;
+      out.push(`<span class="stars" title="柯林斯星级 ${e.c}/5">${filled}${empty}</span>`);
+    }
     if (e.o) out.push(`<span class="badge oxf">牛津3000</span>`);
     if (e.g) e.g.split(/\s+/).forEach((t) => { if (TAG_LABEL[t]) out.push(`<span class="badge exam">${TAG_LABEL[t]}</span>`); });
     if (e.f) out.push(`<span class="badge frq">词频 #${e.f}</span>`);
@@ -97,13 +96,10 @@
     const isFav = favMap.has(word);
     let html = `<div class="entry">`;
     html += `<div class="hw"><span class="word">${esc(word)}</span>`;
-    html += `<button class="fav-btn ${isFav ? 'on' : ''}" id="favbtn" title="收藏到单词本">${isFav ? '★' : '☆'}</button></div>`;
-    if (head.p) {
-      html += `<div class="phon"><span class="ipa">/${esc(head.p)}/</span>`
-        + `<button class="spk" data-type="1">🔊 英</button><button class="spk" data-type="2">🔊 美</button></div>`;
-    } else {
-      html += `<div class="phon"><button class="spk" data-type="1">🔊 英</button><button class="spk" data-type="2">🔊 美</button></div>`;
-    }
+    html += `<button class="fav-btn ${isFav ? 'on' : ''}" id="favbtn" title="收藏到单词本">${ICON(isFav ? 'starfill' : 'star', 24)}</button></div>`;
+    const spk = `<button class="spk" data-type="1">${ICON('speaker', 15)}英</button><button class="spk" data-type="2">${ICON('speaker', 15)}美</button>`;
+    if (head.p) html += `<div class="phon"><span class="ipa">/${esc(head.p)}/</span>${spk}</div>`;
+    else html += `<div class="phon">${spk}</div>`;
     html += renderBadges(head);
 
     entries.forEach((e, idx) => {
@@ -113,7 +109,7 @@
       if (e.x) html += renderForms(e.x);
     });
 
-    html += `<div class="ai-bar"><button class="ai-btn" id="aibtn">✨ AI 深度解析</button></div>`;
+    html += `<div class="ai-bar"><button class="pill-btn" id="aibtn">${ICON('sparkle', 16)}<span class="pill-label">AI 深度解析</span></button></div>`;
     html += `<div class="ai-panel" id="aipanel" hidden></div>`;
     html += `</div>`;
     resultEl.innerHTML = html;
@@ -134,7 +130,7 @@
       const keys = Object.keys(shard).filter((k) => k.startsWith(lw)).slice(0, 8);
       if (keys.length) near = `<div class="quick-chips">${keys.map((k) => `<span class="qc" data-w="${esc(shard[k][0].w)}">${esc(shard[k][0].w)}</span>`).join('')}</div>`;
     }
-    resultEl.innerHTML = `<div class="placeholder"><div class="big">🔍</div>未收录 <b>${esc(word)}</b>${near ? '<br>你是不是要查：' : ''}${near}</div>`;
+    resultEl.innerHTML = `<div class="placeholder"><div class="big">${ICON('search', 42)}</div>未收录 <b>${esc(word)}</b>${near ? '<br>你是不是要查：' : ''}${near}</div>`;
     resultEl.querySelectorAll('.qc[data-w]').forEach((c) => c.addEventListener('click', () => lookup(c.dataset.w)));
   }
 
@@ -213,15 +209,15 @@
     const btn = $('favbtn');
     if (on) {
       favMap.delete(word);
-      if (btn) { btn.classList.remove('on'); btn.textContent = '☆'; }
+      if (btn) { btn.classList.remove('on'); btn.innerHTML = ICON('star', 24); }
       api('unfav', { word });
       toast('已移出单词本');
     } else {
       const snip = (head.t || '').split('\n').slice(0, 2).join(' ').slice(0, 80);
       favMap.set(word, { p: head.p || '', t: snip, created_at: Date.now() });
-      if (btn) { btn.classList.add('on'); btn.textContent = '★'; }
+      if (btn) { btn.classList.add('on'); btn.innerHTML = ICON('starfill', 24); }
       api('fav', { word, p: head.p || '', t: snip });
-      toast('已加入单词本 ★');
+      toast('已加入单词本');
     }
     updateCounts();
     renderFavList();
@@ -265,7 +261,7 @@
       `<div class="litem" data-w="${esc(w)}"><span class="lw">${esc(w)}</span>`
       + `<span class="lp">${v.p ? '/' + esc(v.p) + '/' : ''}</span>`
       + `<span class="lt">${esc(v.t || '')}</span>`
-      + `<button class="rm" data-rm="${esc(w)}" title="移出单词本">×</button></div>`).join('');
+      + `<button class="rm" data-rm="${esc(w)}" title="移出单词本">${ICON('close', 16)}</button></div>`).join('');
     wrap.querySelectorAll('.litem').forEach((it) => it.addEventListener('click', (e) => {
       if (e.target.closest('.rm')) return; lookup(it.dataset.w);
     }));
@@ -296,8 +292,8 @@
   async function runAI(word, head) {
     const btn = $('aibtn'), panel = $('aipanel');
     if (aiCache.has(word)) { showAI(aiCache.get(word)); return; }
-    btn.disabled = true; btn.innerHTML = '<span class="spin"></span> 分析中…';
-    panel.hidden = false; panel.innerHTML = '<p style="color:var(--muted)">AI 正在分析这个单词…</p>';
+    btn.disabled = true; btn.innerHTML = '<span class="spin"></span><span class="pill-label">分析中…</span>';
+    panel.hidden = false; panel.innerHTML = '<p class="muted">AI 正在分析这个单词…</p>';
     try {
       const r = await fetch('/api/dict-ai', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -305,9 +301,9 @@
       });
       const d = await r.json();
       if (r.ok && d.analysis) { aiCache.set(word, d.analysis); showAI(d.analysis); }
-      else { panel.innerHTML = `<p style="color:var(--danger)">${esc(d.error || 'AI 分析失败')}</p>`; }
-    } catch { panel.innerHTML = '<p style="color:var(--danger)">网络错误，请稍后再试</p>'; }
-    finally { btn.disabled = false; btn.innerHTML = '✨ AI 深度解析'; }
+      else { panel.innerHTML = `<p class="err">${esc(d.error || 'AI 分析失败')}</p>`; }
+    } catch { panel.innerHTML = '<p class="err">网络错误，请稍后再试</p>'; }
+    finally { btn.disabled = false; btn.innerHTML = ICON('sparkle', 16) + '<span class="pill-label">AI 深度解析</span>'; }
   }
 
   // ---------- 选项卡 ----------
