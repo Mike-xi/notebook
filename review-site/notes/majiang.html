@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>麻将 · 電脳麻将</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #0b3d24; color: #d8e6dc; }
+    .fallback {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 10px; text-align: center; padding: 24px;
+      font: 14px/1.6 system-ui, -apple-system, "Microsoft YaHei", sans-serif;
+    }
+    .fallback a { color: #7fd9a2; }
+    #mj-frame { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; background: #0b3d24; }
+  </style>
+</head>
+<body>
+  <div class="fallback">
+    <div>正在加载《電脳麻将》（日本立直麻将，单机自带 AI）…</div>
+    <div>若长时间空白，<a href="https://kobalab.net/majiang/" target="_blank" rel="noopener">点此在新标签页打开 ↗</a></div>
+    <div style="opacity:.7;font-size:12px">由 <a href="https://github.com/kobalab/Majiang" target="_blank" rel="noopener">kobalab/電脳麻将</a>（MIT）提供 · 中式玩法后续接入</div>
+  </div>
+  <iframe id="mj-frame"
+          src="https://kobalab.net/majiang/"
+          title="麻将 · 電脳麻将"
+          allow="fullscreen; autoplay; gamepad"
+          referrerpolicy="no-referrer"></iframe>
+</body>
+</html>

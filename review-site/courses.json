@@ -112,6 +112,17 @@
     "tags": ["象棋", "博弈AI", "联机", "Alpha-Beta"]
   },
   {
+    "file": "majiang.html",
+    "title": "麻将 · 電脳麻将",
+    "subject": "桌游",
+    "description": "日本立直麻将 · 单机自带 AI 对战（電脳麻将 kobalab，MIT）· 中式四川玩法后续接入",
+    "icon": "🀄",
+    "color": "#0b7a45",
+    "kind": "html",
+    "category": "play",
+    "tags": ["麻将", "立直", "桌游", "AI"]
+  },
+  {
     "file": "noname-cf.html",
     "title": "三国杀",
     "subject": "桌游",
