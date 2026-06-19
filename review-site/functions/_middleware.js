@@ -29,6 +29,8 @@ export async function onRequest(context) {
   if (path === '/dav' || path.startsWith('/dav/')) return next();
   // 公共云盘 Agent API：由其函数用 X-API-Key 自鉴权（脚本/agent 无登录 Cookie）。
   if (path === '/api/drive/agent') return next();
+  // 苹果比价刷新端点：由其函数用 X-API-Key 自鉴权（GitHub Actions cron 无登录 Cookie）。
+  if (path === '/api/apple/refresh') return next();
 
   if (await isAuthenticated(request, env)) return next();
 

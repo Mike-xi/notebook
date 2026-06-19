@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>苹果比价</title>
+  <!-- 防闪烁：渲染前先按 localStorage 定主题 -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('nb-theme') || 'auto';
+        var dark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      } catch (e) {}
+    })();
+  </script>
+  <style>
+    :root {
+      --bg:#f3f4f6; --fg:#1c1b1f; --muted:#6b7280; --card:#ffffff; --border:#e3e6eb;
+      --accent:#6750A4; --chip:#eef0f4; --danger:#dc2626; --down:#16a34a; --up:#dc2626;
+      --gold:#0a243b; --shadow:0 1px 3px rgba(0,0,0,.06),0 6px 18px rgba(0,0,0,.05);
+    }
+    :root[data-theme="dark"] {
+      --bg:#0f1115; --fg:#e6e1e5; --muted:#9aa0a6; --card:#1a1d23; --border:#2a2e36;
+      --accent:#D0BCFF; --chip:#23262e; --danger:#f87171; --down:#34d399; --up:#f87171;
+      --gold:#e6e1e5; --shadow:0 1px 3px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+    }
+    * { box-sizing:border-box; }
+    [hidden] { display:none !important; }
+    html, body { margin:0; }
+    body {
+      background:var(--bg); color:var(--fg); min-height:100vh;
+      font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    }
+    .ap-header {
+      position:sticky; top:0; z-index:10; display:flex; align-items:center; gap:10px; padding:11px 16px;
+      background:var(--card); border-bottom:1px solid var(--border);
+    }
+    .ap-header .ap-back { text-decoration:none; color:var(--fg); font-size:22px; line-height:1; padding:2px 8px; border-radius:8px; }
+    .ap-header .ap-back:hover { background:var(--chip); }
+    .ap-title { font-weight:700; font-size:17px; flex:1 1 auto; }
+    .ap-title small { font-weight:500; color:var(--muted); font-size:12px; margin-left:8px; }
+    .ap-btn {
+      border:1px solid var(--border); background:var(--card); color:var(--fg); border-radius:10px;
+      padding:7px 13px; font-size:13px; cursor:pointer; font-family:inherit; white-space:nowrap;
+    }
+    .ap-btn:hover { border-color:var(--accent); }
+    .ap-btn.ap-primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .ap-btn:disabled { opacity:.5; cursor:default; }
+    .ap-admin-flag { font-size:11.5px; color:var(--accent); border:1px solid var(--accent); border-radius:999px; padding:2px 9px; }
+
+    .ap-wrap { max-width:1100px; margin:0 auto; padding:16px 16px 60px; }
+
+    /* AI 预算顾问 */
+    .ap-advisor {
+      background:linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, var(--card)), var(--card));
+      border:1px solid var(--border); border-radius:18px; padding:16px 18px; margin-bottom:18px; box-shadow:var(--shadow);
+    }
+    .ap-advisor h2 { margin:0 0 4px; font-size:16px; display:flex; align-items:center; gap:8px; }
+    .ap-advisor .ap-sub { color:var(--muted); font-size:12.5px; margin-bottom:12px; }
+    .ap-adv-form { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+    .ap-field { display:flex; flex-direction:column; gap:4px; }
+    .ap-field label { font-size:12px; color:var(--muted); }
+    .ap-field input, .ap-field select {
+      border:1px solid var(--border); border-radius:10px; padding:9px 11px; font-size:14px;
+      background:var(--bg); color:var(--fg); font-family:inherit;
+    }
+    .ap-field input:focus, .ap-field select:focus { outline:none; border-color:var(--accent); }
+    #ap-budget { width:140px; }
+    #ap-prefer { width:200px; }
+    .ap-adv-result { margin-top:14px; }
+    .ap-adv-summary { font-size:14.5px; font-weight:600; margin-bottom:10px; }
+    .ap-picks { display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
+    .ap-pick {
+      display:flex; align-items:center; gap:10px; background:var(--card); border:1px solid var(--border);
+      border-radius:12px; padding:9px 12px;
+    }
+    .ap-pick .ap-verdict { font-size:11.5px; font-weight:700; border-radius:999px; padding:3px 10px; white-space:nowrap; }
+    .ap-verdict.v-立即 { background:var(--down); color:#fff; }
+    .ap-verdict.v-可买 { background:var(--accent); color:#fff; }
+    .ap-verdict.v-再等 { background:var(--chip); color:var(--muted); }
+    .ap-pick .ap-pick-name { font-weight:600; font-size:14px; }
+    .ap-pick .ap-pick-price { color:var(--accent); font-weight:700; }
+    .ap-pick .ap-pick-reason { color:var(--muted); font-size:12.5px; flex:1 1 100%; margin-top:2px; }
+    .ap-timing { display:flex; flex-direction:column; gap:0; border-left:2px solid var(--border); padding-left:14px; margin-left:6px; }
+    .ap-timing .ap-tw { position:relative; padding:6px 0; }
+    .ap-timing .ap-tw::before { content:""; position:absolute; left:-19px; top:11px; width:9px; height:9px; border-radius:50%; background:var(--accent); }
+    .ap-timing .ap-tw b { font-size:13.5px; }
+    .ap-timing .ap-tw span { color:var(--muted); font-size:12.5px; margin-left:8px; }
+    .ap-adv-note { font-size:12px; color:var(--muted); margin-top:10px; }
+    .ap-tag-src { font-size:11px; color:var(--muted); border:1px solid var(--border); border-radius:999px; padding:1px 8px; margin-left:8px; }
+
+    /* 分类 tabs */
+    .ap-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+    .ap-tab {
+      border:1px solid var(--border); background:var(--card); color:var(--fg); border-radius:999px;
+      padding:6px 16px; font-size:13.5px; cursor:pointer; font-family:inherit;
+    }
+    .ap-tab.active { background:var(--fg); color:var(--bg); border-color:var(--fg); }
+
+    /* 产品网格 */
+    .ap-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:14px; }
+    .ap-card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:15px 16px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:9px; }
+    .ap-card .ap-name { font-weight:650; font-size:14.5px; line-height:1.35; }
+    .ap-card .ap-priceline { display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; }
+    .ap-card .ap-price { font-size:23px; font-weight:750; color:var(--fg); }
+    .ap-card .ap-price small { font-size:13px; font-weight:600; color:var(--muted); }
+    .ap-change { font-size:12px; font-weight:650; border-radius:999px; padding:2px 9px; }
+    .ap-change.down { color:var(--down); background:color-mix(in srgb, var(--down) 14%, transparent); }
+    .ap-change.up { color:var(--up); background:color-mix(in srgb, var(--up) 14%, transparent); }
+    .ap-change.flat { color:var(--muted); background:var(--chip); }
+    .ap-spark { width:100%; height:40px; display:block; }
+    .ap-rangebar { height:8px; border-radius:999px; background:linear-gradient(90deg,var(--down),#eab308,var(--up)); position:relative; margin:2px 0 4px; }
+    .ap-rangebar .ap-knob { position:absolute; top:50%; width:12px; height:12px; border-radius:50%; background:var(--card); border:2px solid var(--fg); transform:translate(-50%,-50%); }
+    .ap-stats { display:flex; gap:12px; flex-wrap:wrap; font-size:11.5px; color:var(--muted); }
+    .ap-stats b { color:var(--fg); font-weight:600; }
+    .ap-links { display:flex; gap:6px; flex-wrap:wrap; margin-top:2px; }
+    .ap-link {
+      text-decoration:none; font-size:11.5px; color:var(--fg); border:1px solid var(--border);
+      border-radius:8px; padding:4px 9px; background:var(--bg);
+    }
+    .ap-link:hover { border-color:var(--accent); color:var(--accent); }
+    .ap-third { display:flex; flex-direction:column; gap:4px; margin-top:2px; }
+    .ap-third .ap-tp { display:flex; align-items:center; gap:8px; font-size:12px; }
+    .ap-third .ap-tp .ch { color:var(--accent); font-weight:600; }
+    .ap-third .ap-tp .pr { font-weight:650; }
+    .ap-third .ap-tp .note { color:var(--muted); }
+    .ap-card .ap-admin-row { display:flex; gap:6px; flex-wrap:wrap; margin-top:4px; border-top:1px dashed var(--border); padding-top:8px; }
+    .ap-mini { font-size:11px; padding:3px 8px; border-radius:7px; border:1px solid var(--border); background:none; color:var(--muted); cursor:pointer; font-family:inherit; }
+    .ap-mini:hover { border-color:var(--accent); color:var(--accent); }
+    .ap-mini.del:hover { border-color:var(--danger); color:var(--danger); }
+
+    .ap-empty { color:var(--muted); text-align:center; padding:48px 0; font-size:14px; }
+    .ap-srcline { color:var(--muted); font-size:11.5px; margin:6px 0 16px; }
+
+    /* modal */
+    .ap-mask { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:50; padding:18px; }
+    .ap-modal { background:var(--card); border:1px solid var(--border); border-radius:18px; padding:18px 20px; max-width:640px; width:100%; max-height:88vh; overflow:auto; box-shadow:var(--shadow); }
+    .ap-modal h3 { margin:0 0 4px; font-size:16px; }
+    .ap-modal .ap-mtitle { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    .ap-modal .ap-x { border:none; background:none; color:var(--muted); font-size:22px; cursor:pointer; line-height:1; }
+    .ap-chart { width:100%; height:240px; display:block; }
+    .ap-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .ap-form-grid .full { grid-column:1 / -1; }
+    .ap-form-grid label { font-size:12px; color:var(--muted); display:block; margin-bottom:3px; }
+    .ap-form-grid input, .ap-form-grid select {
+      width:100%; border:1px solid var(--border); border-radius:10px; padding:9px 11px; font-size:14px;
+      background:var(--bg); color:var(--fg); font-family:inherit;
+    }
+    .ap-modal .ap-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
+
+    .ap-spinner { width:16px; height:16px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; display:inline-block; animation:apspin .7s linear infinite; vertical-align:-3px; }
+    @keyframes apspin { to { transform:rotate(360deg); } }
+    .ap-toast { position:fixed; left:50%; bottom:40px; transform:translateX(-50%); background:#111; color:#fff; padding:9px 18px; border-radius:999px; font-size:13px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:80; }
+    .ap-toast.show { opacity:.93; }
+
+    @media (max-width:560px){ .ap-grid{ grid-template-columns:1fr; } .ap-form-grid{ grid-template-columns:1fr; } #ap-prefer{ width:160px; } }
+  </style>
+</head>
+<body>
+  <header class="ap-header">
+    <a class="ap-back" href="/" title="返回">‹</a>
+    <div class="ap-title">苹果比价 <small id="ap-refreshed">加载中…</small></div>
+    <span class="ap-admin-flag" id="ap-admin-flag" hidden>管理员</span>
+    <button class="ap-btn" id="ap-add-btn" hidden>＋ 录入产品</button>
+    <button class="ap-btn" id="ap-refresh-btn" hidden>↻ 抓取刷新</button>
+  </header>
+
+  <div class="ap-wrap">
+    <!-- AI 预算顾问 -->
+    <section class="ap-advisor">
+      <h2>🤖 AI 预算顾问</h2>
+      <div class="ap-sub">告诉我你的预算，结合真实价格走势与苹果发布/大促周期，帮你判断<strong>买什么</strong>、以及<strong>什么时段出手最划算</strong>。</div>
+      <div class="ap-adv-form">
+        <div class="ap-field">
+          <label for="ap-budget">预算（元）</label>
+          <input id="ap-budget" type="number" min="0" step="100" placeholder="如 6000">
+        </div>
+        <div class="ap-field">
+          <label for="ap-cat-sel">想买</label>
+          <select id="ap-cat-sel">
+            <option value="">不限分类</option>
+            <option value="iphone">iPhone</option>
+            <option value="ipad">iPad</option>
+            <option value="mac">Mac</option>
+            <option value="watch">Apple Watch</option>
+            <option value="airpods">AirPods</option>
+          </select>
+        </div>
+        <div class="ap-field">
+          <label for="ap-prefer">偏好（可选）</label>
+          <input id="ap-prefer" type="text" placeholder="如 拍照好 / 轻便 / 续航">
+        </div>
+        <button class="ap-btn ap-primary" id="ap-analyze">分析</button>
+      </div>
+      <div class="ap-adv-result" id="ap-adv-result" hidden></div>
+    </section>
+
+    <div class="ap-tabs" id="ap-tabs"></div>
+    <div class="ap-srcline" id="ap-srcline"></div>
+    <div class="ap-grid" id="ap-grid"></div>
+    <div class="ap-empty" id="ap-empty" hidden></div>
+  </div>
+
+  <div class="ap-toast" id="ap-toast"></div>
+  <div id="ap-modal-root"></div>
+
+  <script src="/assets/apple.js?v=20260619a"></script>
+</body>
+</html>

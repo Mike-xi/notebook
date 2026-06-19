@@ -308,3 +308,69 @@ export async function pruneDictHistory(env, owner) {
     ).bind(owner, owner, HISTORY_MAX).run();
   } catch {}
 }
+
+// 苹果比价：每日抓太平洋电脑网(pconline)各分类参考价 + 记录价格变化历史 + 管理员手动第三方价。
+//  apple_products：当前在售产品当前价。source=pconline（自动抓）/manual（管理员手录，抓取不覆盖）。
+//  apple_history：每当某产品价格变化（或首次出现）记一条，做趋势折线/降涨标记/AI 出手时段分析。
+//  apple_third：管理员手动维护的第三方渠道价（淘宝/京东/拼多多），按 (name,channel) 唯一。
+let appleReady = false;
+export async function ensureAppleSchema(env) {
+  if (appleReady) return;
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS apple_products (
+       id         INTEGER PRIMARY KEY AUTOINCREMENT,
+       category   TEXT NOT NULL DEFAULT 'iphone',
+       name       TEXT NOT NULL UNIQUE,
+       price      INTEGER NOT NULL DEFAULT 0,
+       url        TEXT NOT NULL DEFAULT '',
+       source     TEXT NOT NULL DEFAULT 'pconline',
+       sort       INTEGER NOT NULL DEFAULT 0,
+       updated_at INTEGER NOT NULL
+     )`
+  ).run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_apple_cat ON apple_products(category, sort)').run();
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS apple_history (
+       id    INTEGER PRIMARY KEY AUTOINCREMENT,
+       name  TEXT NOT NULL,
+       price INTEGER NOT NULL,
+       ts    INTEGER NOT NULL
+     )`
+  ).run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_apple_hist ON apple_history(name, ts)').run();
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS apple_third (
+       name       TEXT NOT NULL,
+       channel    TEXT NOT NULL,
+       price      INTEGER NOT NULL DEFAULT 0,
+       url        TEXT NOT NULL DEFAULT '',
+       note       TEXT NOT NULL DEFAULT '',
+       updated_at INTEGER NOT NULL,
+       PRIMARY KEY (name, channel)
+     )`
+  ).run();
+  appleReady = true;
+}
+
+const APPLE_HISTORY_MAX_PER = 400;   // 每个产品最多保留 400 条价格历史点（兜底防膨胀）
+// 记录一次价格观测：仅当与该产品最近一条历史价不同（或首次）才写入，避免每日重复点。
+// 返回 'new' | 'down' | 'up' | 'same'（相对上一价的变化方向，供调用方统计）。
+export async function recordApplePrice(env, name, price) {
+  try {
+    const last = await env.DB.prepare(
+      'SELECT price FROM apple_history WHERE name = ? ORDER BY ts DESC LIMIT 1'
+    ).bind(name).first();
+    if (last && last.price === price) return 'same';
+    await env.DB.prepare('INSERT INTO apple_history (name, price, ts) VALUES (?, ?, ?)')
+      .bind(name, price, Date.now()).run();
+    if (Math.random() < 0.1) {
+      await env.DB.prepare(
+        `DELETE FROM apple_history WHERE name = ? AND id NOT IN (
+           SELECT id FROM apple_history WHERE name = ? ORDER BY ts DESC LIMIT ?
+         )`
+      ).bind(name, name, APPLE_HISTORY_MAX_PER).run();
+    }
+    if (!last) return 'new';
+    return price < last.price ? 'down' : 'up';
+  } catch { return 'same'; }
+}

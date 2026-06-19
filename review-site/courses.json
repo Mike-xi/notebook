@@ -45,6 +45,18 @@
     "tags": ["英语", "词典", "查词", "单词本", "AI"]
   },
   {
+    "file": "apple",
+    "title": "苹果比价",
+    "subject": "购物",
+    "description": "iPhone/Mac/Watch 全系参考价 · 每日抓取 + 价格走势可视化 · AI 预算顾问帮你算「买什么、什么时段出手最划算」",
+    "icon": "🍎",
+    "color": "#A2AAAD",
+    "kind": "html",
+    "category": "explore",
+    "link": "/apple.html",
+    "tags": ["苹果", "比价", "价格走势", "AI顾问", "购物"]
+  },
+  {
     "file": "osiris.html",
     "title": "OSIRIS 全球情报大屏",
     "subject": "OSINT",
