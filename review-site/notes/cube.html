@@ -47,9 +47,18 @@
   .bg-sw:hover{transform:scale(1.08)} .bg-sw.on{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 30%,transparent)}
   /* 控制区（悬浮在 3D 舞台上，不占独立白框） */
   .controls{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:35;
-    display:flex;flex-direction:column;gap:8px;align-items:center;max-width:calc(100vw - 20px);
-    padding:9px 12px calc(9px + env(safe-area-inset-bottom));border-radius:18px;
-    background:rgba(16,20,30,.44);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);box-shadow:0 10px 34px rgba(0,0,0,.42)}
+    display:flex;flex-direction:column;gap:7px;align-items:center;max-width:calc(100vw - 20px);
+    padding:7px 12px calc(9px + env(safe-area-inset-bottom));border-radius:18px;
+    background:rgba(16,20,30,.46);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);box-shadow:0 10px 34px rgba(0,0,0,.42)}
+  .ctrl-head{display:flex;align-items:center;gap:8px;width:100%;cursor:grab;touch-action:none;user-select:none}
+  .ctrl-head:active{cursor:grabbing}
+  .grip{color:#aab4c5;font-size:13px;letter-spacing:-3px;line-height:1}
+  .ctrl-title{flex:1;color:#cdd6e6;font-size:12px;font-weight:700;text-align:center}
+  .ctrl-toggle{border:0;background:rgba(255,255,255,.16);color:#e7edf7;border-radius:999px;padding:4px 11px;font-size:12px;font-weight:700;cursor:pointer}
+  .ctrl-toggle:hover{background:rgba(255,255,255,.26)}
+  .ctrl-body{display:flex;flex-direction:column;gap:8px;align-items:center}
+  .controls.collapsed{padding:6px 10px calc(6px + env(safe-area-inset-bottom))}
+  .controls.collapsed .ctrl-body{display:none}
   .statusline{color:#e7edf7;font-size:12.5px;font-weight:600;text-align:center;max-width:520px;text-shadow:0 1px 2px #0006}
   .crow{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap}
   .abtn{border:0;border-radius:11px;padding:9px 15px;font-size:14px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.94);color:#1c1b1f}
@@ -83,16 +92,23 @@
       <div class="pill">步数 <b id="stepVal">0</b></div>
     </div>
     <div class="bg-strip hide" id="bgStrip"></div>
-    <div class="controls">
-      <div class="statusline" id="statusBar">拖空白转视角 · Ctrl/中键拖动平移 · 方块面上拖动转一层 · 滚轮缩放</div>
-      <div class="crow">
-        <button class="abtn gold" id="scrambleBtn">🔀 打乱</button>
-        <button class="abtn primary" id="solveBtn">✨ 一键还原</button>
-        <button class="abtn" id="resetBtn">↺ 重置</button>
-        <label class="toggle" id="primeToggle"><span class="dot"></span>逆时针</label>
+    <div class="controls" id="controls">
+      <div class="ctrl-head" id="ctrlHead">
+        <span class="grip" aria-hidden="true">⋮⋮</span>
+        <span class="ctrl-title">控制</span>
+        <button class="ctrl-toggle" id="ctrlToggle" title="收起 / 展开">收起 ▾</button>
       </div>
-      <div class="faces" id="faces"></div>
-      <div class="tip">U 上 · D 下 · L 左 · R 右 · F 前 · B 后　|　开「逆时针」后点击即反向</div>
+      <div class="ctrl-body" id="ctrlBody">
+        <div class="statusline" id="statusBar">拖空白转视角 · Ctrl/中键拖动平移 · 方块面上拖动转一层 · 滚轮缩放</div>
+        <div class="crow">
+          <button class="abtn gold" id="scrambleBtn">🔀 打乱</button>
+          <button class="abtn primary" id="solveBtn">✨ 一键还原</button>
+          <button class="abtn" id="resetBtn">↺ 重置</button>
+          <label class="toggle" id="primeToggle"><span class="dot"></span>逆时针</label>
+        </div>
+        <div class="faces" id="faces"></div>
+        <div class="tip">U 上 · D 下 · L 左 · R 右 · F 前 · B 后　|　开「逆时针」后点击即反向　·　拖动顶栏可移动面板</div>
+      </div>
     </div>
   </div>
 </div>
@@ -380,6 +396,45 @@ if (typeof THREE === 'undefined') {
   $('#resetBtn').onclick = reset;
   // 键盘（桌面）
   addEventListener('keydown', e => { const k = e.key.toUpperCase(); if ('UDLRFB'.includes(k)){ turnFace(k, e.shiftKey, { user:true }); } });
+
+  // ---------- 控制面板：收起 / 拖动移动（手机友好） ----------
+  const controls = $('#controls'), ctrlHead = $('#ctrlHead'), ctrlToggle = $('#ctrlToggle');
+  // 收起 / 展开
+  ctrlToggle.addEventListener('click', () => {
+    const collapsed = controls.classList.toggle('collapsed');
+    ctrlToggle.textContent = collapsed ? '展开 ▴' : '收起 ▾';
+    clampCtrl();
+  });
+  // 拖动面板（拖标题栏；点收起按钮不触发拖动）
+  let cpos = null; try { cpos = JSON.parse(localStorage.getItem('cube-ctrl-pos') || 'null'); } catch (e) {}
+  function placeFree(x, y){ controls.style.left = x + 'px'; controls.style.top = y + 'px'; controls.style.bottom = 'auto'; controls.style.transform = 'none'; }
+  function clampCtrl(){
+    if (!cpos) return;
+    const sr = stage.getBoundingClientRect();
+    cpos.x = Math.max(6, Math.min(sr.width - controls.offsetWidth - 6, cpos.x));
+    cpos.y = Math.max(6, Math.min(sr.height - controls.offsetHeight - 6, cpos.y));
+    placeFree(cpos.x, cpos.y);
+  }
+  if (cpos) requestAnimationFrame(clampCtrl);   // 等布局完成再按尺寸夹取
+  let cdrag = null;
+  ctrlHead.addEventListener('pointerdown', e => {
+    if (e.target.closest('#ctrlToggle')) return;
+    e.preventDefault(); try { ctrlHead.setPointerCapture(e.pointerId); } catch (_) {}
+    const r = controls.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+    cdrag = { ox: e.clientX - r.left, oy: e.clientY - r.top, sr };
+    placeFree(r.left - sr.left, r.top - sr.top);   // 切到自由定位，位置不跳
+  });
+  ctrlHead.addEventListener('pointermove', e => {
+    if (!cdrag) return;
+    let x = e.clientX - cdrag.sr.left - cdrag.ox, y = e.clientY - cdrag.sr.top - cdrag.oy;
+    x = Math.max(6, Math.min(cdrag.sr.width - controls.offsetWidth - 6, x));
+    y = Math.max(6, Math.min(cdrag.sr.height - controls.offsetHeight - 6, y));
+    cpos = { x, y }; placeFree(x, y);
+  });
+  const endCtrlDrag = () => { if (cdrag){ cdrag = null; try { localStorage.setItem('cube-ctrl-pos', JSON.stringify(cpos)); } catch (e) {} } };
+  ctrlHead.addEventListener('pointerup', endCtrlDrag);
+  ctrlHead.addEventListener('pointercancel', endCtrlDrag);
+  addEventListener('resize', () => requestAnimationFrame(clampCtrl));
 
   // ---------- 主循环 ----------
   function loop(){ if (anim) anim(); if (timer.running) $('#timeVal').textContent = fmt(performance.now()-timer.t0); renderer.render(scene, camera); requestAnimationFrame(loop); }
