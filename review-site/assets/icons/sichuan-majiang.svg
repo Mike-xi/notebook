@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="国标麻将">
+  <defs>
+    <linearGradient id="scmj-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#cf4434"/>
+      <stop offset="1" stop-color="#a3271c"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="62" height="62" rx="13" fill="url(#scmj-bg)"/>
+  <rect x="18" y="11" width="28" height="42" rx="5" fill="#cdb98f"/>
+  <rect x="16" y="9" width="28" height="40" rx="5" fill="#fbfaf2" stroke="#d8cdb0" stroke-width="1"/>
+  <text x="30" y="38" text-anchor="middle" font-family="'KaiTi','STKaiti','楷体','SimSun',serif" font-weight="700" font-size="26" fill="#c0392b">中</text>
+</svg>

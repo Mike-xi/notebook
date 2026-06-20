@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="篮球">
+  <defs>
+    <linearGradient id="bk-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2a2f37"/>
+      <stop offset="1" stop-color="#15181d"/>
+    </linearGradient>
+    <radialGradient id="bk-ball" cx="0.38" cy="0.34" r="0.75">
+      <stop offset="0" stop-color="#ffa24d"/>
+      <stop offset="1" stop-color="#dd6112"/>
+    </radialGradient>
+  </defs>
+  <rect x="1" y="1" width="62" height="62" rx="13" fill="url(#bk-bg)"/>
+  <circle cx="32" cy="32" r="19" fill="url(#bk-ball)" stroke="#7a3410" stroke-width="1.4"/>
+  <g fill="none" stroke="#5e2a0c" stroke-width="1.7" stroke-linecap="round">
+    <line x1="13" y1="32" x2="51" y2="32"/>
+    <line x1="32" y1="13" x2="32" y2="51"/>
+    <path d="M19 16 C26 25 26 39 19 48"/>
+    <path d="M45 16 C38 25 38 39 45 48"/>
+  </g>
+</svg>

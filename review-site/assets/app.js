@@ -177,7 +177,7 @@ async function openDeepSearch(q) {
 
 function courseLabel(file) {
   const c = allCoursesMap.get(file);
-  return c ? `${c.icon || '📄'} ${c.title}` : file;
+  return c ? `${iconText(c.icon)} ${c.title}` : file;
 }
 
 // 在摘录里高亮命中词（先转义，再替换）
@@ -319,7 +319,7 @@ async function loadReview() {
     const when = c.created_at ? new Date(c.created_at).toLocaleString('zh-CN', { hour12: false }) : '';
     return `
       <div class="rv-card" data-file="${escapeAttr(c.file)}">
-        <span class="rv-icon">${escapeHTML(c.icon || '📄')}</span>
+        <span class="rv-icon">${isImgIcon(c.icon) ? iconImgHTML(c.icon, 26) : escapeHTML(c.icon || '📄')}</span>
         <div class="rv-info">
           <h4>${escapeHTML(c.title)}</h4>
           <p class="rv-meta">${escapeHTML(c.subject || '未填学科')} · ${kindLabel(c.kind)} · ${escapeHTML(when)}</p>
@@ -1038,6 +1038,11 @@ function escapeHTML(s) {
 function escapeAttr(s) {
   return escapeHTML(s).replace(/`/g, '&#96;');
 }
+// 图标可能是 emoji，也可能是图片路径（.svg/.png 等，如游戏类课程）
+function isImgIcon(ic) { return typeof ic === 'string' && /\.(svg|png|jpe?g|webp)$/i.test(ic); }
+function iconImgHTML(ic, size, cls) { return `<img${cls ? ` class="${cls}"` : ''} src="${escapeAttr(ic)}" alt="" style="width:${size}px;height:${size}px;object-fit:contain;border-radius:${Math.round(size / 4)}px;vertical-align:middle">`; }
+// 纯文本场景（标题/标签里）图片图标退化为占位 emoji
+function iconText(ic) { return isImgIcon(ic) ? '🎮' : (ic || '📄'); }
 
 // 启动
 renderIconPicker();

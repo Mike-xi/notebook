@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>魔方 · Rubik's Cube</title>
+<script>
+  // 跟随站点主题，并剥离阅读器整体反相（nb-dark-invert）
+  (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
+</script>
+<style>
+  :root{
+    --bg:#eef1f5; --panel:#ffffff; --fg:#1c1b1f; --muted:#6b6772; --line:#dcdfe6;
+    --accent:#3b6ef5; --on-accent:#fff; --chip:#eef0f4; --shadow:rgba(0,0,0,.16);
+  }
+  html[data-theme="dark"]{
+    --bg:#10131a; --panel:#1b1f29; --fg:#e6e1e5; --muted:#a9a3b0; --line:#2d3340;
+    --accent:#7aa2ff; --on-accent:#0a1124; --chip:#232838; --shadow:rgba(0,0,0,.55);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--fg);overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+  .hide{display:none !important}
+  button{font:inherit}
+  #wrap{height:100dvh;display:flex;flex-direction:column}
+  /* 顶栏 */
+  .topbar{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:9px 13px;background:var(--panel);border-bottom:1px solid var(--line);z-index:30}
+  .topbar .back{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--bg);color:var(--fg);
+    border-radius:999px;padding:7px 13px;font-size:13.5px;font-weight:600;cursor:pointer}
+  .topbar .back:hover{background:var(--chip)}
+  .topbar .ttl{font-size:15.5px;font-weight:800;letter-spacing:-.01em}
+  .topbar .sp{flex:1}
+  .tbtn{border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:999px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer}
+  .tbtn:hover{background:var(--chip)}
+  /* 舞台 */
+  .stage{position:relative;flex:1 1 auto;min-height:0;overflow:hidden;
+    background:radial-gradient(120% 100% at 50% 0%,#2a3350 0%,#0f1424 75%)}
+  .stage canvas{display:block;touch-action:none}
+  .hud{position:absolute;top:12px;left:12px;display:flex;gap:8px;flex-wrap:wrap;pointer-events:none}
+  .hud .pill{background:rgba(0,0,0,.35);color:#fff;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;backdrop-filter:blur(4px)}
+  .hud .pill b{font-variant-numeric:tabular-nums}
+  .statusbar{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);color:#fff;background:rgba(0,0,0,.34);
+    padding:7px 16px;border-radius:999px;font-size:13.5px;font-weight:600;backdrop-filter:blur(4px);max-width:90%;text-align:center;pointer-events:none}
+  .bg-strip{position:absolute;top:10px;right:10px;z-index:40;display:flex;gap:8px;flex-wrap:wrap;max-width:240px;
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:11px;box-shadow:0 12px 32px var(--shadow)}
+  .bg-sw{width:34px;height:34px;border-radius:50%;border:2px solid transparent;box-shadow:0 1px 3px var(--shadow);cursor:pointer;padding:0;transition:.15s}
+  .bg-sw:hover{transform:scale(1.08)} .bg-sw.on{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 30%,transparent)}
+  /* 控制区 */
+  .controls{flex:0 0 auto;background:var(--panel);border-top:1px solid var(--line);padding:11px 13px calc(11px + env(safe-area-inset-bottom));
+    display:flex;flex-direction:column;gap:10px}
+  .crow{display:flex;gap:9px;align-items:center;justify-content:center;flex-wrap:wrap}
+  .abtn{border:0;border-radius:12px;padding:11px 18px;font-size:14.5px;font-weight:700;cursor:pointer;background:var(--chip);color:var(--fg)}
+  .abtn:hover{filter:brightness(.97)} .abtn:active{transform:translateY(1px)}
+  .abtn.primary{background:var(--accent);color:var(--on-accent)}
+  .abtn.gold{background:#e0a528;color:#3a2700}
+  .toggle{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;color:var(--muted);cursor:pointer;user-select:none;
+    border:1px solid var(--line);border-radius:999px;padding:8px 13px}
+  .toggle.on{color:var(--accent);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+  .toggle .dot{width:14px;height:14px;border-radius:50%;border:2px solid currentColor}
+  .toggle.on .dot{background:currentColor}
+  .faces{display:flex;gap:7px;justify-content:center;flex-wrap:wrap}
+  .fbtn{width:48px;height:48px;border-radius:12px;border:0;font-size:18px;font-weight:800;cursor:pointer;color:#fff;
+    box-shadow:0 2px 6px var(--shadow);position:relative}
+  .fbtn:active{transform:translateY(1px)}
+  .fbtn small{position:absolute;right:4px;bottom:2px;font-size:10px;opacity:.85;font-weight:700}
+  .tip{text-align:center;color:var(--muted);font-size:11.5px;line-height:1.5}
+  @media(max-width:480px){ .fbtn{width:44px;height:44px;font-size:16px} .abtn{padding:10px 14px;font-size:13.5px} }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="topbar">
+    <button class="back" id="backBtn">‹ 课程</button>
+    <span class="ttl">🧩 魔方</span>
+    <span class="sp"></span>
+    <button class="tbtn" id="bgBtn">🎨 背景</button>
+  </div>
+  <div class="stage" id="stage">
+    <div class="hud">
+      <div class="pill">⏱ <b id="timeVal">00:00</b></div>
+      <div class="pill">步数 <b id="stepVal">0</b></div>
+    </div>
+    <div class="statusbar" id="statusBar">拖动空白处转视角 · 在方块面上拖动转动一层</div>
+    <div class="bg-strip hide" id="bgStrip"></div>
+  </div>
+  <div class="controls">
+    <div class="crow">
+      <button class="abtn gold" id="scrambleBtn">🔀 打乱</button>
+      <button class="abtn primary" id="solveBtn">✨ 一键还原</button>
+      <button class="abtn" id="resetBtn">↺ 重置</button>
+      <label class="toggle" id="primeToggle"><span class="dot"></span>逆时针</label>
+    </div>
+    <div class="faces" id="faces"></div>
+    <div class="tip">U 上 · D 下 · L 左 · R 右 · F 前 · B 后　|　打开「逆时针」后点击即反向转动</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>if (typeof THREE === 'undefined') document.write('<scr'+'ipt src="https://unpkg.com/three@0.160.0/build/three.min.js"><\/scr'+'ipt>');</script>
+<script>
+if (typeof THREE === 'undefined') {
+  document.getElementById('statusBar').textContent = '3D 引擎加载失败，请检查网络后刷新';
+  throw new Error('THREE not loaded');
+}
+(function(){
+  'use strict';
+  const $ = s => document.querySelector(s);
+  const stage = $('#stage');
+
+  // 剥离阅读器反相 + 跟随主题
+  const strip = () => document.documentElement.classList.remove('nb-dark-invert');
+  strip(); try { new MutationObserver(strip).observe(document.documentElement, { attributes:true, attributeFilter:['class'] }); } catch(e){}
+  function applyTheme(){ try{ const p=localStorage.getItem('nb-theme')||'auto'; const d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches); document.documentElement.dataset.theme=d?'dark':'light'; }catch(e){} }
+  addEventListener('storage', e=>{ if(e.key==='nb-theme') applyTheme(); });
+  $('#backBtn').onclick = () => { location.href = '/'; };
+
+  // ---------- 背景 ----------
+  const BGS = [
+    { name:'极夜', css:'radial-gradient(120% 100% at 50% 0%,#2a3350 0%,#0f1424 75%)' },
+    { name:'石墨', css:'radial-gradient(120% 100% at 50% 0%,#3a3f47 0%,#16181d 78%)' },
+    { name:'晨雾', css:'radial-gradient(120% 100% at 50% 0%,#dfe7f2 0%,#aebacb 80%)' },
+    { name:'极光', css:'linear-gradient(160deg,#0b2a3a,#16324a 45%,#0a3b34)' },
+    { name:'晚霞', css:'linear-gradient(160deg,#3a2350,#7a3a5a 55%,#c97a5a)' },
+    { name:'抹茶', css:'radial-gradient(120% 100% at 50% 0%,#2f4a32 0%,#162619 80%)' },
+  ];
+  let bgIdx = 0; try { const v = localStorage.getItem('cube-bg'); if (v!==null) bgIdx = +v; } catch(e){}
+  function applyBg(i){ bgIdx=i; stage.style.background = BGS[i].css; try{ localStorage.setItem('cube-bg', String(i)); }catch(e){} }
+  applyBg(BGS[bgIdx] ? bgIdx : (bgIdx=0));
+  function renderBgStrip(){ $('#bgStrip').innerHTML = BGS.map((b,i)=>`<button class="bg-sw${i===bgIdx?' on':''}" data-i="${i}" title="${b.name}" style="background:${b.css}"></button>`).join(''); }
+  $('#bgBtn').onclick = () => { renderBgStrip(); $('#bgStrip').classList.toggle('hide'); };
+  $('#bgStrip').onclick = e => { const b=e.target.closest('.bg-sw'); if(!b) return; applyBg(+b.dataset.i); renderBgStrip(); };
+  document.addEventListener('pointerdown', e => { if(!e.target.closest('#bgStrip') && !e.target.closest('#bgBtn')) $('#bgStrip').classList.add('hide'); });
+
+  // ---------- 渲染器 / 场景 / 相机 ----------
+  const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1, 2));
+  stage.appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.0));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.15); sun.position.set(6, 9, 7); scene.add(sun);
+  const sun2 = new THREE.DirectionalLight(0xffffff, 0.45); sun2.position.set(-7, -4, -6); scene.add(sun2);
+  const camera = new THREE.PerspectiveCamera(46, 1, 0.1, 100);
+
+  // 相机轨道（球坐标）
+  const cam = { theta: Math.PI*0.25, phi: Math.PI*0.30, radius: 8.2, tgt: new THREE.Vector3(0,0,0) };
+  function updateCamera(){
+    const r = cam.radius, sp = Math.sin(cam.phi);
+    camera.position.set(cam.tgt.x + r*sp*Math.sin(cam.theta), cam.tgt.y + r*Math.cos(cam.phi), cam.tgt.z + r*sp*Math.cos(cam.theta));
+    camera.lookAt(cam.tgt);
+  }
+  function resize(){
+    const w = stage.clientWidth, h = stage.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    // 自适应：竖屏/窄屏拉远，保证整方块入镜
+    const fit = Math.max(1, 5.4 / Math.min(w, h) * 100 / 100);
+    cam.radius = 7.4 + Math.max(0, (1 - Math.min(w,h)/520)) * 4.0 + (h>w ? 1.2 : 0);
+    camera.updateProjectionMatrix();
+    updateCamera();
+  }
+  addEventListener('resize', resize);
+
+  // ---------- 构建魔方 ----------
+  const SP = 1.0, BODY = 0.94, ST = 0.80, EPS = 0.001;
+  const STK = { px:0xC8202C, nx:0xF06000, py:0xF7F7F7, ny:0xF7D000, pz:0x0AA050, nz:0x1060C8 }; // R橙红 L橙 U白 D黄 F绿 B蓝
+  const group = new THREE.Group(); scene.add(group);
+  const CUBIES = [];
+  const bodyGeo = new THREE.BoxGeometry(BODY, BODY, BODY);
+  const bodyMat = new THREE.MeshStandardMaterial({ color:0x0c0d10, roughness:0.55, metalness:0.05 });
+  const stkGeo = new THREE.PlaneGeometry(ST, ST);
+  function addSticker(cubie, dir, color){
+    const m = new THREE.Mesh(stkGeo, new THREE.MeshStandardMaterial({ color, roughness:0.36, metalness:0.0 }));
+    const o = BODY/2 + EPS;
+    if (dir==='px'){ m.position.set(o,0,0); m.rotation.y = Math.PI/2; }
+    else if (dir==='nx'){ m.position.set(-o,0,0); m.rotation.y = -Math.PI/2; }
+    else if (dir==='py'){ m.position.set(0,o,0); m.rotation.x = -Math.PI/2; }
+    else if (dir==='ny'){ m.position.set(0,-o,0); m.rotation.x = Math.PI/2; }
+    else if (dir==='pz'){ m.position.set(0,0,o); }
+    else if (dir==='nz'){ m.position.set(0,0,-o); m.rotation.y = Math.PI; }
+    m.userData.sticker = true;
+    cubie.add(m);
+  }
+  for (let x=-1; x<=1; x++) for (let y=-1; y<=1; y++) for (let z=-1; z<=1; z++){
+    if (x===0 && y===0 && z===0) continue;
+    const cubie = new THREE.Group();
+    const body = new THREE.Mesh(bodyGeo, bodyMat); cubie.add(body);
+    if (x===1) addSticker(cubie,'px',STK.px); if (x===-1) addSticker(cubie,'nx',STK.nx);
+    if (y===1) addSticker(cubie,'py',STK.py); if (y===-1) addSticker(cubie,'ny',STK.ny);
+    if (z===1) addSticker(cubie,'pz',STK.pz); if (z===-1) addSticker(cubie,'nz',STK.nz);
+    cubie.position.set(x*SP, y*SP, z*SP);
+    cubie.userData.home = cubie.position.clone();
+    group.add(cubie); CUBIES.push(cubie);
+  }
+
+  // ---------- 转动引擎 ----------
+  const FACE = {
+    U:{axis:'y',layer:1,dir:-1}, D:{axis:'y',layer:-1,dir:1},
+    R:{axis:'x',layer:1,dir:-1}, L:{axis:'x',layer:-1,dir:1},
+    F:{axis:'z',layer:1,dir:-1}, B:{axis:'z',layer:-1,dir:1},
+  };
+  const TURN_MS = 150;
+  let queue = [], anim = null, history = [], onIdle = null;
+  let userMoves = 0, scrambled = false;
+  let timer = { t0:0, running:false, elapsed:0 };
+
+  function snap(c){
+    c.position.set(Math.round(c.position.x/SP)*SP, Math.round(c.position.y/SP)*SP, Math.round(c.position.z/SP)*SP);
+    c.updateMatrix();
+    const e = c.matrix.elements;
+    const col = (a,b,d)=>{ const A=Math.abs(a),B=Math.abs(b),D=Math.abs(d); if(A>=B&&A>=D) return [Math.sign(a),0,0]; if(B>=D) return [0,Math.sign(b),0]; return [0,0,Math.sign(d)]; };
+    const c0=col(e[0],e[1],e[2]), c1=col(e[4],e[5],e[6]), c2=col(e[8],e[9],e[10]);
+    const m = new THREE.Matrix4().set(c0[0],c1[0],c2[0],0, c0[1],c1[1],c2[1],0, c0[2],c1[2],c2[2],0, 0,0,0,1);
+    c.quaternion.setFromRotationMatrix(m);
+  }
+  function enqueue(mv){ queue.push(mv); if(!anim) next(); }
+  function next(){
+    if (!queue.length){
+      anim = null;
+      if (onIdle){ const f = onIdle; onIdle = null; f(); }
+      else checkSolved();
+      return;
+    }
+    startTurn(queue.shift());
+  }
+  function startTurn(mv){
+    const { axis, layer, dir } = mv;
+    const pivot = new THREE.Group(); scene.add(pivot);
+    const sel = CUBIES.filter(c => Math.round(c.position[axis]/SP) === layer);
+    sel.forEach(c => pivot.attach(c));
+    const target = dir * Math.PI/2;
+    const t0 = performance.now();
+    anim = () => {
+      const t = Math.min(1, (performance.now() - t0) / (mv.fast ? 70 : TURN_MS));
+      const e = t<.5 ? 2*t*t : 1 - Math.pow(-2*t+2,2)/2;
+      pivot.rotation[axis] = target * e;
+      if (t >= 1){
+        pivot.rotation[axis] = target; pivot.updateMatrixWorld(true);
+        sel.forEach(c => { group.attach(c); snap(c); });
+        scene.remove(pivot); anim = null;
+        if (mv.record !== false){ history.push({ axis, layer, dir }); }
+        if (mv.user){ userMoves++; if (scrambled && !timer.running) startTimer(); updateHud(); }
+        next();
+      }
+    };
+  }
+  // 对外：按面记法转动
+  function turnFace(face, prime, opts){ const b = FACE[face]; enqueue(Object.assign({ face, axis:b.axis, layer:b.layer, dir: prime ? -b.dir : b.dir }, opts||{})); }
+
+  // ---------- 打乱 / 重置 / 还原 ----------
+  function instantSolved(){
+    CUBIES.forEach(c => { c.position.copy(c.userData.home); c.quaternion.set(0,0,0,1); });
+    history = []; userMoves = 0; queue = []; anim = null; onIdle = null;
+  }
+  function reset(){ instantSolved(); scrambled = false; stopTimer(); timer.elapsed = 0; updateHud(); setStatus('已重置为复原状态'); }
+  function scramble(){
+    instantSolved();
+    const faces = ['U','D','L','R','F','B']; let last = '';
+    for (let i=0;i<22;i++){ let f; do { f = faces[(Math.random()*6)|0]; } while (f===last); last = f; const prime = Math.random()<0.5; turnFace(f, prime, { user:false, fast:true }); }
+    onIdle = () => { scrambled = true; userMoves = 0; timer.elapsed = 0; stopTimer(); updateHud(); setStatus('🔀 打乱完成，开始还原吧！'); };
+  }
+  function solveBack(){
+    if (!history.length){ setStatus('已经是复原状态啦'); return; }
+    const inv = history.slice().reverse().map(m => ({ axis:m.axis, layer:m.layer, dir:-m.dir, record:false }));
+    history = [];
+    onIdle = () => { scrambled = false; stopTimer(); setStatus('✨ 已自动还原'); updateHud(); };
+    inv.forEach(m => enqueue(m));
+  }
+
+  function checkSolved(){
+    if (!scrambled) return;
+    const ok = CUBIES.every(c => {
+      const h = c.userData.home;
+      if (Math.round(c.position.x/SP)!==Math.round(h.x/SP) || Math.round(c.position.y/SP)!==Math.round(h.y/SP) || Math.round(c.position.z/SP)!==Math.round(h.z/SP)) return false;
+      const q = c.quaternion; return Math.abs(q.x)<1e-3 && Math.abs(q.y)<1e-3 && Math.abs(q.z)<1e-3 && Math.abs(Math.abs(q.w)-1)<1e-3;
+    });
+    if (ok){ scrambled = false; stopTimer(); setStatus(`🎉 复原成功！用时 ${fmt(timer.elapsed)} · ${userMoves} 步`); updateHud(); }
+  }
+
+  // ---------- 计时 / HUD ----------
+  function startTimer(){ timer.running = true; timer.t0 = performance.now() - timer.elapsed; }
+  function stopTimer(){ if (timer.running){ timer.elapsed = performance.now() - timer.t0; } timer.running = false; }
+  function fmt(ms){ const s = Math.floor(ms/1000); return String((s/60)|0).padStart(2,'0') + ':' + String(s%60).padStart(2,'0'); }
+  function updateHud(){ $('#stepVal').textContent = userMoves; if (!timer.running) $('#timeVal').textContent = fmt(timer.elapsed); }
+  function setStatus(t){ $('#statusBar').textContent = t; }
+
+  // ---------- 输入：相机轨道 + 拖动转层 ----------
+  const ray = new THREE.Raycaster();
+  const ndc = new THREE.Vector2();
+  let drag = null;
+  function pointerNDC(ev){ const r = renderer.domElement.getBoundingClientRect(); ndc.set(((ev.clientX-r.left)/r.width)*2-1, -((ev.clientY-r.top)/r.height)*2+1); }
+  function pickFace(ev){
+    pointerNDC(ev); ray.setFromCamera(ndc, camera);
+    const hits = ray.intersectObjects(CUBIES, true);
+    for (const h of hits){ if (h.object.userData.sticker){
+      const n = h.face.normal.clone().transformDirection(h.object.matrixWorld).round();
+      let cubie = h.object; while (cubie.parent && cubie.parent !== group) cubie = cubie.parent;
+      return { normal:n, cubie, point:h.point.clone() };
+    }}
+    return null;
+  }
+  function onDown(ev){
+    if (ev.target.closest('#bgStrip') || ev.target.closest('.controls') || ev.target.closest('.topbar')) return;
+    renderer.domElement.setPointerCapture && renderer.domElement.setPointerCapture(ev.pointerId);
+    const pick = anim ? null : pickFace(ev);
+    if (pick){ drag = { mode:'turn', x:ev.clientX, y:ev.clientY, pick, decided:false }; }
+    else { drag = { mode:'orbit', x:ev.clientX, y:ev.clientY, theta:cam.theta, phi:cam.phi }; }
+  }
+  function onMove(ev){
+    if (!drag) return;
+    const dx = ev.clientX - drag.x, dy = ev.clientY - drag.y;
+    if (drag.mode==='orbit'){
+      cam.theta = drag.theta - dx*0.008;
+      cam.phi = Math.max(0.18, Math.min(Math.PI-0.18, drag.phi - dy*0.008));
+      updateCamera();
+    } else if (drag.mode==='turn' && !drag.decided){
+      if (Math.hypot(dx,dy) < 9) return;
+      drag.decided = true;
+      decideTurn(drag.pick, dx, dy);
+    }
+  }
+  function onUp(ev){ drag = null; }
+  function decideTurn(pick, dx, dy){
+    // 世界空间拖动方向
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
+    const worldDrag = right.multiplyScalar(dx).add(up.multiplyScalar(-dy)).normalize();
+    const n = pick.normal.clone().normalize();
+    // 旋转轴 ≈ n × 拖动方向，吸附到最近的坐标轴
+    const rot = new THREE.Vector3().crossVectors(n, worldDrag);
+    const ax = Math.abs(rot.x), ay = Math.abs(rot.y), az = Math.abs(rot.z);
+    let axis, sign;
+    if (ax>=ay && ax>=az){ axis='x'; sign=Math.sign(rot.x); }
+    else if (ay>=az){ axis='y'; sign=Math.sign(rot.y); }
+    else { axis='z'; sign=Math.sign(rot.z); }
+    const layer = Math.round(pick.cubie.position[axis]/SP);
+    // 方向：让抓取面沿拖动方向移动
+    const axisVec = new THREE.Vector3(axis==='x'?1:0, axis==='y'?1:0, axis==='z'?1:0);
+    const motion = new THREE.Vector3().crossVectors(axisVec, n);
+    let dir = Math.sign(motion.dot(worldDrag)) || 1;
+    enqueue({ axis, layer, dir, user:true });
+  }
+  const dom = renderer.domElement;
+  dom.addEventListener('pointerdown', onDown);
+  dom.addEventListener('pointermove', onMove);
+  dom.addEventListener('pointerup', onUp);
+  dom.addEventListener('pointercancel', onUp);
+  // 缩放
+  stage.addEventListener('wheel', e => { e.preventDefault(); cam.radius = Math.max(5, Math.min(16, cam.radius + Math.sign(e.deltaY)*0.6)); updateCamera(); }, { passive:false });
+  let pinch = null;
+  dom.addEventListener('touchmove', e => {
+    if (e.touches.length===2){ const d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY); if (pinch){ cam.radius = Math.max(5, Math.min(16, cam.radius - (d-pinch)*0.02)); updateCamera(); } pinch = d; drag = null; }
+  }, { passive:true });
+  dom.addEventListener('touchend', () => { pinch = null; });
+
+  // ---------- 面按钮 ----------
+  const FACE_BTN = [['U','#f7f7f7','#222'],['D','#f7d000','#5a4500'],['L','#f06000','#fff'],['R','#c8202c','#fff'],['F','#0aa050','#fff'],['B','#1060c8','#fff']];
+  $('#faces').innerHTML = FACE_BTN.map(([f,bg,fg]) => `<button class="fbtn" data-f="${f}" style="background:${bg};color:${fg}">${f}</button>`).join('');
+  let prime = false;
+  $('#primeToggle').onclick = () => { prime = !prime; $('#primeToggle').classList.toggle('on', prime); };
+  $('#faces').addEventListener('click', e => { const b = e.target.closest('.fbtn'); if (!b) return; turnFace(b.dataset.f, prime, { user:true }); });
+  $('#scrambleBtn').onclick = scramble;
+  $('#solveBtn').onclick = solveBack;
+  $('#resetBtn').onclick = reset;
+  // 键盘（桌面）
+  addEventListener('keydown', e => { const k = e.key.toUpperCase(); if ('UDLRFB'.includes(k)){ turnFace(k, e.shiftKey, { user:true }); } });
+
+  // ---------- 主循环 ----------
+  function loop(){ if (anim) anim(); if (timer.running) $('#timeVal').textContent = fmt(performance.now()-timer.t0); renderer.render(scene, camera); requestAnimationFrame(loop); }
+  resize(); updateHud(); loop();
+
+  // 调试钩子
+  window.__cube = { turnFace, scramble, solveBack, reset, get history(){ return history; }, get solved(){ return !scrambled; }, CUBIES, cam };
+})();
+</script>
+</body>
+</html>

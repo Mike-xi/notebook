@@ -9,6 +9,7 @@ import { SCMJGame, aiChooseQue, DEFAULT_RULE, ruleFor } from '../../assets/scmj-
 const json = (o, status = 200) => Response.json(o, { status });
 const clean = (s, n = 16) => (typeof s === 'string' ? s : '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, n);
 const cleanNick = (s) => (typeof s === 'string' ? s : '').replace(/[\x00-\x1f\x7f<>]/g, '').slice(0, 12) || '玩家';
+const cleanText = (s) => (typeof s === 'string' ? s : '').replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '').trim().slice(0, 120);
 const safeJSON = (s, d) => { try { return JSON.parse(s); } catch { return d; } };
 const sumCounts = (c) => c.reduce((a, b) => a + b, 0);
 
@@ -22,9 +23,12 @@ async function ensureSchema(env) {
        seats TEXT NOT NULL,
        rule TEXT NOT NULL,
        wdl INTEGER DEFAULT 0,
+       chat TEXT NOT NULL DEFAULT '[]',
        updated_at INTEGER NOT NULL,
        created_at INTEGER NOT NULL)`
   ).run();
+  // 旧表补 chat 列（对局聊天）；列已存在则忽略报错
+  try { await env.DB.prepare(`ALTER TABLE scmj_rooms ADD COLUMN chat TEXT NOT NULL DEFAULT '[]'`).run(); } catch (e) {}
   ready = true;
 }
 const getRow = (env, room) => env.DB.prepare('SELECT * FROM scmj_rooms WHERE room=?').bind(room).first();
@@ -81,7 +85,7 @@ function advance(g, seats, now, wdl) {
   return wdl;
 }
 
-function view(room, g, seats, cid) {
+function view(room, g, seats, cid, chat = []) {
   const s = g.s;
   const mySeat = seats.findIndex(x => x.cid && x.cid === cid);
   const ended = s.phase === 'end';
@@ -108,6 +112,7 @@ function view(room, g, seats, cid) {
     dingqueNeeded: s.phase === 'dingque' && mySeat >= 0 && s.players[mySeat].que == null,
     seatsFilled: seats.map(x => !x.ai),
     log: s.log.slice(-14),
+    chat: chat || [],
   };
 }
 
@@ -117,7 +122,8 @@ async function load(env, room) {
   const seats = safeJSON(row.seats, null);
   const rule = safeJSON(row.rule, DEFAULT_RULE);
   const g = SCMJGame.from(safeJSON(row.state, null));
-  return { row, seats, rule, g, wdl: row.wdl | 0 };
+  const chat = safeJSON(row.chat, []);
+  return { row, seats, rule, g, wdl: row.wdl | 0, chat };
 }
 
 export async function onRequestPost({ request, env }) {
@@ -155,14 +161,23 @@ export async function onRequestPost({ request, env }) {
 
   const L = await load(env, room);
   if (!L) return json({ error: 'no room', notFound: true }, 404);
-  const { seats, g } = L;
+  const { seats, g, chat } = L;
   let wdl = L.wdl;
   const mySeat = seats.findIndex(x => x.cid && x.cid === cid);
 
   if (action === 'state') {
     wdl = advance(g, seats, now, wdl);
     await saveRow(env, room, g, seats, wdl);
-    return json(view(room, g, seats, cid));
+    return json(view(room, g, seats, cid, chat));
+  }
+  if (action === 'chat') {
+    if (mySeat < 0) return json({ error: 'not a player' }, 403);
+    const t = cleanText(body.text);
+    if (t) {
+      chat.push({ by: mySeat, nick: seats[mySeat].nick || ('玩家' + (mySeat + 1)), t, ts: now });
+      await env.DB.prepare('UPDATE scmj_rooms SET chat=?, updated_at=? WHERE room=?').bind(JSON.stringify(chat.slice(-40)), now, room).run();
+    }
+    return json(view(room, g, seats, cid, chat.slice(-40)));
   }
   if (action === 'leave') {
     if (mySeat >= 0) { seats[mySeat].cid = null; seats[mySeat].ai = true; }
@@ -176,7 +191,7 @@ export async function onRequestPost({ request, env }) {
     const ng = newGame(seats, rule, (g.s.dealer + 1) % 4);
     wdl = advance(ng, seats, now, 0);
     await saveRow(env, room, ng, seats, wdl);
-    return json(view(room, ng, seats, cid));
+    return json(view(room, ng, seats, cid, chat));
   }
 
   if (mySeat < 0) return json({ error: 'not a player', ...view(room, g, seats, cid) }, 403);
@@ -207,13 +222,13 @@ export async function onRequestPost({ request, env }) {
 
   wdl = advance(g, seats, now, action === 'respond' || action === 'discard' ? 0 : wdl);
   await saveRow(env, room, g, seats, wdl);
-  return json(view(room, g, seats, cid));
+  return json(view(room, g, seats, cid, chat));
 }
 
 async function doJoin(env, room, cid, nick, now) {
   const L = await load(env, room);
   if (!L) return json({ error: 'no room', notFound: true }, 404);
-  const { seats, g, rule } = L;
+  const { seats, g, rule, chat } = L;
   let wdl = L.wdl;
   let seat = seats.findIndex(x => x.cid && x.cid === cid);
   if (seat < 0) seat = seats.findIndex(x => x.ai);          // 占一个 AI 空位
@@ -223,7 +238,7 @@ async function doJoin(env, room, cid, nick, now) {
   g.s.players[seat].isAI = false; g.s.players[seat].name = nick;
   wdl = advance(g, seats, now, wdl);
   await saveRow(env, room, g, seats, wdl);
-  return json(view(room, g, seats, cid));
+  return json(view(room, g, seats, cid, chat));
 }
 
 const clampSuit = (v) => { v = +v; return (v === 0 || v === 1 || v === 2) ? v : 0; };

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="狼人杀">
+  <defs>
+    <linearGradient id="ww-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2c3550"/>
+      <stop offset="1" stop-color="#171c2c"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="62" height="62" rx="13" fill="url(#ww-bg)"/>
+  <circle cx="45" cy="19" r="8.5" fill="#f1e6b8"/>
+  <circle cx="42" cy="17" r="8.5" fill="url(#ww-bg)"/>
+  <g fill="#cdd6e6">
+    <path d="M20 22 L25 35 L20 33 Z"/>
+    <path d="M44 22 L39 35 L44 33 Z"/>
+    <path d="M32 24 C22 24 18 32 18 39 C18 47 24 52 32 52 C40 52 46 47 46 39 C46 32 42 24 32 24 Z"/>
+    <path d="M32 52 L27 44 L32 46 L37 44 Z" fill="#2c3550"/>
+  </g>
+  <g fill="#ffd24d">
+    <path d="M26 37 l3 -2 l3 2 l-3 2 z"/>
+    <path d="M32 37 l3 -2 l3 2 l-3 2 z"/>
+  </g>
+  <path d="M30 46 l2 2 l2 -2" fill="none" stroke="#7a8499" stroke-width="1.2" stroke-linecap="round"/>
+</svg>

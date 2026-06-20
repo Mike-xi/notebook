@@ -394,3 +394,203 @@ function aiLead(cards, ctx) {
 }
 
 export const __engine = { parseCombo, comboBeats, enumerateBeats, handSteps, leadOptions };
+
+/* ============================================================================
+ * DoudizhuGame — 可序列化、服务端权威的斗地主状态机
+ *   单机（浏览器内运行）与联机后端（functions/api/poker-ddz.js）共用同一份逻辑，
+ *   区别只在“谁提供人类输入”。座位 0/1/2，出牌顺序 0->1->2。
+ *   牌仍用 {r,s,id} 对象；id 在一副牌内唯一（0..53），客户端按 id 匹配选牌。
+ * ========================================================================== */
+
+// 不可压牌型的“手数权重”——给 AI 用，已在 handSteps 里有更完整版本，这里复用
+function comboKindOf(cards) { const c = parseCombo(cards); return c ? c.type : null; }
+
+export class DoudizhuGame {
+  // opts: { names?, isAI?, seed?, dealer? }
+  constructor(opts = {}) {
+    if (opts.__raw) { this.s = opts.__raw; return; }   // from() 走这条
+    const names = opts.names || ['你', '下家', '上家'];
+    const isAI = opts.isAI || [false, true, true];
+    const rng = mulberry32((opts.seed ?? ((Date.now() ^ (Math.random() * 1e9)) >>> 0)));
+    this.s = this._deal(names, isAI, rng, opts.dealer);
+  }
+
+  _deal(names, isAI, rng, dealer) {
+    const deck = shuffle(makeDeck(), rng);
+    const hands = [sortHand(deck.slice(0, 17)), sortHand(deck.slice(17, 34)), sortHand(deck.slice(34, 51))];
+    const bottom = deck.slice(51, 54);
+    const start = (dealer == null) ? Math.floor(rng() * 3) : (dealer % 3);
+    return {
+      names: names.slice(0, 3), isAI: isAI.slice(0, 3),
+      hands, bottom, landlord: -1, roles: [null, null, null],
+      phase: 'bid', turn: start,
+      bid: { order: [start, (start + 1) % 3, (start + 2) % 3], idx: 0, max: 0, leader: -1, calls: [null, null, null] },
+      target: null, targetSeat: -1, passes: 0,
+      lastPlay: [null, null, null],
+      multiplier: 0, bombs: 0, base: 0,
+      everFarmerPlayed: false, llPlays: 0,
+      result: null, log: [], startSeat: start, redeals: 0,
+    };
+  }
+
+  // 重新发一副（叫分无人叫时 / 联机 reset），保留名字与 AI 标记，换庄
+  redeal() {
+    const s = this.s;
+    const rng = mulberry32(((Date.now() ^ (Math.random() * 1e9)) >>> 0));
+    const dealer = (s.startSeat + 1) % 3;
+    const redeals = s.redeals + 1;
+    this.s = this._deal(s.names, s.isAI, rng, dealer);
+    this.s.redeals = redeals;
+    return this;
+  }
+
+  _log(t) { this.s.log.push(t); if (this.s.log.length > 40) this.s.log = this.s.log.slice(-40); }
+  _name(i) { return this.s.names[i] || ['你', '下家', '上家'][i]; }
+
+  /* ---------------- 叫分 ---------------- */
+  bidOptions() {
+    const s = this.s; if (s.phase !== 'bid') return [];
+    const opts = [0];
+    for (let v = 1; v <= 3; v++) if (v > s.bid.max) opts.push(v);
+    return opts;
+  }
+  bid(seat, call) {
+    const s = this.s;
+    if (s.phase !== 'bid') return { ok: false };
+    if (s.bid.order[s.bid.idx] !== seat) return { ok: false };
+    call = call | 0;
+    if (call !== 0 && (call <= s.bid.max || call > 3)) return { ok: false };
+    s.bid.calls[seat] = call;
+    if (call > s.bid.max) { s.bid.max = call; s.bid.leader = seat; this._log(this._name(seat) + ' 叫 ' + call + ' 分'); }
+    else this._log(this._name(seat) + ' 不叫');
+    s.bid.idx++;
+    if (s.bid.idx >= 3 || s.bid.max === 3) this._finishBidding();
+    else s.turn = s.bid.order[s.bid.idx];
+    return { ok: true };
+  }
+  aiBidTurn(seat) {
+    const s = this.s;
+    const call = aiBid(s.hands[seat], s.bid.max);
+    return this.bid(seat, call);
+  }
+  _finishBidding() {
+    const s = this.s;
+    if (s.bid.max === 0) { this.redeal(); return; }    // 无人叫 → 重发
+    const ll = s.bid.leader;
+    s.landlord = ll;
+    s.roles = [0, 1, 2].map(i => (i === ll ? 'landlord' : 'farmer'));
+    s.hands[ll] = sortHand(s.hands[ll].concat(s.bottom));
+    s.base = s.bid.max; s.multiplier = s.bid.max;
+    s.phase = 'play'; s.turn = ll; s.target = null; s.targetSeat = -1; s.passes = 0;
+    s.lastPlay = [null, null, null];
+    this._log(this._name(ll) + ' 当地主（底分 ' + s.bid.max + '）');
+  }
+
+  /* ---------------- 出牌 ---------------- */
+  // 出牌；cards 为 {r,s,id} 数组（必须是手牌子集）。返回 {ok, err?}
+  play(seat, cards) {
+    const s = this.s;
+    if (s.phase !== 'play' || s.turn !== seat) return { ok: false, err: 'turn' };
+    if (!Array.isArray(cards) || !cards.length) return { ok: false, err: 'empty' };
+    const handIds = new Set(s.hands[seat].map(c => c.id));
+    if (!cards.every(c => handIds.has(c.id))) return { ok: false, err: 'nothand' };
+    const cb = parseCombo(cards);
+    if (!cb) return { ok: false, err: 'badcombo' };
+    if (s.target && !comboBeats(cb, s.target)) return { ok: false, err: 'small' };
+    const ids = new Set(cards.map(c => c.id));
+    s.hands[seat] = s.hands[seat].filter(c => !ids.has(c.id));
+    s.lastPlay[seat] = cards.slice();
+    if (cb.type === 'bomb' || cb.type === 'rocket') { s.bombs++; s.multiplier *= 2; }
+    if (s.roles[seat] === 'landlord') s.llPlays++; else s.everFarmerPlayed = true;
+    s.target = { type: cb.type, len: cb.len, key: cb.key }; s.targetSeat = seat; s.passes = 0;
+    this._log(this._name(seat) + ' 出 ' + comboName(cb.type));
+    if (s.hands[seat].length === 0) { this._endGame(seat); return { ok: true }; }
+    s.turn = (seat + 1) % 3;
+    return { ok: true };
+  }
+  // 由引擎按 id 还原牌对象再出牌（联机后端用，客户端只传 id 数组）
+  playByIds(seat, ids) {
+    const hand = this.s.hands[seat] || [];
+    const map = new Map(hand.map(c => [c.id, c]));
+    const cards = ids.map(id => map.get(id | 0)).filter(Boolean);
+    if (cards.length !== ids.length) return { ok: false, err: 'nothand' };
+    return this.play(seat, cards);
+  }
+  pass(seat) {
+    const s = this.s;
+    if (s.phase !== 'play' || s.turn !== seat) return { ok: false, err: 'turn' };
+    if (s.target === null) return { ok: false, err: 'mustplay' };   // 首出不能过
+    s.lastPlay[seat] = 'pass'; s.passes++;
+    this._log(this._name(seat) + ' 不要');
+    if (s.passes >= 2) { s.target = null; s.targetSeat = -1; s.passes = 0; s.lastPlay = [null, null, null]; }
+    s.turn = (seat + 1) % 3;
+    return { ok: true };
+  }
+  // AI 行动一步：自动出牌或过
+  aiActTurn(seat) {
+    const s = this.s;
+    const mustPlay = s.target === null;
+    const oppMin = Math.min(...[0, 1, 2].filter(i => i !== seat).map(i => s.hands[i].length));
+    const play = aiPlay(s.hands[seat], {
+      target: mustPlay ? null : s.target, mustPlay, myRole: s.roles[seat],
+      targetRole: s.targetSeat >= 0 ? s.roles[s.targetSeat] : null, oppMinCount: oppMin,
+    });
+    if (play && play.length) return this.play(seat, play);
+    return this.pass(seat);
+  }
+
+  _endGame(winner) {
+    const s = this.s;
+    const farmersWin = s.roles[winner] === 'farmer';
+    let spring = false;
+    if (!farmersWin && !s.everFarmerPlayed) spring = true;          // 地主春天
+    else if (farmersWin && s.llPlays <= 1) spring = true;           // 农民反春天
+    if (spring) s.multiplier *= 2;
+    s.phase = 'end';
+    s.result = {
+      winner, farmersWin, spring,
+      base: s.base, multiplier: s.multiplier, bombs: s.bombs,
+      factor: s.base ? s.multiplier / s.base : 1,
+    };
+    this._log((farmersWin ? '农民胜' : '地主胜') + (spring ? '·春天' : '') + '，共 ' + s.multiplier + ' 倍');
+  }
+
+  /* ---------------- 视图（隐藏他人手牌） ---------------- */
+  publicView(seat) {
+    const s = this.s;
+    const ended = s.phase === 'end';
+    const players = [0, 1, 2].map(i => ({
+      name: this._name(i), ai: s.isAI[i], role: s.roles[i],
+      handCount: s.hands[i].length,
+      hand: (i === seat || ended) ? s.hands[i] : null,
+      lastPlay: s.lastPlay[i],
+    }));
+    return {
+      phase: s.phase, turn: s.turn, landlord: s.landlord, roles: s.roles,
+      mySeat: seat, players,
+      bottom: (s.landlord >= 0 || ended) ? s.bottom : null,
+      bid: s.phase === 'bid' ? { order: s.bid.order, idx: s.bid.idx, max: s.bid.max, leader: s.bid.leader, calls: s.bid.calls.slice(), options: this.bidOptions() } : null,
+      target: s.target, targetSeat: s.targetSeat, passes: s.passes,
+      base: s.base, multiplier: s.multiplier, bombs: s.bombs,
+      result: s.result, log: s.log.slice(-12),
+    };
+  }
+
+  /* ---------------- 序列化 ---------------- */
+  toJSON() { return this.s; }
+  static from(raw) { return raw ? new DoudizhuGame({ __raw: raw }) : null; }
+}
+
+// 把所有“该 AI 行动”的步骤推进完（叫分 + 出牌都自动跑 AI）。无定时窗口。
+export function ddzAdvance(g) {
+  const s = g.s;
+  let guard = 0;
+  while (guard++ < 600) {
+    if (s.phase === 'end') return;
+    const seat = s.turn;
+    if (!s.isAI[seat]) return;          // 轮到真人 → 停
+    if (s.phase === 'bid') { g.aiBidTurn(seat); continue; }
+    if (s.phase === 'play') { g.aiActTurn(seat); continue; }
+    return;
+  }
+}
