@@ -1,0 +1,396 @@
+// poker-engine.js — 斗地主纯逻辑引擎（牌型识别 / 比较 / 找牌 / 启发式 AI）
+// 单一真相源：notes/poker.html 用 <script type="module"> import，nn-diag 单测也 import。
+// 牌：对象 {r, s, id}。r=点数值(3..15=2)，小王 r=16，大王 r=17；s=花色 0♠1♥2♣3♦，王 s='x'/'X'。
+
+export const SUITS = ['♠', '♥', '♣', '♦'];
+export const R3 = 3, R2 = 15, BJ = 16, RJ = 17; // 王炸用 BJ/RJ
+
+// 点数标签
+export function rankLabel(r) {
+  if (r === 16) return 'w';   // 小王
+  if (r === 17) return 'W';   // 大王
+  if (r === 15) return '2';
+  if (r === 14) return 'A';
+  if (r === 13) return 'K';
+  if (r === 12) return 'Q';
+  if (r === 11) return 'J';
+  if (r === 10) return '10';
+  return String(r);
+}
+export function isRed(c) { return c.s === 1 || c.s === 3 || c.s === 'X'; }
+export function isJoker(c) { return c.r >= 16; }
+
+// 生成 54 张牌
+export function makeDeck() {
+  const d = [];
+  let id = 0;
+  for (let r = 3; r <= 15; r++) for (let s = 0; s < 4; s++) d.push({ r, s, id: id++ });
+  d.push({ r: 16, s: 'x', id: id++ });
+  d.push({ r: 17, s: 'X', id: id++ });
+  return d;
+}
+
+// 可注入随机数的洗牌（测试可固定种子）
+export function shuffle(arr, rng = Math.random) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+// 简单可重现 RNG
+export function mulberry32(seed) {
+  let t = seed >>> 0;
+  return function () {
+    t += 0x6D2B79F5;
+    let x = t;
+    x = Math.imul(x ^ (x >>> 15), x | 1);
+    x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export function sortHand(cards) {
+  return cards.slice().sort((a, b) => b.r - a.r || (suitOrd(a) - suitOrd(b)));
+}
+function suitOrd(c) { return typeof c.s === 'number' ? c.s : (c.s === 'X' ? 5 : 4); }
+
+// ---- 牌型识别 ----
+const TYPE_NAME = {
+  single: '单牌', pair: '对子', trio: '三张', trio_single: '三带一', trio_pair: '三带二',
+  straight: '顺子', straight_pair: '连对', plane: '飞机', plane_single: '飞机带单',
+  plane_pair: '飞机带对', four_two_single: '四带二', four_two_pair: '四带两对',
+  bomb: '炸弹', rocket: '王炸',
+};
+export function comboName(t) { return TYPE_NAME[t] || t; }
+
+function counts(cards) {
+  const m = {};
+  for (const c of cards) m[c.r] = (m[c.r] || 0) + 1;
+  return m;
+}
+function byCountBuckets(cnt) {
+  const b = { 1: [], 2: [], 3: [], 4: [] };
+  for (const r in cnt) b[cnt[r]].push(+r);
+  for (const k in b) b[k].sort((a, x) => a - x);
+  return b;
+}
+function consecutive(sorted, maxAllowed = 14) {
+  if (sorted.length === 0) return false;
+  if (sorted[sorted.length - 1] > maxAllowed) return false; // 不含 2/王
+  for (let i = 1; i < sorted.length; i++) if (sorted[i] !== sorted[i - 1] + 1) return false;
+  return true;
+}
+
+// 返回 {type, len, key} 或 null。len 用于顺子/连对/飞机的长度比较。
+export function parseCombo(cards) {
+  const n = cards.length;
+  if (n === 0) return null;
+  const cnt = counts(cards);
+  const b = byCountBuckets(cnt);
+  const ranks = Object.keys(cnt).map(Number);
+
+  if (n === 1) return { type: 'single', len: 1, key: ranks[0] };
+  if (n === 2) {
+    if (b[1].length === 2 && b[1].includes(16) && b[1].includes(17)) return { type: 'rocket', len: 1, key: 100 };
+    if (b[2].length === 1) return { type: 'pair', len: 1, key: b[2][0] };
+    return null;
+  }
+  if (n === 3) { if (b[3].length === 1) return { type: 'trio', len: 1, key: b[3][0] }; return null; }
+  if (n === 4) {
+    if (b[4].length === 1) return { type: 'bomb', len: 1, key: b[4][0] };
+    if (b[3].length === 1 && b[1].length === 1) return { type: 'trio_single', len: 1, key: b[3][0] };
+    return null;
+  }
+
+  // n>=5
+  // 顺子
+  if (b[2].length === 0 && b[3].length === 0 && b[4].length === 0 && b[1].length === n && consecutive(b[1]) && n >= 5)
+    return { type: 'straight', len: n, key: Math.max(...b[1]) };
+  // 连对
+  if (n % 2 === 0 && b[1].length === 0 && b[3].length === 0 && b[4].length === 0 && b[2].length === n / 2 && b[2].length >= 3 && consecutive(b[2]))
+    return { type: 'straight_pair', len: n / 2, key: Math.max(...b[2]) };
+  // 飞机族（三连张只取 count===3 的，且不允许出现炸弹）
+  const trios = b[3];
+  if (trios.length >= 2 && b[4].length === 0 && consecutive(trios)) {
+    const t = trios.length, top = trios[t - 1];
+    if (n === 3 * t && b[1].length === 0 && b[2].length === 0) return { type: 'plane', len: t, key: top };
+    if (n === 4 * t) { const wing = b[1].length + b[2].length * 2; if (wing === t) return { type: 'plane_single', len: t, key: top }; }
+    if (n === 5 * t) { if (b[2].length === t && b[1].length === 0) return { type: 'plane_pair', len: t, key: top }; }
+  }
+  // 三带二
+  if (n === 5 && b[3].length === 1 && b[2].length === 1) return { type: 'trio_pair', len: 1, key: b[3][0] };
+  // 四带二（单）/四带两对
+  if (n === 6 && b[4].length === 1) {
+    if (b[1].length === 2 || b[2].length === 1) return { type: 'four_two_single', len: 1, key: b[4][0] };
+  }
+  if (n === 8 && b[4].length === 1 && b[2].length === 2) return { type: 'four_two_pair', len: 1, key: b[4][0] };
+  return null;
+}
+
+// a 能否压过 b（b 为当前需要跟的牌；b 为 null 时表示首出，任意合法牌型都可）
+export function comboBeats(a, b) {
+  if (!a) return false;
+  if (!b) return true;
+  if (a.type === 'rocket') return true;
+  if (b.type === 'rocket') return false;
+  if (a.type === 'bomb' && b.type !== 'bomb') return true;
+  if (b.type === 'bomb' && a.type !== 'bomb') return false;
+  if (a.type === b.type && a.len === b.len) return a.key > b.key;
+  return false;
+}
+
+// ---- 找出手中所有能压过 target 的牌（含炸弹/王炸） ----
+function byRank(cards) {
+  const m = new Map();
+  for (const c of cards) { if (!m.has(c.r)) m.set(c.r, []); m.get(c.r).push(c); }
+  return m;
+}
+function smallestWing(map, excludeRanks, k, pairWing) {
+  // 返回 k 个单牌(pairWing=false) 或 k 对(返回 2k 张) 的最小翼牌，避开 excludeRanks；找不到返回 null
+  const need = pairWing ? 2 : 1;
+  const out = [];
+  const ranks = [...map.keys()].sort((a, b) => a - b);
+  for (const r of ranks) {
+    if (excludeRanks.includes(r)) continue;
+    const arr = map.get(r);
+    if (arr.length >= need) { out.push(arr.slice(0, need)); if (out.length === k) break; }
+  }
+  if (out.length < k) return null;
+  return out.flat();
+}
+
+export function enumerateBeats(cards, target) {
+  const res = [];
+  const map = byRank(cards);
+  const ranks = [...map.keys()].sort((a, b) => a - b);
+  const has = r => (map.get(r) || []).length;
+  const take = (r, k) => (map.get(r) || []).slice(0, k);
+  const t = target;
+  const add = arr => { if (arr && arr.length) res.push(arr); };
+
+  if (t) {
+    if (t.type === 'single') { for (const r of ranks) if (r > t.key && has(r) >= 1) add(take(r, 1)); }
+    else if (t.type === 'pair') { for (const r of ranks) if (r > t.key && has(r) >= 2) add(take(r, 2)); }
+    else if (t.type === 'trio') { for (const r of ranks) if (r > t.key && has(r) >= 3) add(take(r, 3)); }
+    else if (t.type === 'trio_single') {
+      for (const r of ranks) if (r > t.key && has(r) >= 3) { const w = smallestWing(map, [r], 1, false); if (w) add([...take(r, 3), ...w]); }
+    } else if (t.type === 'trio_pair') {
+      for (const r of ranks) if (r > t.key && has(r) >= 3) { const w = smallestWing(map, [r], 1, true); if (w) add([...take(r, 3), ...w]); }
+    } else if (t.type === 'straight' || t.type === 'straight_pair') {
+      const need = t.type === 'straight' ? 1 : 2;
+      addStraights(map, t.len, t.key, need, add);
+    } else if (t.type === 'plane' || t.type === 'plane_single' || t.type === 'plane_pair') {
+      addPlanes(map, t, add);
+    } else if (t.type === 'four_two_single' || t.type === 'four_two_pair') {
+      const pairWing = t.type === 'four_two_pair';
+      for (const r of ranks) if (r > t.key && has(r) >= 4) {
+        const w = smallestWing(map, [r], 2, pairWing);
+        if (w) add([...take(r, 4), ...w]);
+      }
+    }
+  }
+  // 炸弹永远可压（target 是炸弹则需更大；target 是王炸则不可）
+  if (!t || t.type !== 'rocket') {
+    for (const r of ranks) if (has(r) >= 4) { if (t && t.type === 'bomb') { if (r > t.key) add(take(r, 4)); } else add(take(r, 4)); }
+    if (has(16) && has(17)) add([...take(16, 1), ...take(17, 1)]);
+  }
+  return res;
+}
+
+function addStraights(map, len, key, need, add) {
+  // 窗口长 len 的连续点数(<=14)，每点 count>=need，且窗口最大点 > key
+  for (let start = 3; start + len - 1 <= 14; start++) {
+    const end = start + len - 1;
+    if (end <= key) continue;
+    let ok = true;
+    for (let r = start; r <= end; r++) if (((map.get(r) || []).length) < need) { ok = false; break; }
+    if (!ok) continue;
+    const cards = [];
+    for (let r = start; r <= end; r++) cards.push(...map.get(r).slice(0, need));
+    add(cards);
+  }
+}
+function addPlanes(map, t, add) {
+  const len = t.len; // 三张连张数
+  for (let start = 3; start + len - 1 <= 14; start++) {
+    const end = start + len - 1;
+    if (end <= t.key) continue;
+    let ok = true;
+    for (let r = start; r <= end; r++) if (((map.get(r) || []).length) < 3) { ok = false; break; }
+    if (!ok) continue;
+    const base = [];
+    const exclude = [];
+    for (let r = start; r <= end; r++) { base.push(...map.get(r).slice(0, 3)); exclude.push(r); }
+    if (t.type === 'plane') { add(base); continue; }
+    const pairWing = t.type === 'plane_pair';
+    const w = smallestWing(map, exclude, len, pairWing);
+    if (w) add([...base, ...w]);
+  }
+}
+
+// 首出时可选的所有“起手”牌型（用于人类“提示”循环 & AI 候选）
+export function leadOptions(cards) {
+  const res = [];
+  const map = byRank(cards);
+  const ranks = [...map.keys()].sort((a, b) => a - b);
+  const has = r => (map.get(r) || []).length;
+  const take = (r, k) => map.get(r).slice(0, k);
+  // 单 / 对 / 三 / 三带一 / 三带二
+  for (const r of ranks) {
+    res.push(take(r, 1));
+    if (has(r) >= 2) res.push(take(r, 2));
+    if (has(r) >= 3) {
+      res.push(take(r, 3));
+      const w1 = smallestWing(map, [r], 1, false); if (w1) res.push([...take(r, 3), ...w1]);
+      const w2 = smallestWing(map, [r], 1, true); if (w2) res.push([...take(r, 3), ...w2]);
+    }
+  }
+  // 顺子（5..最长）/ 连对 / 飞机
+  for (let len = 5; len <= 12; len++) addStraights(map, len, 2, 1, a => res.push(a));
+  for (let len = 3; len <= 10; len++) addStraights(map, len, 2, 2, a => res.push(a));
+  for (let len = 2; len <= 6; len++) {
+    addPlanes(map, { type: 'plane', len, key: 2 }, a => res.push(a));
+    addPlanes(map, { type: 'plane_single', len, key: 2 }, a => res.push(a));
+    addPlanes(map, { type: 'plane_pair', len, key: 2 }, a => res.push(a));
+  }
+  // 四带二
+  for (const r of ranks) if (has(r) >= 4) {
+    const w = smallestWing(map, [r], 2, false); if (w) res.push([...take(r, 4), ...w]);
+    const wp = smallestWing(map, [r], 2, true); if (wp) res.push([...take(r, 4), ...wp]);
+    res.push(take(r, 4)); // 炸弹
+  }
+  if (has(16) && has(17)) res.push([...take(16, 1), ...take(17, 1)]);
+  // 去重 + 过滤非法
+  const seen = new Set(), out = [];
+  for (const a of res) {
+    const cb = parseCombo(a); if (!cb) continue;
+    const key = a.map(c => c.id).sort((x, y) => x - y).join(',');
+    if (seen.has(key)) continue; seen.add(key); out.push(a);
+  }
+  return out;
+}
+
+// ---- 启发式 AI ----
+// 叫分：基于王炸/炸弹/2/大牌评估，返回 0..3
+export function aiBid(cards, current = 0) {
+  let score = 0;
+  const cnt = counts(cards);
+  const has2 = (cnt[15] || 0), bj = cnt[16] || 0, rj = cnt[17] || 0;
+  if (bj && rj) score += 3.0;            // 王炸
+  else if (bj || rj) score += 1.0;       // 单王
+  score += has2 * 1.2;                   // 每张 2
+  for (const r in cnt) if (cnt[r] === 4) score += 2.5; // 炸弹
+  score += (cnt[14] || 0) * 0.5;         // A
+  score += (cnt[13] || 0) * 0.3;         // K
+  let call = 0;
+  if (score >= 7) call = 3; else if (score >= 4.5) call = 2; else if (score >= 2.6) call = 1;
+  return call > current ? call : 0; // 不超过已叫分则不叫
+}
+
+// 估算手牌“手数”（越少越接近走完），用于辅助 AI 决策
+function handSteps(cards) {
+  // 贪心拆牌：火箭/炸弹各 1 手，顺子/连对/飞机尽量长，余下三带/对/单
+  let pool = counts(cards);
+  let steps = 0;
+  const cntOf = r => pool[r] || 0;
+  // 火箭
+  if (cntOf(16) && cntOf(17)) { steps++; pool[16]--; pool[17]--; }
+  // 炸弹
+  for (let r = 3; r <= 17; r++) if (cntOf(r) === 4) { steps++; pool[r] = 0; }
+  // 顺子（从长到短）
+  for (let len = 12; len >= 5; len--) {
+    for (let s = 3; s + len - 1 <= 14; s++) {
+      let ok = true; for (let r = s; r < s + len; r++) if (cntOf(r) < 1) { ok = false; break; }
+      if (ok) { steps++; for (let r = s; r < s + len; r++) pool[r]--; }
+    }
+  }
+  // 连对
+  for (let len = 10; len >= 3; len--) {
+    for (let s = 3; s + len - 1 <= 14; s++) {
+      let ok = true; for (let r = s; r < s + len; r++) if (cntOf(r) < 2) { ok = false; break; }
+      if (ok) { steps++; for (let r = s; r < s + len; r++) pool[r] -= 2; }
+    }
+  }
+  // 三张
+  for (let r = 3; r <= 15; r++) while (cntOf(r) >= 3) { steps++; pool[r] -= 3; }
+  // 对子
+  for (let r = 3; r <= 17; r++) while (cntOf(r) >= 2) { steps++; pool[r] -= 2; }
+  // 单牌
+  for (let r = 3; r <= 17; r++) steps += cntOf(r);
+  return steps;
+}
+
+// AI 决策：返回要出的 cards 数组，或 null（不要 / 首出必须出则给最小）。
+// ctx: { target, mustPlay(首出), myRole, targetRole, myCount, oppMinCount }
+export function aiPlay(cards, ctx) {
+  const { target, mustPlay, myRole, targetRole, oppMinCount = 99 } = ctx;
+  if (mustPlay || !target) return aiLead(cards, ctx);
+
+  // 跟牌
+  let beats = enumerateBeats(cards, target);
+  if (beats.length === 0) return null;
+  const myCount = cards.length;
+  // 队友出的牌：农民之间默认不压（除非自己能一手走完）
+  const isTeammate = targetRole && myRole && targetRole === myRole && myRole === 'farmer';
+  if (isTeammate) {
+    // 能直接打光且这手刚好是整副 → 出，否则让队友
+    const exact = beats.find(b => b.length === myCount && parseCombo(b));
+    if (exact) return exact;
+    return null;
+  }
+  // 对手出的牌：挑“最小且不是炸弹/王炸”的来压
+  const nonBomb = beats.filter(b => { const c = parseCombo(b); return c && c.type !== 'bomb' && c.type !== 'rocket'; });
+  const bombs = beats.filter(b => { const c = parseCombo(b); return c && (c.type === 'bomb' || c.type === 'rocket'); });
+  const score = b => b.length + parseCombo(b).key / 100; // 越小越优先
+  nonBomb.sort((a, b) => score(a) - score(b));
+  if (nonBomb.length) {
+    // 若能正好走完，必出
+    const exact = nonBomb.find(b => b.length === myCount);
+    if (exact) return exact;
+    // 不要为压一张小单牌而拆掉很大的牌：若需用到 2/王 压单且自己牌还多，可考虑过（简单阈值）
+    const best = nonBomb[0];
+    const cb = parseCombo(best);
+    if (target.type === 'single' && cb.key >= 15 && myCount > 4 && target.key < 11) {
+      // 对方出小单，自己只能用 2/王 压，牌还多 → 过
+      return null;
+    }
+    return best;
+  }
+  // 只能用炸弹：对手快走完(<=2 手内) 或自己能一击走完才炸
+  bombs.sort((a, b) => a.length - b.length || parseCombo(a).key - parseCombo(b).key);
+  if (oppMinCount <= 2 || myRole === 'farmer' && targetRole === 'landlord' && oppMinCount <= 3) return bombs[0];
+  return null;
+}
+
+function aiLead(cards, ctx) {
+  const opts = leadOptions(cards).filter(o => o.length);
+  if (opts.length === 0) return cards.slice(0, 1);
+  const myCount = cards.length;
+  // 能一手走完优先
+  const win = opts.find(o => o.length === myCount && parseCombo(o));
+  if (win) return win;
+  const rank = o => {
+    const c = parseCombo(o);
+    let pri = 5;
+    if (c.type === 'straight' || c.type === 'straight_pair' || c.type.startsWith('plane')) pri = 0; // 优先甩长条
+    else if (c.type === 'trio' || c.type === 'trio_single' || c.type === 'trio_pair') pri = 1;
+    else if (c.type === 'single') pri = 2;
+    else if (c.type === 'pair') pri = 3;
+    else if (c.type === 'bomb' || c.type === 'rocket') pri = 9; // 炸弹/王炸不轻易首出
+    else pri = 4;
+    return [pri, c.key, -o.length];
+  };
+  opts.sort((a, b) => { const ra = rank(a), rb = rank(b); return ra[0] - rb[0] || ra[1] - rb[1] || ra[2] - rb[2]; });
+  // 避免首出就甩 2/王单张（保留控牌）：若最优是 2/王 的单/对，挑次优非大牌
+  for (const o of opts) {
+    const c = parseCombo(o);
+    if ((c.type === 'bomb' || c.type === 'rocket')) continue;
+    if ((c.type === 'single' || c.type === 'pair') && c.key >= 15 && opts.length > 3) continue;
+    return o;
+  }
+  return opts[0];
+}
+
+export const __engine = { parseCombo, comboBeats, enumerateBeats, handSteps, leadOptions };
