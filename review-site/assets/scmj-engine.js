@@ -213,7 +213,37 @@ export const DEFAULT_RULE = {
   zimoFan: 1, pengpengFan: 1, qingyiseFan: 2, qiduiFan: 2,
   jiangduiFan: 2, jingouFan: 1, ganghuaFan: 1, qianggangFan: 1, haidiFan: 1,
   tianhuFan: 6,
+  // —— 变体开关 ——
+  variant: 'sichuan',
+  dingque: true,        // 是否定缺
+  allowChi: false,      // 是否可吃
+  bloodBattle: true,    // 血战到底（多胡）/ 单赢一局
+  liujuSettle: 'sichuan', // 流局结算：'sichuan'(查叫查花猪) / 'none'(荒庄)
 };
+// 变体预设
+export const RULES = {
+  sichuan: () => Object.assign({}, DEFAULT_RULE, {
+    variant: 'sichuan', dingque: true, allowChi: false, bloodBattle: true, liujuSettle: 'sichuan',
+  }),
+  changsha: () => Object.assign({}, DEFAULT_RULE, {
+    variant: 'changsha', dingque: false, allowChi: true, bloodBattle: false, liujuSettle: 'none',
+  }),
+};
+export function ruleFor(variant, over) {
+  const base = (RULES[variant] || RULES.sichuan)();
+  return Object.assign(base, over || {});
+}
+
+// 吃：返回能与 tile 组成顺子的顺子起始牌 low 列表（同花色，需手里另两张）。
+export function chiOptions(cnt, tile) {
+  const out = [];
+  const s = suitOf(tile), r = rankOf(tile);      // r:1..9
+  const has = (rank) => rank >= 1 && rank <= 9 && cnt[s * 9 + (rank - 1)] > 0;
+  if (has(r - 2) && has(r - 1)) out.push(s * 9 + (r - 3));   // low = r-2
+  if (has(r - 1) && has(r + 1)) out.push(s * 9 + (r - 2));   // low = r-1
+  if (has(r + 1) && has(r + 2)) out.push(s * 9 + (r - 1));   // low = r
+  return out;
+}
 
 // concealed 含和牌张; melds=[{type,tile}]; 返回 {fanList,fan,bei,points,type,name}
 export function scoreWin(opts) {
@@ -228,9 +258,10 @@ export function scoreWin(opts) {
   const total = sum(cnt);
   const allTiles = cnt.slice();
   for (const m of melds) {
-    // 副露每组 3 张同牌（四川无吃，皆为刻/杠）
-    allTiles[m.tile] += (m.type === 'gang' || m.type === 'angang' || m.type === 'bugang') ? 4 : 3;
+    if (m.type === 'chi') { allTiles[m.tile]++; allTiles[m.tile + 1]++; allTiles[m.tile + 2]++; }
+    else allTiles[m.tile] += (m.type === 'gang' || m.type === 'angang' || m.type === 'bugang') ? 4 : 3;
   }
+  const noChi = melds.every(m => m.type !== 'chi');
 
   // —— 牌型 ——
   let isQidui = false, qiduiGangs = 0;
@@ -238,7 +269,7 @@ export function scoreWin(opts) {
     const qi = chiitoiInfo(cnt);
     if (qi.win) { isQidui = true; qiduiGangs = qi.gangs; }
   }
-  const allTriplets = !isQidui && isAllTriplets(cnt);
+  const allTriplets = !isQidui && noChi && isAllTriplets(cnt);
   // 清一色：所有牌同花色
   let suitsUsed = new Set();
   for (let i = 0; i < 27; i++) if (allTiles[i] > 0) suitsUsed.add(suitOf(i));
@@ -378,6 +409,18 @@ function quelessCounts(cnt, que) {
   if (que != null) for (let r = 0; r < 9; r++) c[que * 9 + r] = 0;
   return c;
 }
+// AI 选吃：返回使吃后向听最小的顺子起始 low；无改善则 null
+export function aiChooseChi(cnt, que, meldsCount, tile, lows) {
+  const before = shanten(cnt, meldsCount, que);
+  let best = null, bestSh = Infinity;
+  for (const low of lows) {
+    const c = cnt.slice();
+    for (const t of [low, low + 1, low + 2]) if (t !== tile) c[t]--;
+    const sh = shanten(c, meldsCount + 1, que);
+    if (sh < bestSh) { bestSh = sh; best = low; }
+  }
+  return (best != null && bestSh < before) ? best : null;
+}
 // AI 是否直杠（别人打出）：一般有利则杠（除非破坏听牌/七对）
 export function aiShouldGangDiscard(cnt, que, meldsCount, tile) {
   if (que != null && suitOf(tile) === que) return false;
@@ -430,7 +473,7 @@ export class SCMJGame {
     }
     players[dealer].hand[wall[wpos]]++; players[dealer].drawn = wall[wpos]; wpos++;
     this.s = {
-      rule, seed, dealer, turn: dealer, phase: 'dingque',
+      rule, seed, dealer, turn: dealer, phase: rule.dingque ? 'dingque' : 'play',
       wall, wpos, wend: wall.length,
       players, lastDraw: { seat: dealer, tile: players[dealer].drawn },
       window: null, liveCount: 4, log: [], result: null,
@@ -504,13 +547,19 @@ export class SCMJGame {
       const canRon = canHu(p.hand, p.melds.length, p.que);
       p.hand[tile]--;
       if (canRon) opts.push('hu');
+      let chi = null;
       if (!isQiangGang) {
         // 明杠
         if (p.hand[tile] === 3 && !(p.que != null && suitOf(tile) === p.que)) opts.push('gang');
         // 碰
         if (p.hand[tile] >= 2 && !(p.que != null && suitOf(tile) === p.que)) opts.push('peng');
+        // 吃（仅下家、变体允许）
+        if (s.rule.allowChi && seat === (from + 1) % 4) {
+          const co = chiOptions(p.hand, tile);
+          if (co.length) { opts.push('chi'); chi = co; }
+        }
       }
-      if (opts.length) responders[seat] = { opts, resp: null };
+      if (opts.length) responders[seat] = { opts, resp: null, chi };
     }
     s.window = { tile, from, isQiangGang, responders, haidi: s.wpos >= s.wend, _bugang: bugangInfo || null };
     if (Object.keys(responders).length === 0) {
@@ -525,12 +574,13 @@ export class SCMJGame {
     return w ? Object.keys(w.responders).map(Number) : [];
   }
   // 玩家对窗口响应：action ∈ {'hu','peng','gang','pass'}
-  respond(seat, action) {
+  respond(seat, action, meta) {
     const s = this.s;
     const w = s.window;
     if (!w || !w.responders[seat]) return { ok: false };
     if (action !== 'pass' && !w.responders[seat].opts.includes(action)) return { ok: false };
     w.responders[seat].resp = action;
+    w.responders[seat].meta = meta || null;
     if (Object.values(w.responders).every(r => r.resp != null)) return this._resolveWindow();
     return { ok: true, pending: true };
   }
@@ -543,11 +593,11 @@ export class SCMJGame {
     const s = this.s, w = s.window;
     const tile = w.tile, from = w.from;
     const entries = Object.entries(w.responders).map(([seat, r]) => ({ seat: +seat, resp: r.resp }));
-    // 一炮多响：所有选 hu 的都胡
-    const huers = entries.filter(e => e.resp === 'hu').map(e => e.seat);
+    // 一炮多响：所有选 hu 的都胡（单赢变体只取最近一家）
+    let huers = entries.filter(e => e.resp === 'hu').map(e => e.seat);
     if (huers.length) {
-      // 按座位顺序结算点炮
       huers.sort((a, b) => ((a - from + 4) % 4) - ((b - from + 4) % 4));
+      if (!s.rule.bloodBattle) huers = [huers[0]];
       for (const seat of huers) {
         const p = s.players[seat];
         p.hand[tile]++;
@@ -578,6 +628,20 @@ export class SCMJGame {
       s.window = null;
       s.phase = 'play'; s.turn = seat;
       return { ok: true, peng: { seat, tile }, needDiscard: seat };
+    }
+    // 吃（仅下家）
+    const chier = entries.find(e => e.resp === 'chi');
+    if (chier) {
+      const seat = chier.seat, p = s.players[seat];
+      const avail = w.responders[seat].chi || [];
+      const meta = w.responders[seat].meta || {};
+      let low = meta.seq;
+      if (low == null || !avail.includes(low)) low = avail[0];
+      for (const t of [low, low + 1, low + 2]) if (t !== tile) p.hand[t]--;
+      p.melds.push({ type: 'chi', tile: low, from });
+      this._log({ t: 'chi', seat, tile, low, from });
+      s.window = null; s.phase = 'play'; s.turn = seat;
+      return { ok: true, chi: { seat, low }, needDiscard: seat };
     }
     // 全部过
     return this._closeWindow();
@@ -718,6 +782,7 @@ export class SCMJGame {
 
   _afterWinAdvance(fromSeat) {
     const s = this.s;
+    if (!s.rule.bloodBattle) return this._endGame('win');   // 单赢一局即结束
     if (s.liveCount <= 1) return this._endGame('all_hu');
     // 自摸后从自己下家摸；点炮后从放炮者下家摸
     return this._nextDraw(fromSeat);
@@ -726,6 +791,7 @@ export class SCMJGame {
   // ---- 流局（查叫 / 查花猪 / 退税） ----
   _liuju() {
     const s = this.s;
+    if (s.rule.liujuSettle === 'none') return this._endGame('liuju');   // 荒庄不赔
     const live = [];
     for (let i = 0; i < 4; i++) if (!s.players[i].hu) live.push(i);
     // 判定每家：花猪 / 听牌 / 未听
@@ -805,15 +871,20 @@ export class SCMJGame {
     if (!w || !w.responders[seat]) return { ok: false };
     const p = s.players[seat];
     const opts = w.responders[seat].opts;
-    if (opts.includes('hu')) return this.respond(seat, 'hu');   // 有胡必胡（血战）
+    if (opts.includes('hu')) return this.respond(seat, 'hu');   // 有胡必胡
     if (opts.includes('gang') && aiShouldGangDiscard(p.hand, p.que, p.melds.length, w.tile)) return this.respond(seat, 'gang');
     if (opts.includes('peng') && aiShouldPeng(p.hand, p.que, p.melds.length, w.tile)) return this.respond(seat, 'peng');
+    if (opts.includes('chi')) {
+      const best = aiChooseChi(p.hand, p.que, p.melds.length, w.tile, w.responders[seat].chi || []);
+      if (best != null) return this.respond(seat, 'chi', { seq: best });
+    }
     return this.respond(seat, 'pass');
   }
 }
 
 export default {
   SCMJGame, scoreWin, canHu, isTing, tingTiles, shanten, chiitoiInfo,
-  aiChooseQue, aiDiscard, freshWall, mulberry32, tstr, parseTile,
+  aiChooseQue, aiDiscard, aiChooseChi, chiOptions, freshWall, mulberry32, tstr, parseTile,
+  RULES, ruleFor, DEFAULT_RULE,
   SUITS, SUIT_NAME, suitOf, rankOf, tid, listToCounts, countsToList, emptyCounts,
 };

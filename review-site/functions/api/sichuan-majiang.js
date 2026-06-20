@@ -4,7 +4,7 @@
 //     create{nick,di,cap} / join{nick} / state / dingque{suit} / discard{tile}
 //     / zimo / angang{tile} / bugang{tile} / respond{resp} / reset / leave
 // 鉴权由 _middleware.js 统一处理（仅登录用户可访问 /api/*）。
-import { SCMJGame, aiChooseQue, DEFAULT_RULE } from '../../assets/scmj-engine.js';
+import { SCMJGame, aiChooseQue, DEFAULT_RULE, ruleFor } from '../../assets/scmj-engine.js';
 
 const json = (o, status = 200) => Response.json(o, { status });
 const clean = (s, n = 16) => (typeof s === 'string' ? s : '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, n);
@@ -94,14 +94,14 @@ function view(room, g, seats, cid) {
   }));
   let win = null;
   if (s.phase === 'window' && mySeat >= 0 && s.window.responders[mySeat]) {
-    win = { tile: s.window.tile, from: s.window.from, opts: s.window.responders[mySeat].opts, waiting: s.window.responders[mySeat].resp != null };
+    win = { tile: s.window.tile, from: s.window.from, opts: s.window.responders[mySeat].opts, chi: s.window.responders[mySeat].chi || null, waiting: s.window.responders[mySeat].resp != null };
   } else if (s.phase === 'window') {
     win = { tile: s.window.tile, from: s.window.from, opts: [], waiting: true };
   }
   let turnOpts = null;
   if (s.phase === 'play' && s.turn === mySeat && !s.players[mySeat].hu) turnOpts = g.turnOptions(mySeat);
   return {
-    room, mySeat, phase: s.phase, turn: s.turn, dealer: s.dealer,
+    room, mySeat, variant: s.rule.variant, phase: s.phase, turn: s.turn, dealer: s.dealer,
     rest: Math.max(0, s.wend - s.wpos), liveCount: s.liveCount,
     ended, reason: s.result && s.result.reason, result: s.result,
     players, window: win, turnOpts, lastDraw: s.lastDraw,
@@ -140,7 +140,7 @@ export async function onRequestPost({ request, env }) {
       // 已存在 → 当作加入
       return doJoin(env, room, cid, cleanNick(body.nick), now);
     }
-    const rule = Object.assign({}, DEFAULT_RULE, { di: clampDi(body.di), maxFan: clampCap(body.cap) });
+    const rule = ruleFor(clampVariant(body.variant), { di: clampDi(body.di), maxFan: clampCap(body.cap) });
     const seats = newSeats(cid, cleanNick(body.nick));
     const g = newGame(seats, rule, 0);
     const wdl = advance(g, seats, now, 0);
@@ -198,8 +198,8 @@ export async function onRequestPost({ request, env }) {
     r = g.bugang(mySeat, clampTile(body.tile));
   } else if (action === 'respond') {
     const resp = clean(body.resp, 8);
-    if (!['hu', 'peng', 'gang', 'pass'].includes(resp)) return json({ error: 'bad resp' }, 400);
-    r = g.respond(mySeat, resp);
+    if (!['hu', 'peng', 'gang', 'chi', 'pass'].includes(resp)) return json({ error: 'bad resp' }, 400);
+    r = g.respond(mySeat, resp, resp === 'chi' ? { seq: clampTile(body.seq) } : null);
   } else {
     return json({ error: 'unknown action' }, 400);
   }
@@ -230,5 +230,6 @@ const clampSuit = (v) => { v = +v; return (v === 0 || v === 1 || v === 2) ? v : 
 const clampTile = (v) => { v = +v; return (Number.isInteger(v) && v >= 0 && v < 27) ? v : -1; };
 const clampDi = (v) => { v = +v; return [1, 2, 5].includes(v) ? v : 1; };
 const clampCap = (v) => { v = +v; return [3, 4, 5].includes(v) ? v : 4; };
+const clampVariant = (v) => (v === 'changsha' ? 'changsha' : 'sichuan');
 
 export async function onRequestGet() { return json({ error: 'use POST' }, 405); }
