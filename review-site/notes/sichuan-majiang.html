@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>四川麻将 · 血战到底</title>
+<script>
+  // 跟随站点主题；本页自管配色并剥离阅读器整体反相（nb-dark-invert）。
+  (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
+</script>
+<style>
+  :root{
+    --bg:#0e5a34; --felt:#0b7a45; --felt2:#0a6b3d; --panel:#ffffff; --fg:#13231a; --muted:#6b7d72;
+    --line:#d7ddd8; --accent:#0b7a45; --on-accent:#fff; --gold:#e7c25a; --shadow:rgba(0,0,0,.22);
+    --chip:#eef2ef; --hl:#ffd24d; --danger:#c0392b; --tile-bg:#fbfaf5;
+  }
+  html[data-theme="dark"]{
+    --bg:#0a3322; --felt:#0c5e38; --felt2:#0a4f2f; --panel:#1d241f; --fg:#e7efe9; --muted:#9fb3a6;
+    --line:#33403a; --accent:#3fae74; --on-accent:#08160e; --shadow:rgba(0,0,0,.5);
+    --chip:#27302a; --tile-bg:#ece8db;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg); color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased; min-height:100%;}
+  .hide{display:none !important}
+  button{font:inherit}
+
+  /* ---------- 开局设置 ---------- */
+  #setup{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:18px}
+  .card{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:18px;
+    box-shadow:0 8px 30px var(--shadow);padding:22px;width:100%;max-width:460px}
+  .card h1{font-size:22px;margin:0 0 2px}
+  .sub{color:var(--muted);font-size:13px;margin:0 0 16px;line-height:1.5}
+  .label{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;margin:14px 2px 8px}
+  .label:first-of-type{margin-top:0}
+  .modes{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .mode{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 8px;border:1.5px solid var(--line);
+    border-radius:14px;background:transparent;color:var(--fg);cursor:pointer;transition:.15s}
+  .mode .em{font-size:22px}.mode b{font-size:13.5px}.mode small{font-size:11px;color:var(--muted);text-align:center}
+  .mode:hover{background:var(--chip)}
+  .mode.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
+  .seg{display:flex;gap:4px;padding:4px;background:var(--chip);border-radius:999px}
+  .seg button{flex:1;padding:8px 6px;border:0;border-radius:999px;background:transparent;color:var(--muted);
+    font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+  .seg button.on{background:var(--accent);color:var(--on-accent)}
+  input.txt{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:12px;background:var(--bg);
+    color:var(--fg);font-size:14px;outline:none}
+  html[data-theme="dark"] input.txt{background:#0d1a13}
+  .start{width:100%;margin-top:20px;padding:14px;border:0;border-radius:999px;background:var(--accent);color:var(--on-accent);
+    font-size:15px;font-weight:700;cursor:pointer;transition:.15s}
+  .start:hover{filter:brightness(1.06)}
+  .hint{font-size:12px;color:var(--muted);margin:8px 2px 0;line-height:1.5}
+
+  /* ---------- 牌桌 ---------- */
+  #game{min-height:100vh;display:flex;flex-direction:column;
+    background:radial-gradient(120% 120% at 50% 30%,var(--felt) 0%,var(--felt2) 70%);}
+  .topbar{display:flex;align-items:center;gap:10px;padding:10px 14px;color:#eaf6ee;font-size:13px}
+  .topbar .t{font-weight:700;font-size:15px}
+  .topbar .sp{flex:1}
+  .topbar button{padding:7px 12px;border:1px solid #ffffff44;background:#ffffff1a;color:#eaf6ee;border-radius:999px;cursor:pointer;font-size:12.5px}
+  .topbar button:hover{background:#ffffff30}
+  .table{flex:1;display:grid;gap:6px;padding:8px 10px 4px;
+    grid-template-columns:120px 1fr 120px;grid-template-rows:auto 1fr auto;
+    grid-template-areas:"top top top" "left center right" "bottom bottom bottom";max-width:1100px;margin:0 auto;width:100%}
+  .seat{color:#eaf6ee}
+  .seat.top{grid-area:top}.seat.left{grid-area:left}.seat.right{grid-area:right}.seat.bottom{grid-area:bottom}
+  .center{grid-area:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:120px}
+  .nameplate{display:inline-flex;align-items:center;gap:7px;background:#00000033;border-radius:999px;padding:4px 11px;font-size:12.5px}
+  .nameplate.turn{outline:2px solid var(--hl);background:#00000055}
+  .nameplate .q{background:var(--gold);color:#3a2c00;border-radius:6px;padding:0 5px;font-weight:700;font-size:11px}
+  .nameplate .sc{font-weight:700}
+  .nameplate .huf{background:var(--danger);color:#fff;border-radius:6px;padding:0 5px;font-size:11px}
+  .nameplate .ai{opacity:.7;font-size:11px}
+  .melds{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0}
+  .meld{display:flex;background:#0003;border-radius:5px;padding:1px}
+  .river{display:flex;flex-wrap:wrap;gap:2px;max-width:340px;margin:2px auto}
+  .seat.left .river,.seat.right .river{max-width:108px}
+  .hbacks{display:flex;flex-wrap:wrap;gap:1px}
+  .seat.left .hand-area,.seat.right .hand-area{writing-mode:vertical-lr}
+  /* 牌 */
+  img.t{height:38px;display:block;border-radius:3px;background:var(--tile-bg);box-shadow:0 1px 2px #0004}
+  img.t.sm{height:24px}
+  img.t.river{height:26px}
+  img.t.back{height:38px}
+  .hand{display:flex;flex-wrap:wrap;gap:3px;justify-content:center;align-items:flex-end;padding:6px 4px}
+  .hand img.t{height:52px;cursor:pointer;transition:transform .1s}
+  .hand img.t:hover{transform:translateY(-8px)}
+  .hand .gap{width:14px}
+  .hand img.t.drawn{margin-left:2px;outline:2px solid var(--gold)}
+  .hand.disabled img.t{cursor:default}.hand.disabled img.t:hover{transform:none}
+  .you-plate{text-align:center;margin-top:2px}
+  /* 操作按钮 */
+  .actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;min-height:0;margin:4px 0 8px}
+  .actions button{padding:10px 18px;border:0;border-radius:999px;font-size:14.5px;font-weight:700;cursor:pointer;
+    background:var(--panel);color:var(--fg);box-shadow:0 3px 10px var(--shadow)}
+  .actions button.pri{background:var(--gold);color:#3a2c00}
+  .actions button.hu{background:var(--danger);color:#fff}
+  .actions button.pass{background:#ffffff22;color:#eaf6ee;box-shadow:none;border:1px solid #ffffff44}
+  .actions button:hover{filter:brightness(1.05)}
+  .center .info{color:#dff2e6;font-size:13px;text-align:center;line-height:1.6}
+  .center .rest{font-size:26px;font-weight:800;color:#fff}
+  .say{font-size:15px;font-weight:800;color:var(--gold);text-shadow:0 1px 3px #000;min-height:20px}
+
+  /* ---------- 弹层 ---------- */
+  .overlay{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+  .dialog{background:var(--panel);color:var(--fg);border-radius:18px;padding:20px;max-width:520px;width:100%;box-shadow:0 12px 40px #000a;max-height:90vh;overflow:auto}
+  .dialog h2{margin:0 0 4px;font-size:19px}
+  .dialog .qbtns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:16px 0 6px}
+  .dialog .qbtns button{padding:16px 8px;border:1.5px solid var(--line);border-radius:14px;background:transparent;color:var(--fg);
+    font-size:16px;font-weight:700;cursor:pointer}
+  .dialog .qbtns button:hover{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
+  .reslist{margin:10px 0}
+  .resrow{display:flex;align-items:center;gap:8px;padding:7px 4px;border-bottom:1px solid var(--line);font-size:14px}
+  .resrow .pts{margin-left:auto;font-weight:800}
+  .pos{color:#1a8a4e}.neg{color:var(--danger)}
+  .fanline{font-size:12.5px;color:var(--muted)}
+  .dialog .start{margin-top:14px}
+  table.fantab{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+  table.fantab td{padding:4px 6px;border-bottom:1px solid var(--line)}
+  table.fantab td:last-child{text-align:right;color:var(--muted)}
+</style>
+</head>
+<body>
+  <!-- 开局设置 -->
+  <div id="setup">
+    <div class="card">
+      <h1>四川麻将 · 血战到底</h1>
+      <p class="sub">108 张（万/筒/条，无字牌）· 定缺一门 · 只碰不吃 · 刮风下雨 · 三家胡杀到底 · 流局查叫查花猪</p>
+
+      <div class="label">对战形式</div>
+      <div class="modes" id="modeSel">
+        <button class="mode on" data-mode="solo"><span class="em">🀄</span><b>单机 AI</b><small>你 + 3 个本地 AI</small></button>
+        <button class="mode" data-mode="online"><span class="em">📡</span><b>联机对战</b><small>和朋友开房同玩</small></button>
+      </div>
+
+      <div id="onlineBox" class="hide">
+        <div class="label">房间号（留空=自动新建）</div>
+        <input id="roomInput" class="txt" placeholder="如 6 位房间号" maxlength="8">
+        <div class="label">你的昵称</div>
+        <input id="nickInput" class="txt" placeholder="昵称" maxlength="12">
+        <p class="hint">空位会由 AI 自动补齐，人到齐可顶替。把房间号发给朋友即可加入。</p>
+      </div>
+
+      <div class="label">底分</div>
+      <div class="seg" id="diSel">
+        <button data-di="1" class="on">1 分</button><button data-di="2">2 分</button><button data-di="5">5 分</button>
+      </div>
+
+      <div class="label">封顶（番数，不含根）</div>
+      <div class="seg" id="capSel">
+        <button data-cap="3">3 番</button><button data-cap="4" class="on">4 番</button><button data-cap="5">5 番</button>
+      </div>
+
+      <button class="start" id="startBtn">开始对局</button>
+      <p class="hint">规则说明与番表可在牌桌右上「规则」查看。基于本站自研引擎，<a href="/majiang/index.html" target="_blank" style="color:var(--accent)">日本立直麻将</a> 另设课程。</p>
+    </div>
+  </div>
+
+  <!-- 牌桌 -->
+  <div id="game" class="hide">
+    <div class="topbar">
+      <span class="t">四川麻将 · 血战到底</span>
+      <span id="modeTag"></span>
+      <span class="sp"></span>
+      <span id="restTag"></span>
+      <button id="ruleBtn">规则/番表</button>
+      <button id="restartBtn">重开</button>
+      <button id="quitBtn">退出</button>
+    </div>
+    <div class="table">
+      <div class="seat top" data-seat="2"></div>
+      <div class="seat left" data-seat="3"></div>
+      <div class="center">
+        <div class="say" id="centerSay"></div>
+        <div class="rest" id="centerRest"></div>
+        <div class="info" id="centerInfo"></div>
+      </div>
+      <div class="seat right" data-seat="1"></div>
+      <div class="seat bottom" data-seat="0"></div>
+    </div>
+    <div class="actions" id="actions"></div>
+  </div>
+
+  <!-- 弹层挂载点 -->
+  <div id="overlayHost"></div>
+
+<script type="module">
+import * as E from '/assets/scmj-engine.js';
+const { SCMJGame, aiChooseQue, tstr, suitOf, rankOf, countsToList, SUIT_NAME } = E;
+
+const $ = s => document.querySelector(s);
+const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+const IMG = '/majiang/img/';
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const sumC = c => c.reduce((a, b) => a + b, 0);
+const SUITC = ['万', '筒', '条'];
+function tname(id) { return rankOf(id) + SUITC[suitOf(id)]; }
+function setCenterSay(t) { $('#centerSay').textContent = t || ''; }
+
+// 剥离阅读器整体反相
+const stripInvert = () => document.documentElement.classList.remove('nb-dark-invert');
+try { new MutationObserver(stripInvert).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] }); } catch (e) {}
+function applyTheme() { try { var p = localStorage.getItem('nb-theme') || 'auto'; var d = p === 'dark' || (p === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches); document.documentElement.dataset.theme = d ? 'dark' : 'light'; } catch (e) {} }
+window.addEventListener('storage', e => { if (e.key === 'nb-theme') applyTheme(); });
+
+// ---------- 设置交互 ----------
+let MODE = 'solo', DI = 1, CAP = 4;
+$('#modeSel').addEventListener('click', e => { const b = e.target.closest('.mode'); if (!b) return; MODE = b.dataset.mode; document.querySelectorAll('#modeSel .mode').forEach(m => m.classList.toggle('on', m === b)); $('#onlineBox').classList.toggle('hide', MODE !== 'online'); });
+$('#diSel').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; DI = +b.dataset.di; document.querySelectorAll('#diSel button').forEach(x => x.classList.toggle('on', x === b)); });
+$('#capSel').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; CAP = +b.dataset.cap; document.querySelectorAll('#capSel button').forEach(x => x.classList.toggle('on', x === b)); });
+$('#startBtn').addEventListener('click', () => { if (MODE === 'online') startOnline(); else startSolo(); });
+$('#ruleBtn').addEventListener('click', showRules);
+$('#restartBtn').addEventListener('click', () => { if (MODE === 'online') onlineAction('reset'); else startSolo(); });
+$('#quitBtn').addEventListener('click', () => { stopOnline(); location.href = '/'; });
+
+// ============================================================
+//  状态：solo 用引擎实例 g；online 用服务端 view
+// ============================================================
+let g = null, AUTO = false, busy = false;          // solo
+let ROOM = null, MYSEAT = 0, pollTimer = null, lastView = null;  // online
+let dqShown = false, endShown = false;
+
+function ruleObj() { return Object.assign({}, E.DEFAULT_RULE, { di: DI, maxFan: CAP }); }
+function enterGame(tag) { $('#setup').classList.add('hide'); $('#game').classList.remove('hide'); $('#modeTag').textContent = tag; dqShown = false; endShown = false; }
+
+// ---- 统一视图模型（solo 从 g.s 构造，使其与服务端 view 同形）----
+function soloVM() {
+  const s = g.s;
+  const players = s.players.map((p, i) => ({
+    name: p.name, ai: p.isAI, que: p.que, score: p.score, hu: p.hu, huInfo: p.huInfo,
+    melds: p.melds, discards: p.discards, handCount: sumC(p.hand),
+    hand: (i === 0 || p.hu || s.phase === 'end') ? p.hand : null, drawn: i === 0 ? p.drawn : null,
+  }));
+  let win = null;
+  if (s.phase === 'window' && s.window.responders[0]) win = { tile: s.window.tile, from: s.window.from, opts: s.window.responders[0].opts, waiting: false };
+  else if (s.phase === 'window') win = { tile: s.window.tile, from: s.window.from, opts: [], waiting: true };
+  return {
+    room: null, mySeat: 0, phase: s.phase, turn: s.turn, dealer: s.dealer,
+    rest: Math.max(0, s.wend - s.wpos), liveCount: s.liveCount, ended: s.phase === 'end',
+    reason: s.result && s.result.reason, result: s.result, players, window: win,
+    turnOpts: (s.phase === 'play' && s.turn === 0 && !AUTO && !s.players[0].hu) ? g.turnOptions(0) : null,
+    dingqueNeeded: s.phase === 'dingque' && s.players[0].que == null,
+  };
+}
+
+// ============================================================
+//  渲染（solo / online 共用）
+// ============================================================
+function meldHtml(m) {
+  const n = (m.type === 'gang' || m.type === 'angang' || m.type === 'bugang') ? 4 : 3;
+  let imgs = '';
+  for (let k = 0; k < n; k++) {
+    const back = (m.type === 'angang' && (k === 0 || k === 3));
+    imgs += back ? `<img class="t sm back" src="${IMG}pai.gif">` : `<img class="t sm" src="${IMG}${tstr(m.tile)}.gif">`;
+  }
+  return `<div class="meld">${imgs}</div>`;
+}
+const riverHtml = (p) => `<div class="river">${p.discards.map(id => `<img class="t river" src="${IMG}${tstr(id)}.gif">`).join('')}</div>`;
+function plate(p, isTurn) {
+  const q = p.que != null ? `<span class="q">缺${SUITC[p.que]}</span>` : '';
+  const hu = p.hu ? `<span class="huf">已胡 ${p.huInfo ? p.huInfo.type : ''}</span>` : '';
+  const ai = p.ai ? `<span class="ai">AI</span>` : '';
+  const sc = `<span class="sc ${p.score >= 0 ? 'pos' : 'neg'}">${p.score >= 0 ? '+' : ''}${p.score}</span>`;
+  return `<div class="nameplate ${isTurn ? 'turn' : ''}">${p.name} ${ai} ${q} ${sc} ${hu}</div>`;
+}
+
+function renderVM(vm) {
+  lastView = vm;
+  $('#restTag').textContent = vm.ended ? '本局结束' : `剩 ${vm.rest} 张${vm.room ? ' · 房间 ' + vm.room : ''}`;
+  $('#centerRest').textContent = vm.ended ? '' : vm.rest;
+  $('#centerInfo').innerHTML = vm.ended ? '' : `存活 ${vm.liveCount} 家`;
+  for (let a = 0; a < 4; a++) {
+    const pos = (a - vm.mySeat + 4) % 4;        // 0=下(我) 1=右 2=上 3=左
+    const box = document.querySelector(`.seat[data-seat="${pos}"]`);
+    const p = vm.players[a];
+    const isTurn = !vm.ended && vm.turn === a && !p.hu;
+    if (pos === 0) renderSelfBox(box, p, vm);
+    else renderOppBox(box, p, isTurn);
+  }
+  updateActions(vm);
+  maybeDingque(vm);
+  if (vm.ended) showEnd(vm);
+}
+function renderOppBox(box, p, isTurn) {
+  const meldsH = `<div class="melds">${p.melds.map(meldHtml).join('')}</div>`;
+  let backs;
+  if (p.hand) backs = `<div class="hbacks">${countsToList(p.hand).map(id => `<img class="t sm" src="${IMG}${tstr(id)}.gif">`).join('')}</div>`;
+  else backs = `<div class="hbacks">${Array.from({ length: p.handCount }).map(() => `<img class="t sm back" src="${IMG}pai.gif">`).join('')}</div>`;
+  box.innerHTML = `${plate(p, isTurn)}<div class="hand-area">${backs}${meldsH}</div>${riverHtml(p)}`;
+}
+function renderSelfBox(box, p, vm) {
+  const isTurn = !vm.ended && vm.turn === vm.mySeat && !p.hu;
+  box.innerHTML = `${riverHtml(p)}
+    <div class="melds" style="justify-content:center">${p.melds.map(meldHtml).join('')}</div>
+    <div class="hand" id="selfHand"></div>
+    <div class="you-plate">${plate(p, isTurn)}</div>`;
+  const clickable = vm.phase === 'play' && vm.turn === vm.mySeat && !p.hu && (MODE === 'online' || !AUTO);
+  renderHandInto($('#selfHand'), p, clickable);
+}
+function renderHandInto(wrap, p, clickable) {
+  if (!wrap || !p.hand) return;
+  wrap.className = 'hand' + (clickable ? '' : ' disabled');
+  wrap.innerHTML = '';
+  const list = countsToList(p.hand); const drawn = p.drawn;
+  let drawnShown = false;
+  const main = list.filter(id => { if (!drawnShown && drawn != null && id === drawn) { drawnShown = true; return false; } return true; });
+  for (const id of main) wrap.appendChild(tileEl(id, clickable, false));
+  if (drawn != null && drawnShown) { wrap.appendChild(el('div', 'gap')); wrap.appendChild(tileEl(drawn, clickable, true)); }
+}
+function tileEl(id, clickable, isDrawn) {
+  const img = el('img', 't' + (isDrawn ? ' drawn' : '')); img.src = IMG + tstr(id) + '.gif'; img.dataset.id = id;
+  if (clickable) img.addEventListener('click', () => discardTile(id));
+  return img;
+}
+
+// ============================================================
+//  操作按钮
+// ============================================================
+function mkBtn(label, cls, fn) { const b = el('button', cls, label); b.addEventListener('click', fn); return b; }
+function updateActions(vm) {
+  const acts = $('#actions'); acts.innerHTML = '';
+  if (vm.ended) { setCenterSay(''); return; }
+  const w = vm.window;
+  if (w && w.opts && w.opts.length && !w.waiting) {
+    if (w.opts.includes('hu')) acts.appendChild(mkBtn('胡！', 'hu', () => respondAction('hu')));
+    if (w.opts.includes('gang')) acts.appendChild(mkBtn('杠', 'pri', () => respondAction('gang')));
+    if (w.opts.includes('peng')) acts.appendChild(mkBtn('碰', 'pri', () => respondAction('peng')));
+    acts.appendChild(mkBtn('过', 'pass', () => respondAction('pass')));
+    setCenterSay(`${vm.players[w.from].name} 打出 ${tname(w.tile)}`);
+    return;
+  }
+  if (vm.turnOpts) {
+    const o = vm.turnOpts;
+    if (o.zimo) acts.appendChild(mkBtn('自摸', 'hu', () => turnAction('zimo')));
+    for (const t of (o.angang || [])) acts.appendChild(mkBtn('暗杠 ' + tname(t), 'pri', () => turnAction('angang', t)));
+    for (const t of (o.bugang || [])) acts.appendChild(mkBtn('补杠 ' + tname(t), 'pri', () => turnAction('bugang', t)));
+    if (o.discard) setCenterSay('请出牌');
+    return;
+  }
+  if (w && w.waiting) { setCenterSay('等待其他玩家…'); return; }
+  setCenterSay('');
+}
+
+// ---- 动作分发（solo 调引擎，online 调 API）----
+function discardTile(id) {
+  if (MODE === 'online') { onlineAction('discard', { tile: id }); return; }
+  if (busy) return; const s = g.s;
+  if (s.phase !== 'play' || s.turn !== 0) return;
+  g.discard(0, id); busy = false; soloLoop();
+}
+function turnAction(kind, tile) {
+  if (MODE === 'online') { onlineAction(kind, tile != null ? { tile } : {}); return; }
+  if (kind === 'zimo') g.zimo(0); else if (kind === 'angang') g.angang(0, tile); else if (kind === 'bugang') g.bugang(0, tile);
+  busy = false; soloLoop();
+}
+function respondAction(a) {
+  if (MODE === 'online') { onlineAction('respond', { resp: a }); return; }
+  g.respond(0, a); busy = false; soloLoop();
+}
+function dingqueChoose(suit) {
+  $('#overlayHost').innerHTML = ''; dqShown = false;
+  if (MODE === 'online') { onlineAction('dingque', { suit }); return; }
+  g.setQue(0, suit); renderVM(soloVM()); soloLoop();
+}
+
+// ============================================================
+//  单机驱动
+// ============================================================
+function startSolo() {
+  MODE = 'solo'; enterGame('单机');
+  g = new SCMJGame({ rule: ruleObj(), dealer: 0, isAI: [false, true, true, true], names: ['你', '下家', '对家', '上家'] });
+  exposeHook();
+  for (let i = 1; i < 4; i++) g.setQue(i, aiChooseQue(g.s.players[i].hand));
+  busy = false;
+  if (AUTO) { g.setQue(0, aiChooseQue(g.s.players[0].hand)); soloLoop(); }
+  else renderVM(soloVM());     // 显示定缺弹窗
+}
+async function soloLoop() {
+  if (busy) return; busy = true;
+  let guard = 0;
+  try {
+    while (guard++ < 6000) {
+      const s = g.s;
+      if (s.phase === 'end') { renderVM(soloVM()); break; }
+      if (s.phase === 'dingque') {
+        if (AUTO) { for (let i = 0; i < 4; i++) if (s.players[i].que == null) g.setQue(i, aiChooseQue(s.players[i].hand)); continue; }
+        renderVM(soloVM()); break;             // 等真人定缺
+      }
+      if (s.phase === 'window') {
+        for (const seat of g.windowResponders()) if (seat !== 0 && s.window.responders[seat].resp == null) g.aiRespond(seat);
+        if (s.phase !== 'window') { renderVM(soloVM()); await wait(380); continue; }
+        if (AUTO) { g.aiRespond(0); continue; }
+        renderVM(soloVM()); break;             // 等真人响应
+      }
+      if (s.phase === 'play') {
+        if (s.turn === 0 && !AUTO) { renderVM(soloVM()); break; }
+        renderVM(soloVM());
+        await wait(AUTO ? 0 : 520);
+        g.aiActTurn(s.turn);
+        continue;
+      }
+      break;
+    }
+  } finally { busy = false; }
+}
+
+// ============================================================
+//  联机驱动
+// ============================================================
+function cid() { try { let c = localStorage.getItem('scmj-cid'); if (!c) { c = 'c' + Math.random().toString(36).slice(2, 12); localStorage.setItem('scmj-cid', c); } return c; } catch (e) { return 'c' + Math.random().toString(36).slice(2, 12); } }
+let CID = null;
+function startOnline() {
+  MODE = 'online'; CID = cid(); enterGame('联机');
+  ROOM = ($('#roomInput').value || '').trim().replace(/[^0-9A-Za-z]/g, '').slice(0, 12);
+  const nick = ($('#nickInput').value || '').trim() || '玩家';
+  onlineAction(ROOM ? 'join' : 'create', { nick, di: DI, cap: CAP }).then(d => { if (d && !d.notFound) startPoll(); });
+}
+function stopOnline() { if (pollTimer) clearInterval(pollTimer); pollTimer = null; }
+function startPoll() { stopOnline(); pollTimer = setInterval(() => onlineAction('state'), 1300); }
+async function onlineAction(action, extra = {}) {
+  try {
+    const body = Object.assign({ action, room: ROOM, cid: CID }, extra);
+    const r = await fetch('/api/sichuan-majiang', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok && !d.players) { setCenterSay('联机错误：' + (d.error || r.status)); return d; }
+    if (d.room) ROOM = d.room;
+    if (d.mySeat != null && d.mySeat >= 0) MYSEAT = d.mySeat;
+    if (d.players) renderVM(normalizeOnline(d));
+    return d;
+  } catch (e) { setCenterSay('网络错误'); return {}; }
+}
+// 服务端 view 已与 VM 同形；补 turnOpts/mySeat 对齐
+function normalizeOnline(d) {
+  return {
+    room: d.room, mySeat: d.mySeat, phase: d.phase, turn: d.turn, dealer: d.dealer,
+    rest: d.rest, liveCount: d.liveCount, ended: d.ended, reason: d.reason, result: d.result,
+    players: d.players, window: d.window, turnOpts: d.turnOpts,
+    dingqueNeeded: d.dingqueNeeded,
+  };
+}
+
+// ============================================================
+//  定缺弹窗 / 结算 / 规则
+// ============================================================
+function maybeDingque(vm) {
+  if (!vm.dingqueNeeded) { if (dqShown) { $('#overlayHost').innerHTML = ''; dqShown = false; } return; }
+  if (dqShown) return; dqShown = true;
+  const p = vm.players[vm.mySeat];
+  const tilesHtml = p.hand ? countsToList(p.hand).map(id => `<img class="t sm" src="${IMG}${tstr(id)}.gif">`).join('') : '';
+  const dlg = el('div', 'overlay');
+  dlg.innerHTML = `<div class="dialog"><h2>定缺</h2>
+    <p class="sub">选一门花色作为「缺门」打出去——和牌时手里不能有这门花色。建议选张数最少的一门。</p>
+    <div class="melds" style="justify-content:center">${tilesHtml}</div>
+    <div class="qbtns"><button data-q="0">缺 万</button><button data-q="1">缺 筒</button><button data-q="2">缺 条</button></div></div>`;
+  dlg.querySelector('.qbtns').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; dingqueChoose(+b.dataset.q); });
+  $('#overlayHost').innerHTML = ''; $('#overlayHost').appendChild(dlg);
+}
+
+function showEnd(vm) {
+  if (endShown) return; endShown = true;
+  const s = vm; const seats = [0, 1, 2, 3];
+  const order = seats.slice().sort((a, b) => s.players[b].score - s.players[a].score);
+  const rows = order.map((seat, i) => {
+    const p = s.players[seat];
+    return `<div class="resrow"><span>${['🥇', '🥈', '🥉', '4️⃣'][i]}</span><span>${p.name}${seat === vm.mySeat ? '（你）' : ''}</span>
+      ${p.hu ? `<span class="fanline">${p.huInfo.type}</span>` : '<span class="fanline">未胡</span>'}
+      <span class="pts ${p.score >= 0 ? 'pos' : 'neg'}">${p.score >= 0 ? '+' : ''}${p.score}</span></div>`;
+  }).join('');
+  const reason = vm.reason === 'all_hu' ? '三家胡牌，杀到底结束' : '牌摸完，流局结算（查叫/查花猪）';
+  const dlg = el('div', 'overlay');
+  dlg.innerHTML = `<div class="dialog"><h2>本局结束</h2><p class="sub">${reason}</p>
+    <div class="reslist">${rows}</div>
+    <button class="start" id="againBtn">再来一局</button></div>`;
+  $('#overlayHost').innerHTML = ''; $('#overlayHost').appendChild(dlg);
+  $('#againBtn').addEventListener('click', () => { $('#overlayHost').innerHTML = ''; endShown = false; if (MODE === 'online') onlineAction('reset'); else startSolo(); });
+}
+
+function showRules() {
+  const dlg = el('div', 'overlay');
+  dlg.innerHTML = `<div class="dialog"><h2>四川麻将 · 血战到底 规则</h2>
+    <p class="sub" style="line-height:1.7">
+    · <b>108 张</b>：万/筒/条 各 1–9，每种 4 张，无字牌无花牌。<br>
+    · <b>定缺</b>：开局每人选一门「缺门」，和牌时手里不能有这门花色。<br>
+    · <b>只碰不吃</b>：可碰、可杠（明杠/暗杠/补杠），不能吃。<br>
+    · <b>血战到底</b>：有人胡牌后退出，其余继续打，直到 3 家胡牌或牌摸完。一炮可多响。<br>
+    · <b>流局</b>：牌摸完时，未听牌者赔听牌者（查大叫）；手握三门花色=花猪，重罚（查花猪）。</p>
+    <h2 style="font-size:16px;margin-top:12px">番表（番＝翻倍）</h2>
+    <table class="fantab">
+      <tr><td>平胡</td><td>底分 ×1</td></tr><tr><td>自摸</td><td>+1 番</td></tr>
+      <tr><td>碰碰胡</td><td>+1 番</td></tr><tr><td>清一色</td><td>+2 番</td></tr>
+      <tr><td>七对</td><td>+2 番</td></tr><tr><td>龙七对（含 4 张）</td><td>+3 番起</td></tr>
+      <tr><td>将对（全 2/5/8 碰碰胡）</td><td>+3 番</td></tr><tr><td>金钩钓（全副露单吊）</td><td>+2 番</td></tr>
+      <tr><td>根（每 4 张相同）</td><td>+1 番</td></tr><tr><td>杠上开花 / 抢杠胡 / 海底</td><td>各 +1 番</td></tr>
+    </table>
+    <h2 style="font-size:16px;margin-top:12px">刮风下雨（杠分，立即结算）</h2>
+    <table class="fantab">
+      <tr><td>暗杠（下雨）</td><td>每家 2×底</td></tr>
+      <tr><td>明杠（刮风，直杠）</td><td>放杠者 2×底</td></tr>
+      <tr><td>补杠（转弯杠）</td><td>每家 1×底</td></tr>
+    </table>
+    <p class="hint">得分 = 底分 × 2^番（番数封顶 ${CAP} 番，不含根）。点炮由放炮者一人付，自摸全家付。</p>
+    <button class="start" id="closeRule">知道了</button></div>`;
+  $('#overlayHost').innerHTML = ''; $('#overlayHost').appendChild(dlg);
+  $('#closeRule').addEventListener('click', () => $('#overlayHost').innerHTML = '');
+}
+
+// ---------- 调试钩子 ----------
+function exposeHook() {
+  window.__scmj = {
+    E, get g() { return g; }, get state() { return g && g.s; }, get view() { return lastView; },
+    setAuto(v) { AUTO = !!v; },
+    async auto() { AUTO = true; $('#overlayHost').innerHTML = ''; dqShown = false; if (g.s.phase === 'dingque') for (let i = 0; i < 4; i++) if (g.s.players[i].que == null) g.setQue(i, aiChooseQue(g.s.players[i].hand)); busy = false; await soloLoop(); return g.s.result; },
+    errs: [],
+  };
+}
+window.addEventListener('error', e => { try { (window.__scmj && window.__scmj.errs || []).push(String(e.message)); } catch (_) {} });
+exposeHook();
+</script>
+</body>
+</html>

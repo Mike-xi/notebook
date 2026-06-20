@@ -113,14 +113,25 @@
   },
   {
     "file": "majiang.html",
-    "title": "麻将 · 電脳麻将",
+    "title": "立直麻将 · 電脳麻将",
     "subject": "桌游",
-    "description": "日本立直麻将 · 单机自带 AI 对战（電脳麻将 kobalab，MIT）· 中式四川玩法后续接入",
+    "description": "日本立直麻将 · 单机自带 AI 对战（電脳麻将 kobalab，MIT）· 中式玩法见「四川麻将」",
     "icon": "🀄",
     "color": "#0b7a45",
     "kind": "html",
     "category": "play",
-    "tags": ["麻将", "立直", "桌游", "AI"]
+    "tags": ["麻将", "立直", "日麻", "AI"]
+  },
+  {
+    "file": "sichuan-majiang.html",
+    "title": "四川麻将 · 血战到底",
+    "subject": "桌游",
+    "description": "成都血战到底 · 定缺只碰不吃 · 刮风下雨 · 三家胡杀到底 · 单机本地 AI 对战 + 联机和朋友开房同玩（自研引擎）",
+    "icon": "🀅",
+    "color": "#c0392b",
+    "kind": "html",
+    "category": "play",
+    "tags": ["麻将", "四川麻将", "血战到底", "AI", "联机"]
   },
   {
     "file": "noname-cf.html",
