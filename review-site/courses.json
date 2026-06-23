@@ -126,6 +126,18 @@
     "tags": ["扫雷", "Minesweeper", "益智", "经典"]
   },
   {
+    "file": "pvz2",
+    "title": "植物大战僵尸 2 · Gardendless",
+    "subject": "塔防",
+    "description": "Web 技术(cocos)重写的 PvZ2 · 点击进入启动页，新标签打开官方在线版(EdgeOne 加速)。素材约 3GB 首次加载较慢",
+    "icon": "🌻",
+    "color": "#5cbf3f",
+    "kind": "html",
+    "category": "play",
+    "link": "/games/pvz2.html",
+    "tags": ["植物大战僵尸", "PvZ2", "塔防", "在线游戏"]
+  },
+  {
     "file": "gomoku.html",
     "title": "五子棋 · Gomoku",
     "subject": "对弈",

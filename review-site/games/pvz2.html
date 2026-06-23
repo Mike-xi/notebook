@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>植物大战僵尸 2 · Gardendless</title>
+<script>
+  // 跟随站点主题 + 剥离阅读器整体反相（以防被嵌入时）
+  (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}
+   var strip=function(){document.documentElement.classList.remove('nb-dark-invert');};strip();try{new MutationObserver(strip).observe(document.documentElement,{attributes:true,attributeFilter:['class']});}catch(e){}})();
+</script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    color:#eafbe0;display:flex;align-items:center;justify-content:center;text-align:center;
+    background:radial-gradient(120% 120% at 50% 0%,#6cbf3f 0%,#3f8b2f 42%,#26521f 100%);overflow:hidden;position:relative}
+  /* 阳光点缀 */
+  body::before,body::after{content:"";position:absolute;border-radius:50%;filter:blur(2px);opacity:.5}
+  body::before{width:120px;height:120px;background:#ffe45e;top:8%;left:10%;box-shadow:0 0 60px #ffe45e}
+  body::after{width:80px;height:80px;background:#ffe45e;bottom:12%;right:14%;box-shadow:0 0 40px #ffe45e}
+  .card{position:relative;z-index:2;max-width:540px;padding:42px 38px;border-radius:22px;
+    background:rgba(15,40,12,.46);backdrop-filter:blur(8px);box-shadow:0 18px 50px rgba(0,0,0,.4);border:1px solid #ffffff22}
+  .logo{font-size:60px;line-height:1;margin-bottom:8px;filter:drop-shadow(0 4px 8px #0006)}
+  h1{font-size:27px;letter-spacing:1px;text-shadow:2px 2px 0 #1c3a14}
+  .en{font-size:14px;opacity:.78;margin-top:4px;letter-spacing:2px}
+  .desc{font-size:14px;line-height:1.8;opacity:.9;margin:20px 0 8px}
+  .play{display:inline-flex;align-items:center;gap:10px;margin-top:18px;cursor:pointer;border:none;
+    font-size:20px;font-weight:800;letter-spacing:3px;color:#1c3a14;background:linear-gradient(#ffe45e,#ffc224);
+    padding:15px 46px;border-radius:14px;box-shadow:0 5px 0 #b9851a,0 10px 22px #0007;transition:.12s;text-decoration:none}
+  .play:hover{filter:brightness(1.06)}
+  .play:active{transform:translateY(4px);box-shadow:0 1px 0 #b9851a}
+  .note{font-size:12px;opacity:.72;margin-top:22px;line-height:1.7}
+  .note b{color:#ffe45e}
+  .links{margin-top:18px;font-size:12.5px;opacity:.8}
+  .links a{color:#dff7cf}
+  .back{position:fixed;left:14px;top:14px;z-index:5;color:#eafbe0;text-decoration:none;font-size:13px;font-weight:600;
+    background:#0006;border:1px solid #ffffff33;padding:7px 14px;border-radius:999px;backdrop-filter:blur(4px)}
+  .back:hover{background:#0009}
+  html[data-theme="dark"] .card{background:rgba(8,22,6,.6)}
+</style>
+</head>
+<body>
+  <a class="back" href="/">‹ 返回复习站</a>
+  <div class="card">
+    <div class="logo">🌻🧟</div>
+    <h1>植物大战僵尸 2 · Gardendless</h1>
+    <div class="en">PvZ2 Gardendless · Online</div>
+    <p class="desc">完全用 Web 技术（cocos 引擎）重写的《植物大战僵尸 2》<br>「无尽花园，需要无尽的防御！」</p>
+    <a class="play" id="playBtn" href="https://play.pvzge.com/" target="_blank" rel="noopener">▶ 开始游戏</a>
+    <p class="note">
+      点击将在<b>新标签页</b>打开官方在线版（<b>play.pvzge.com</b>，腾讯 EdgeOne CDN 加速）。<br>
+      游戏体量很大（约 3GB 素材），<b>首次加载较慢</b>，请耐心等待；用 Wi-Fi 体验更佳。
+    </p>
+    <div class="links">
+      开源项目 ·
+      <a href="https://github.com/Gzh0821/pvzge_web" target="_blank" rel="noopener">游戏仓库</a> ·
+      <a href="https://pvzge.com" target="_blank" rel="noopener">官网</a> ·
+      作者 Gaozih（GPL-3.0）
+    </div>
+  </div>
+</body>
+</html>
