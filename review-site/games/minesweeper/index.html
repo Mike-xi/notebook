@@ -7,10 +7,30 @@
     <link rel="stylesheet" href="Minesweeper/client/main.css">
     <link rel="icon" type="image/png" href="resources/images/flagged.png" />
     <title>Minesweeper solver</title>
+    <style id="mb-mobile">
+      #mb-menuToggle{position:fixed;left:10px;bottom:12px;z-index:100000;background:#1f6f3a;color:#fff;border:none;
+        padding:11px 18px;border-radius:999px;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.4);
+        font:700 15px/1 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+      #mb-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99980;display:none}
+      @media (max-width:760px){
+        /* 棋盘永远占满宽度 */
+        #wholeboard{left:0 !important}
+        #messageBarBottom>div,#exportBarBottom>div{left:0 !important}
+        /* 左侧控制栏改为可滑出的抽屉 */
+        #controls{background:#d4d0c8;box-shadow:3px 0 16px rgba(0,0,0,.45);z-index:99990;
+          transform:translateX(-105%);transition:transform .22s ease}
+        body.mb-open #controls{transform:translateX(0)}
+        body.mb-open #mb-backdrop{display:block}
+        body.mb-open #mb-menuToggle{display:none}
+      }
+      @media (min-width:761px){ #mb-menuToggle{display:none} }
+    </style>
 </head>
 <!--    -->
 <body style="position: absolute; left:0px; right:0px; top:0px; bottom:0px; zoom: 1.0;" onresize="browserResized()" onload="load_images()">
     <a href="/" style="position:fixed;right:8px;top:8px;z-index:99999;background:#0008;color:#fff;text-decoration:none;padding:6px 12px;border-radius:999px;font:600 13px/1 sans-serif;backdrop-filter:blur(4px)">‹ 返回复习站</a>
+    <button id="mb-menuToggle" type="button" onclick="mbToggle()">≡ 菜单</button>
+    <div id="mb-backdrop" onclick="mbToggle()"></div>
 
     <!-- Title at the top -->
     <h1 id="headerPanel" style="position: absolute; left: 0px; top: 0px; height: 50px; right: 0px; overflow-y: auto;">
@@ -418,5 +438,9 @@
 
     </script>
 
+    <script>
+      // 手机端左侧控制栏抽屉开关；点菜单按钮或遮罩切换
+      function mbToggle(){ document.body.classList.toggle('mb-open'); }
+    </script>
 </body>
 </html>
