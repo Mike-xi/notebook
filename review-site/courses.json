@@ -102,6 +102,30 @@
     "tags": ["麻城一中", "Minecraft", "3D", "校园漫游", "Three.js"]
   },
   {
+    "file": "g2048",
+    "title": "2048",
+    "subject": "益智",
+    "description": "经典数字合成 · 方向键/滑动合并相同数字凑出 2048 · 原作者 gabrielecirulli 开源版（MIT）",
+    "icon": "🔢",
+    "color": "#edc22e",
+    "kind": "html",
+    "category": "play",
+    "link": "/games/2048/",
+    "tags": ["2048", "数字", "益智", "休闲"]
+  },
+  {
+    "file": "minesweeper",
+    "title": "扫雷 · Minesweeper",
+    "subject": "益智",
+    "description": "经典扫雷 · 初级/中级/专家 + 自定义 + 无猜模式 · 左键翻开右键插旗 · 内置概率解题器（开源 JSMinesweeper，MIT）",
+    "icon": "💣",
+    "color": "#4a90d9",
+    "kind": "html",
+    "category": "play",
+    "link": "/games/minesweeper/?board=16x16x40",
+    "tags": ["扫雷", "Minesweeper", "益智", "经典"]
+  },
+  {
     "file": "gomoku.html",
     "title": "五子棋 · Gomoku",
     "subject": "对弈",
