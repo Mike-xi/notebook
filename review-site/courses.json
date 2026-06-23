@@ -90,6 +90,18 @@
     "tags": ["魔方", "3D", "益智", "计时", "互动"]
   },
   {
+    "file": "macheng",
+    "title": "麻城一中 · Minecraft 漫游",
+    "subject": "校园",
+    "description": "Minecraft 体素风格按大致比例复刻的麻城一中 · 第一人称自由行走（WASD + 鼠标）· 教学楼/连廊/报告厅/宿舍/田径场全收录 · 飞行 + 一键传送 + 小地图",
+    "icon": "🏫",
+    "color": "#8a3b2e",
+    "kind": "html",
+    "category": "play",
+    "link": "/macheng.html",
+    "tags": ["麻城一中", "Minecraft", "3D", "校园漫游", "Three.js"]
+  },
+  {
     "file": "gomoku.html",
     "title": "五子棋 · Gomoku",
     "subject": "对弈",
