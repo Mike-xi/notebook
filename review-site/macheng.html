@@ -11,7 +11,6 @@
   #app { position:fixed; inset:0; }
   canvas { display:block; }
 
-  /* 准星 */
   #crosshair { position:fixed; left:50%; top:50%; width:22px; height:22px; transform:translate(-50%,-50%);
     pointer-events:none; opacity:.85; z-index:5; }
   #crosshair::before,#crosshair::after{ content:""; position:absolute; background:#fff;
@@ -19,23 +18,20 @@
   #crosshair::before{ left:50%; top:0; width:2px; height:100%; transform:translateX(-50%); }
   #crosshair::after { top:50%; left:0; height:2px; width:100%; transform:translateY(-50%); }
 
-  /* 开始遮罩 */
   #overlay { position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center;
     background:linear-gradient(160deg,#1b2a44 0%,#24405f 60%,#3a6b8f 100%); color:#eef4ff; text-align:center; }
-  #overlay .panel { max-width:560px; padding:34px 40px; }
-  #overlay h1 { font-size:30px; letter-spacing:2px; margin-bottom:6px;
-    text-shadow:2px 2px 0 #0006; }
-  #overlay .sub { font-size:14px; opacity:.8; margin-bottom:22px; }
+  #overlay .panel { max-width:600px; padding:34px 40px; }
+  #overlay h1 { font-size:30px; letter-spacing:2px; margin-bottom:6px; text-shadow:2px 2px 0 #0006; }
+  #overlay .sub { font-size:14px; opacity:.85; margin-bottom:20px; line-height:1.6; }
   #overlay .keys { display:grid; grid-template-columns:1fr 1fr; gap:8px 26px; font-size:14px;
-    margin:0 auto 26px; max-width:430px; text-align:left; }
-  #overlay .keys b{ display:inline-block; min-width:74px; color:#ffd76a; }
+    margin:0 auto 22px; max-width:460px; text-align:left; }
+  #overlay .keys b{ display:inline-block; min-width:78px; color:#ffd76a; }
   #startBtn { font-size:18px; padding:13px 40px; border:none; border-radius:10px; cursor:pointer;
     background:#4caf50; color:#fff; box-shadow:0 4px 0 #357a38, 0 8px 18px #0007; transition:.12s; letter-spacing:3px; }
   #startBtn:hover{ background:#5cc15f; }
   #startBtn:active{ transform:translateY(3px); box-shadow:0 1px 0 #357a38; }
-  #overlay .tip{ margin-top:16px; font-size:12px; opacity:.6; }
+  #overlay .tip{ margin-top:14px; font-size:12px; opacity:.6; }
 
-  /* HUD */
   #hud { position:fixed; left:12px; bottom:12px; z-index:5; color:#fff; font-size:12px; line-height:1.6;
     text-shadow:1px 1px 2px #000a; pointer-events:none; }
   #hud .loc{ color:#ffe08a; }
@@ -50,6 +46,11 @@
     background:#0007; padding:7px 14px; border-radius:999px; font-size:13px; font-weight:600;
     backdrop-filter:blur(4px); border:1px solid #ffffff33; }
   #backBtn:hover{ background:#000a; }
+  #tpbar{ position:fixed; left:50%; bottom:12px; transform:translateX(-50%); z-index:7; display:flex; gap:6px;
+    flex-wrap:wrap; justify-content:center; max-width:60vw; pointer-events:auto; }
+  #tpbar button{ font-size:12px; padding:5px 10px; border-radius:7px; border:1px solid #ffffff33; cursor:pointer;
+    background:#0008; color:#fff; backdrop-filter:blur(3px); }
+  #tpbar button:hover{ background:#1c8f3e; }
 </style>
 </head>
 <body>
@@ -62,13 +63,14 @@
   <div id="modeline">🚶 步行模式</div>
 </div>
 <div id="fps">FPS —</div>
-<canvas id="minimap" width="190" height="190"></canvas>
+<canvas id="minimap" width="200" height="200"></canvas>
 <div id="toast"></div>
+<div id="tpbar"></div>
 
 <div id="overlay">
   <div class="panel">
     <h1>麻 城 一 中</h1>
-    <div class="sub">Minecraft 风格 · 第一人称校园漫游（按大致比例复刻）</div>
+    <div class="sub">Minecraft 风格 · 第一人称校园漫游<br>按新校区（河东滨江新区）卫星图与实拍照片复刻</div>
     <div class="keys">
       <div><b>W A S D</b> 移动</div>
       <div><b>鼠标</b> 转视角</div>
@@ -76,11 +78,11 @@
       <div><b>空格</b> 跳跃 / 飞行上升</div>
       <div><b>F</b> 切换飞行</div>
       <div><b>Ctrl</b> 飞行下降</div>
-      <div><b>1~6</b> 快速传送</div>
+      <div><b>1~8</b> 快速传送</div>
       <div><b>Esc</b> 释放鼠标</div>
     </div>
     <button id="startBtn">点击进入校园</button>
-    <div class="tip">提示：进入后鼠标会被锁定，按 Esc 退出锁定。建议全屏（F11）体验。</div>
+    <div class="tip">提示：进入后鼠标会被锁定，按 Esc 退出锁定。建议全屏（F11）+ 开启飞行（F）俯瞰全校。</div>
   </div>
 </div>
 
@@ -94,14 +96,14 @@ if (typeof THREE === 'undefined'){
     '<div style="margin:auto;color:#fff;text-align:center;font-size:18px">3D 引擎加载失败<br>请检查网络后刷新</div>';
   return;
 }
-// 跟随站点主题 + 剥离阅读器整体反相（嵌入复习站时生效，独立打开无害）
+// 嵌入复习站时剥离阅读器反相
 (function(){ const strip=()=>document.documentElement.classList.remove('nb-dark-invert');
   strip(); try{ new MutationObserver(strip).observe(document.documentElement,{attributes:true,attributeFilter:['class']}); }catch(e){} })();
 
 // ===================== 基础常量 =====================
-const FLOOR_H = 4;            // 每层楼高（方块感）
-const EYE = 1.7;             // 眼睛高度
-const PLAYER_R = 1.4;        // 玩家半径（碰撞）
+const FLOOR_H = 3.6;          // 每层楼高
+const EYE = 1.7;
+const PLAYER_R = 1.3;
 const TEST = new URLSearchParams(location.search).has('test');
 
 // ===================== 渲染器 / 场景 / 相机 =====================
@@ -114,139 +116,129 @@ app.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x8fc1ee);
-scene.fog = new THREE.Fog(0x9fc8ee, 220, 620);
+scene.fog = new THREE.Fog(0x9fc8ee, 300, 900);
 
-const camera = new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.1, 1500);
+const camera = new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.1, 2000);
 
-// 光照（Lambert 面着色 = 方块感）
 scene.add(new THREE.HemisphereLight(0xcfe6ff, 0x6b7a55, 0.95));
 const sun = new THREE.DirectionalLight(0xfff2d6, 1.05);
-sun.position.set(140, 260, 90);
+sun.position.set(180, 320, 140);
 scene.add(sun);
-scene.add(new THREE.AmbientLight(0xffffff, 0.22));
+scene.add(new THREE.AmbientLight(0xffffff, 0.24));
 
-// ===================== 贴图工具（程序化像素贴图） =====================
+// ===================== 程序化像素贴图 =====================
 function tex(size, draw, rx=1, ry=1){
-  const c = document.createElement('canvas'); c.width=c.height=size;
-  const g = c.getContext('2d'); draw(g, size);
-  const t = new THREE.CanvasTexture(c);
-  t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter;
-  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
-  t.repeat.set(rx, ry);
+  const c=document.createElement('canvas'); c.width=c.height=size;
+  const g=c.getContext('2d'); draw(g,size);
+  const t=new THREE.CanvasTexture(c);
+  t.magFilter=THREE.NearestFilter; t.minFilter=THREE.NearestFilter;
+  t.wrapS=t.wrapT=THREE.RepeatWrapping; t.colorSpace=THREE.SRGBColorSpace; t.repeat.set(rx,ry);
   return t;
 }
-function rnd(g,size,base,specks){
-  g.fillStyle=base; g.fillRect(0,0,size,size);
-  for(const [col,n] of specks){ g.fillStyle=col;
-    for(let i=0;i<n;i++){ g.fillRect((Math.random()*size)|0,(Math.random()*size)|0,1,1); } }
+// 矩形画布贴图（运动场/篮球阵列等需要非正方形比例）
+function texRect(w,h, draw, smooth=true){
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const g=c.getContext('2d'); draw(g,w,h);
+  const t=new THREE.CanvasTexture(c);
+  t.magFilter=t.minFilter=smooth?THREE.LinearFilter:THREE.NearestFilter;
+  t.colorSpace=THREE.SRGBColorSpace; return t;
 }
+function rnd(g,size,base,specks){ g.fillStyle=base; g.fillRect(0,0,size,size);
+  for(const [col,n] of specks){ g.fillStyle=col; for(let i=0;i<n;i++){ g.fillRect((Math.random()*size)|0,(Math.random()*size)|0,1,1);} } }
+function shade(hex,amt){ const n=parseInt(hex.slice(1),16); let r=(n>>16)+amt,gg=((n>>8)&255)+amt,b=(n&255)+amt;
+  r=Math.max(0,Math.min(255,r));gg=Math.max(0,Math.min(255,gg));b=Math.max(0,Math.min(255,b));
+  return '#'+((1<<24)+(r<<16)+(gg<<8)+b).toString(16).slice(1); }
 
-// 草地
 const grassTex = tex(16,(g,s)=>rnd(g,s,'#5d9440',[['#6ea84c',26],['#4f8235',26],['#7cb858',10]]));
-// 泥土小路 / 砖铺
-const paveTex  = tex(32,(g,s)=>{ rnd(g,s,'#c4bfb2',[['#b7b1a3',60],['#d2cdc0',40]]);
-  g.strokeStyle='#9d978a'; g.lineWidth=1; for(let i=0;i<=s;i+=8){g.beginPath();g.moveTo(i,0);g.lineTo(i,s);g.moveTo(0,i);g.lineTo(s,i);g.stroke();} });
-// 沥青路
+const paveTex  = tex(32,(g,s)=>{ rnd(g,s,'#cdc8bb',[['#bdb7a9',60],['#dcd7ca',40]]);
+  g.strokeStyle='#a8a293'; g.lineWidth=1; for(let i=0;i<=s;i+=8){g.beginPath();g.moveTo(i,0);g.lineTo(i,s);g.moveTo(0,i);g.lineTo(s,i);g.stroke();} });
 const roadTex  = tex(16,(g,s)=>rnd(g,s,'#3b3d44',[['#34363d',40],['#45474f',24]]));
-// 屋顶
-const roofTex  = tex(16,(g,s)=>{ rnd(g,s,'#6e2f25',[['#7d362a',26],['#5d271e',26]]);
-  g.strokeStyle='#4f211a';g.lineWidth=1; for(let i=0;i<=s;i+=4){g.beginPath();g.moveTo(0,i);g.lineTo(s,i);g.stroke();} });
+const roofTex  = tex(16,(g,s)=>{ rnd(g,s,'#7a3328',[['#8a3a2d',26],['#642a20',26]]);
+  g.strokeStyle='#522017';g.lineWidth=1; for(let i=0;i<=s;i+=4){g.beginPath();g.moveTo(0,i);g.lineTo(s,i);g.stroke();} });
+const greyRoofTex = tex(16,(g,s)=>rnd(g,s,'#8c8e94',[['#7c7e84',30],['#9ca0a6',26]]));
 
-// 通用：在一个 cell 里画一面"楼层"（砖 + 一扇窗 + 楼板线）
+// 一格"楼层"立面：墙 + 窗 + 楼板带
 function facadeCell(g,s,wallCol,bandCol,frameCol){
-  // 墙底
   rnd(g,s,wallCol,[[shade(wallCol,12),50],[shade(wallCol,-12),50]]);
-  // 砖缝（仅红砖时明显）
   g.strokeStyle=shade(wallCol,-22); g.globalAlpha=.5;
-  for(let y=4;y<s;y+=4){ g.beginPath(); g.moveTo(0,y); g.lineTo(s,y); g.stroke(); }
-  g.globalAlpha=1;
-  // 楼板带（cell 底部）
+  for(let y=4;y<s;y+=4){ g.beginPath(); g.moveTo(0,y); g.lineTo(s,y); g.stroke(); } g.globalAlpha=1;
   g.fillStyle=bandCol; g.fillRect(0,s-4,s,4);
-  // 窗
-  const wx=6, wy=6, ww=s-12, wh=s-16;
-  g.fillStyle=frameCol; g.fillRect(wx-1,wy-1,ww+2,wh+2);       // 窗框
+  const wx=6,wy=6,ww=s-12,wh=s-16;
+  g.fillStyle=frameCol; g.fillRect(wx-1,wy-1,ww+2,wh+2);
   const grd=g.createLinearGradient(0,wy,0,wy+wh);
   grd.addColorStop(0,'#9fc0d8'); grd.addColorStop(.5,'#6f90ad'); grd.addColorStop(1,'#86a6c0');
-  g.fillStyle=grd; g.fillRect(wx,wy,ww,wh);                     // 玻璃
-  g.fillStyle=frameCol; g.fillRect(wx+ww/2-1,wy,2,wh);          // 竖框
-  g.fillRect(wx,wy+wh/2-1,ww,2);                                // 横框
+  g.fillStyle=grd; g.fillRect(wx,wy,ww,wh);
+  g.fillStyle=frameCol; g.fillRect(wx+ww/2-1,wy,2,wh); g.fillRect(wx,wy+wh/2-1,ww,2);
 }
-function shade(hex,amt){
-  const n=parseInt(hex.slice(1),16); let r=(n>>16)+amt,gg=((n>>8)&255)+amt,b=(n&255)+amt;
-  r=Math.max(0,Math.min(255,r));gg=Math.max(0,Math.min(255,gg));b=Math.max(0,Math.min(255,b));
-  return '#'+((1<<24)+(r<<16)+(gg<<8)+b).toString(16).slice(1);
-}
-const brickFacade = tex(32,(g,s)=>facadeCell(g,s,'#b1493b','#e9e2d2','#efe9dc')); // 红砖教学楼
-const whiteFacade = tex(32,(g,s)=>facadeCell(g,s,'#d6d0c2','#b9b3a4','#f2efe7')); // 白色综合楼/食堂
+const brickFacade = tex(32,(g,s)=>facadeCell(g,s,'#b1493b','#ece5d6','#efe9dc')); // 红砖教学楼
+const whiteFacade = tex(32,(g,s)=>facadeCell(g,s,'#dcd6c8','#bfb9aa','#f3f0e8')); // 白色公共楼
 const dormFacade  = tex(32,(g,s)=>{ facadeCell(g,s,'#cdbb9c','#a8987a','#efe9dc');
-  // 阳台栏杆
-  g.fillStyle='#8d7d62'; g.fillRect(4,s-7,s-8,2);
-  for(let x=6;x<s-4;x+=3) g.fillRect(x,s-7,1,3); });
+  g.fillStyle='#8d7d62'; g.fillRect(4,s-7,s-8,2); for(let x=6;x<s-4;x+=3) g.fillRect(x,s-7,1,3); }); // 米色宿舍
 
-// 运动场（俯视烘焙到一张贴图）
-const fieldTex = tex(256,(g,s)=>{
-  g.fillStyle='#3f7d39'; g.fillRect(0,0,s,s);                       // 外围草
-  // 红色塑胶跑道（圆角矩形环）
-  const rr=(x,y,w,h,r,col)=>{ g.fillStyle=col; g.beginPath();
+// 运动场（标准 400m：红跑道 + 绿茵足球场，画在 200x380 竖向画布）
+const fieldTex = texRect(220,400,(g,W,H)=>{
+  g.fillStyle='#3f8a39'; g.fillRect(0,0,W,H);
+  const rr=(x,y,w,h,r,col,stroke)=>{ g.beginPath();
     g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r);
-    g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); g.fill(); };
-  rr(14,40,228,176,80,'#b5483a');                                  // 跑道红
-  // 白色分道线
-  g.strokeStyle='#f3efe6'; g.lineWidth=1; g.globalAlpha=.85;
-  for(let k=0;k<6;k++){ const o=8+k*6;
-    g.beginPath();
-    const x=14+o,y=40+o,w=228-o*2,h=176-o*2,r=Math.max(8,80-o);
-    g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r);
-    g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); g.stroke(); }
+    g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath();
+    if(col){g.fillStyle=col;g.fill();} if(stroke){g.strokeStyle=stroke;g.stroke();} };
+  rr(14,20,W-28,H-40,95,'#b5483a');                         // 红色跑道
+  g.lineWidth=1.4; g.strokeStyle='#f0ece2'; g.globalAlpha=.85;
+  for(let k=1;k<8;k++){ const o=k*5; rr(14+o,20+o,W-28-o*2,H-40-o*2,Math.max(8,95-o),null,'#f0ece2'); }
   g.globalAlpha=1;
-  rr(58,74,140,108,2,'#3f8a39');                                   // 内场绿
-  // 足球场白线
-  g.strokeStyle='#f3efe6'; g.lineWidth=2; g.strokeRect(62,78,132,100);
-  g.beginPath(); g.moveTo(128,78); g.lineTo(128,178); g.stroke();
-  g.beginPath(); g.arc(128,128,16,0,Math.PI*2); g.stroke();
-}, 1, 1);
-fieldTex.magFilter=THREE.LinearFilter;
+  rr(34,86,W-68,H-172,4,'#3f9a39');                          // 内场草
+  g.strokeStyle='#f3efe6'; g.lineWidth=2.4; g.strokeRect(40,92,W-80,H-184);
+  g.beginPath(); g.moveTo(40,H/2); g.lineTo(W-40,H/2); g.stroke();
+  g.beginPath(); g.arc(W/2,H/2,26,0,Math.PI*2); g.stroke();
+  g.strokeRect(W/2-44,92,88,40); g.strokeRect(W/2-44,H-132,88,40);   // 禁区
+});
+// 篮球场阵列（3 行 × 6 列）画在长方形画布
+const courtsTex = texRect(384,200,(g,W,H)=>{
+  g.fillStyle='#a23c30'; g.fillRect(0,0,W,H);             // 场间红色塑胶
+  const cols=6,rows=3, pad=8, cw=(W-pad)/cols-pad, ch=(H-pad)/rows-pad;
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+    const x=pad+c*(cw+pad), y=pad+r*(ch+pad);
+    g.fillStyle='#2f7d56'; g.fillRect(x,y,cw,ch);          // 绿色球场
+    g.strokeStyle='#f2efe6'; g.lineWidth=1.6; g.strokeRect(x+3,y+3,cw-6,ch-6);
+    g.beginPath(); g.moveTo(x+cw/2,y+3); g.lineTo(x+cw/2,y+ch-3); g.stroke();
+    g.beginPath(); g.arc(x+cw/2,y+ch/2,8,0,Math.PI*2); g.stroke();
+  }
+});
+// 网球场阵列（更细）
+const tennisTex = texRect(384,160,(g,W,H)=>{
+  g.fillStyle='#9a3a30'; g.fillRect(0,0,W,H);
+  const cols=6,rows=2,pad=7,cw=(W-pad)/cols-pad,ch=(H-pad)/rows-pad;
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){ const x=pad+c*(cw+pad),y=pad+r*(ch+pad);
+    g.fillStyle='#2d6f8a'; g.fillRect(x,y,cw,ch);
+    g.strokeStyle='#f2efe6'; g.lineWidth=1.4; g.strokeRect(x+4,y+4,cw-8,ch-8);
+    g.beginPath(); g.moveTo(x+cw/2,y+4); g.lineTo(x+cw/2,y+ch-4); g.stroke(); }
+});
 
-// 篮球场贴图
-const courtTex = tex(128,(g,s)=>{
-  g.fillStyle='#2e6f4e'; g.fillRect(0,0,s,s);
-  g.fillStyle='#3f7d39'; g.fillRect(0,0,s,s);
-  g.fillStyle='#c98a3a'; g.fillRect(8,18,112,92);                  // 场地
-  g.strokeStyle='#fff'; g.lineWidth=2; g.strokeRect(8,18,112,92);
-  g.beginPath(); g.moveTo(64,18); g.lineTo(64,110); g.stroke();
-  g.beginPath(); g.arc(64,64,16,0,Math.PI*2); g.stroke();
-}, 1, 1);
-courtTex.magFilter=THREE.LinearFilter;
-
-// ===================== 材质缓存 =====================
+// ===================== 材质 =====================
 const mat = (t,opts={})=> new THREE.MeshLambertMaterial({ map:t, ...opts });
 function facadeMat(baseTex, wCells, floors){
-  const t = baseTex.clone(); t.needsUpdate=true; t.repeat.set(Math.max(1,Math.round(wCells)), floors);
+  const t=baseTex.clone(); t.needsUpdate=true; t.repeat.set(Math.max(1,Math.round(wCells)), floors);
   return new THREE.MeshLambertMaterial({ map:t });
 }
 
-// ===================== 世界容器 / 碰撞 / 地图数据 =====================
+// ===================== 世界 / 碰撞 / 地图 =====================
 const world = new THREE.Group(); scene.add(world);
-const colliders = [];   // {minx,maxx,minz,maxz}
-const mapShapes = [];   // 小地图: {x,z,w,d,c}
-const labels = [];      // 文字标牌
-const teleports = {};   // 传送点
-
+const colliders=[]; const mapShapes=[]; const labels=[]; const teleports={};
 function addCollider(x,z,w,d){ colliders.push({minx:x-w/2,maxx:x+w/2,minz:z-d/2,maxz:z+d/2}); }
 
-// 地面 plane（顶面朝上）
 function plane(tx,w,d,x,z,y=0.02,rep=null){
-  const t = (rep? tx.clone():tx); if(rep){ t.needsUpdate=true; t.repeat.set(rep[0],rep[1]); }
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(w,d), new THREE.MeshLambertMaterial({map:t}));
+  const t=(rep?tx.clone():tx); if(rep){ t.needsUpdate=true; t.repeat.set(rep[0],rep[1]); }
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,d), new THREE.MeshLambertMaterial({map:t}));
   m.rotation.x=-Math.PI/2; m.position.set(x,y,z); world.add(m); return m;
 }
+function planeMat(material,w,d,x,z,y=0.05){
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(w,d),material); m.rotation.x=-Math.PI/2; m.position.set(x,y,z); world.add(m); return m;
+}
 
-// 文字标牌（精灵）
-function makeLabel(text, x, y, z, color='#fff'){
-  const c=document.createElement('canvas'); c.width=256; c.height=64;
-  const g=c.getContext('2d');
+function makeLabel(text,x,y,z,color='#fff'){
+  const c=document.createElement('canvas'); c.width=256; c.height=64; const g=c.getContext('2d');
   g.fillStyle='rgba(0,0,0,.55)'; roundRect(g,0,0,256,64,12); g.fill();
-  g.font='bold 34px "Microsoft YaHei"'; g.textAlign='center'; g.textBaseline='middle';
+  g.font='bold 32px "Microsoft YaHei"'; g.textAlign='center'; g.textBaseline='middle';
   g.fillStyle=color; g.fillText(text,128,34);
   const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace;
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:true,transparent:true}));
@@ -255,379 +247,404 @@ function makeLabel(text, x, y, z, color='#fff'){
 function roundRect(g,x,y,w,h,r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r);
   g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
 
-// ===================== 建筑：多层楼（4 面墙 + 屋顶） =====================
-function building({x, z, w, d, floors, facade=brickFacade, roof=roofTex, label, labelColor='#fff', mapColor='#c0564a', collide=true}){
-  const h = floors*FLOOR_H;
-  const g = new THREE.Group(); g.position.set(x,0,z);
-  const CELL = 5;
-  const mW = facadeMat(facade, w/CELL, floors);
-  const mD = facadeMat(facade, d/CELL, floors);
-  const mk = (geo,mt,px,py,pz,ry)=>{ const m=new THREE.Mesh(geo,mt); m.position.set(px,py,pz); m.rotation.y=ry; g.add(m); };
-  const pw = new THREE.PlaneGeometry(w,h), pd = new THREE.PlaneGeometry(d,h);
+// ===================== 基础楼栋（4 面立面 + 屋顶 + 勒脚） =====================
+function building({x,z,w,d,floors,facade=brickFacade,roof=roofTex,label,labelColor='#fff',mapColor='#c0564a',collide=true,baseCol=0xb9b2a2}){
+  const h=floors*FLOOR_H;
+  const g=new THREE.Group(); g.position.set(x,0,z);
+  const CELL=5;
+  const mW=facadeMat(facade,w/CELL,floors), mD=facadeMat(facade,d/CELL,floors);
   mW.side=mD.side=THREE.DoubleSide;
-  mk(pw,mW, 0,h/2, d/2, 0);
-  mk(pw,mW, 0,h/2,-d/2, Math.PI);
-  mk(pd,mD, w/2,h/2,0,  Math.PI/2);
-  mk(pd,mD,-w/2,h/2,0, -Math.PI/2);
-  // 屋顶
-  const roofMesh = new THREE.Mesh(new THREE.BoxGeometry(w+1,1.4,d+1), mat(roofTex));
-  roofMesh.position.y=h+0.4; g.add(roofMesh);
-  // 底部勒脚
-  const base = new THREE.Mesh(new THREE.BoxGeometry(w+0.6,2.2,d+0.6),
-    new THREE.MeshLambertMaterial({color:0xb9b2a2})); base.position.y=1.1; g.add(base);
+  const pw=new THREE.PlaneGeometry(w,h), pd=new THREE.PlaneGeometry(d,h);
+  const mk=(geo,mt,px,py,pz,ry)=>{ const m=new THREE.Mesh(geo,mt); m.position.set(px,py,pz); m.rotation.y=ry; g.add(m); };
+  mk(pw,mW,0,h/2,d/2,0); mk(pw,mW,0,h/2,-d/2,Math.PI);
+  mk(pd,mD,w/2,h/2,0,Math.PI/2); mk(pd,mD,-w/2,h/2,0,-Math.PI/2);
+  const roofMesh=new THREE.Mesh(new THREE.BoxGeometry(w+1,1.3,d+1), mat(roof)); roofMesh.position.y=h+0.3; g.add(roofMesh);
+  const base=new THREE.Mesh(new THREE.BoxGeometry(w+0.6,2,d+0.6), new THREE.MeshLambertMaterial({color:baseCol})); base.position.y=1; g.add(base);
   world.add(g);
   if(collide) addCollider(x,z,w,d);
   mapShapes.push({x,z,w,d,c:mapColor});
-  if(label) makeLabel(label, x, h+7, z, labelColor);
+  if(label) makeLabel(label,x,h+6,z,labelColor);
   return {x,z,w,d,h};
 }
 
-// ===================== 连廊（拱门走廊） =====================
+// ===================== 梳齿/E形楼（长脊 + 多翼，围合庭院） =====================
+// dir: 翼楼伸出方向，+1 向南(+z)，-1 向北(-z)
+function combBuilding({x,z,spineLen,spineD=13,wingLen=34,wingD=12,nWings=4,floors=5,
+                       facade=brickFacade,dir=1,label,labelColor='#fff',mapColor='#c0564a'}){
+  building({x,z,w:spineLen,d:spineD,floors,facade,mapColor,collide:true});
+  const span=spineLen-wingD-6, startX=x-span/2;
+  for(let i=0;i<nWings;i++){
+    const wx=startX + (nWings>1? span*i/(nWings-1):0);
+    const wz=z + dir*(spineD/2 + wingLen/2 - 0.5);
+    building({x:wx,z:wz,w:wingD,d:wingLen,floors,facade,mapColor,collide:true});
+  }
+  // 端部连廊（封口的一翼），让外轮廓更像实物
+  if(label) makeLabel(label, x, floors*FLOOR_H+6, z, labelColor);
+}
+
+// ===================== 连廊（二层拱门走廊，对应实拍） =====================
 function corridor(x1,z1,x2,z2){
-  const dx=x2-x1, dz=z2-z1, len=Math.hypot(dx,dz), ang=Math.atan2(dx,dz);
-  const g=new THREE.Group(); g.position.set((x1+x2)/2, 0,(z1+z2)/2); g.rotation.y=ang;
-  // 二层连廊主体
-  const body=new THREE.Mesh(new THREE.BoxGeometry(6, 4, len), facadeMat(brickFacade, 2, 1));
-  body.position.y=FLOOR_H*2+2; g.add(body);
-  // 底部柱子（形成拱门感）
-  const pillarMat=new THREE.MeshLambertMaterial({color:0xd8d2c4});
-  const n=Math.max(2,Math.round(len/8));
+  const dx=x2-x1,dz=z2-z1,len=Math.hypot(dx,dz),ang=Math.atan2(dx,dz);
+  const g=new THREE.Group(); g.position.set((x1+x2)/2,0,(z1+z2)/2); g.rotation.y=ang;
+  const body=new THREE.Mesh(new THREE.BoxGeometry(5,3.4,len), facadeMat(brickFacade,2,1));
+  body.position.y=FLOOR_H*2+1.7; g.add(body);
+  const pillarMat=new THREE.MeshLambertMaterial({color:0xe2dccd});
+  const n=Math.max(2,Math.round(len/9));
   for(let i=0;i<=n;i++){ const p=new THREE.Mesh(new THREE.BoxGeometry(1.4,FLOOR_H*2,1.4),pillarMat);
-    p.position.set(0, FLOOR_H, -len/2 + i*(len/n)); g.add(p); }
+    p.position.set(0,FLOOR_H,-len/2+i*(len/n)); g.add(p); }
   world.add(g);
 }
 
-// ===================== 圆顶报告厅 / 体育馆 =====================
-function domeHall(x,z,r,name){
+// ===================== 体育馆（红砖基座 + 浅色拱顶） =====================
+function gymHall(x,z,w,d,name){
   const g=new THREE.Group(); g.position.set(x,0,z);
-  const drumMat=new THREE.MeshLambertMaterial({color:0xcfc8b8, flatShading:true});
-  const drum=new THREE.Mesh(new THREE.CylinderGeometry(r,r,16,10,1),drumMat);
-  drum.position.y=8; g.add(drum);
-  // 一圈窗带
-  const ring=new THREE.Mesh(new THREE.CylinderGeometry(r+0.1,r+0.1,4,10,1),
-    new THREE.MeshLambertMaterial({color:0x44586a, flatShading:true}));
-  ring.position.y=13; g.add(ring);
-  const dome=new THREE.Mesh(new THREE.SphereGeometry(r,10,5,0,Math.PI*2,0,Math.PI/2),
-    new THREE.MeshLambertMaterial({color:0x7fa6c4, flatShading:true}));
-  dome.position.y=16; g.add(dome);
-  const top=new THREE.Mesh(new THREE.BoxGeometry(3,4,3),new THREE.MeshLambertMaterial({color:0xb9b2a2}));
-  top.position.y=16+r*0.95; g.add(top);
+  const baseH=10;
+  // 基座（红砖立面 box，用 building 风格但单体）
+  const bm=facadeMat(whiteFacade, w/6, 2); bm.side=THREE.DoubleSide;
+  const pw=new THREE.PlaneGeometry(w,baseH), pd=new THREE.PlaneGeometry(d,baseH);
+  const mk=(geo,px,py,pz,ry)=>{ const m=new THREE.Mesh(geo,bm); m.position.set(px,py,pz); m.rotation.y=ry; g.add(m); };
+  mk(pw,0,baseH/2,d/2,0); mk(pw,0,baseH/2,-d/2,Math.PI); mk(pd,w/2,baseH/2,0,Math.PI/2); mk(pd,-w/2,baseH/2,0,-Math.PI/2);
+  // 红砖勒脚
+  const skirt=new THREE.Mesh(new THREE.BoxGeometry(w+0.6,3,d+0.6), new THREE.MeshLambertMaterial({color:0x9a4034})); skirt.position.y=1.5; g.add(skirt);
+  // 拱顶（半圆柱沿 d 方向）
+  const roof=new THREE.Mesh(new THREE.CylinderGeometry(d/2*0.92,d/2*0.92,w,18,1,false,0,Math.PI),
+    new THREE.MeshLambertMaterial({color:0xeef0f2,flatShading:true}));
+  roof.rotation.z=Math.PI/2; roof.position.y=baseH; g.add(roof);
+  // 顶脊
+  const ridge=new THREE.Mesh(new THREE.BoxGeometry(w,0.8,1.2), new THREE.MeshLambertMaterial({color:0xc9ccd0}));
+  ridge.position.y=baseH+d/2*0.92; g.add(ridge);
   world.add(g);
-  addCollider(x,z,r*2,r*2); mapShapes.push({x,z,w:r*2,d:r*2,c:'#8fb6d6'});
-  makeLabel(name, x, 16+r+8, z, '#dff0ff');
+  addCollider(x,z,w,d); mapShapes.push({x,z,w,d,c:'#dfe2e6'});
+  makeLabel(name,x,baseH+d/2+6,z,'#eaf4ff');
+}
+
+// ===================== 张拉膜看台（白色帐篷顶，对应实拍） =====================
+function grandstand(x,z,len,name){
+  const g=new THREE.Group(); g.position.set(x,0,z);
+  // 看台基座（阶梯）
+  for(let i=0;i<4;i++){ const step=new THREE.Mesh(new THREE.BoxGeometry(6-i*1.1,1.4,len),
+    new THREE.MeshLambertMaterial({color:i%2?0xb24a3c:0xcdc7b8}));
+    step.position.set(-2.5+i*0.9, 0.7+i*1.4, 0); g.add(step); }
+  // 张拉膜白色尖顶（一排 4 面体 + 桅杆）
+  const nPk=Math.max(3,Math.round(len/14));
+  const memb=new THREE.MeshLambertMaterial({color:0xf6f7f9,flatShading:true,side:THREE.DoubleSide,transparent:true,opacity:0.96});
+  for(let i=0;i<nPk;i++){ const pz=-len/2+ (i+0.5)*(len/nPk);
+    const peak=new THREE.Mesh(new THREE.ConeGeometry(8.2,6,4), memb);
+    peak.rotation.y=Math.PI/4; peak.position.set(-1, 9.5, pz); g.add(peak);
+    const mast=new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.25,12,6), new THREE.MeshLambertMaterial({color:0xbfc4c9}));
+    mast.position.set(-1,6,pz); g.add(mast);
+  }
+  world.add(g);
+  addCollider(x,z,7,len); mapShapes.push({x,z,w:7,d:len,c:'#eef0f2'});
+  makeLabel(name,x,16,z,'#eaf4ff');
+}
+
+// ===================== 篮球架（实例化简化） =====================
+function hoops(x0,z0,cols,rows,dx,dz){
+  const poleGeo=new THREE.BoxGeometry(0.35,4,0.35), boardGeo=new THREE.BoxGeometry(2,1.2,0.2);
+  const poleMat=new THREE.MeshLambertMaterial({color:0x556069}), boardMat=new THREE.MeshLambertMaterial({color:0xf2f2f2});
+  const n=cols*rows*2;
+  const pole=new THREE.InstancedMesh(poleGeo,poleMat,n), board=new THREE.InstancedMesh(boardGeo,boardMat,n);
+  const m=new THREE.Matrix4(); let k=0;
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){ const cx=x0+c*dx, cz=z0+r*dz;
+    for(const s of [-1,1]){ const px=cx, pz=cz+s*(dz*0.42);
+      m.makeTranslation(px,2,pz); pole.setMatrixAt(k,m);
+      m.makeTranslation(px,4.2,pz - s*0.4); board.setMatrixAt(k,m); k++; } }
+  pole.count=k; board.count=k; world.add(pole); world.add(board);
 }
 
 // ===================== 树 / 路灯（实例化） =====================
-const treePos=[], lampPos=[];
+const treePos=[], lampPos=[], gardenLampPos=[];
 function buildTrees(){
-  const trunkGeo=new THREE.BoxGeometry(1.2,5,1.2);
-  const leafGeo =new THREE.BoxGeometry(5,5,5);
-  const trunkMat=new THREE.MeshLambertMaterial({color:0x6b4a2b});
-  const leafMat =new THREE.MeshLambertMaterial({color:0x3f8f3a});
-  const trunk=new THREE.InstancedMesh(trunkGeo,trunkMat,treePos.length);
-  const leaf =new THREE.InstancedMesh(leafGeo, leafMat, treePos.length*2);
+  if(!treePos.length) return;
+  const trunkGeo=new THREE.BoxGeometry(1.1,5,1.1), leafGeo=new THREE.BoxGeometry(5,5,5);
+  const trunkMat=new THREE.MeshLambertMaterial({color:0x6b4a2b}), leafMat=new THREE.MeshLambertMaterial({color:0x3f8f3a});
+  const trunk=new THREE.InstancedMesh(trunkGeo,trunkMat,treePos.length), leaf=new THREE.InstancedMesh(leafGeo,leafMat,treePos.length*2);
   const m=new THREE.Matrix4(); let li=0;
-  treePos.forEach((p,i)=>{
-    m.makeTranslation(p.x,2.5,p.z); trunk.setMatrixAt(i,m);
+  treePos.forEach((p,i)=>{ m.makeTranslation(p.x,2.5,p.z); trunk.setMatrixAt(i,m);
     m.makeTranslation(p.x,6.5,p.z); leaf.setMatrixAt(li++,m);
-    m.compose(new THREE.Vector3(p.x,9.5,p.z), new THREE.Quaternion(), new THREE.Vector3(0.7,0.7,0.7)); leaf.setMatrixAt(li++,m);
-  });
+    m.compose(new THREE.Vector3(p.x,9.3,p.z),new THREE.Quaternion(),new THREE.Vector3(0.7,0.7,0.7)); leaf.setMatrixAt(li++,m); });
   world.add(trunk); world.add(leaf);
 }
 function buildLamps(){
-  const poleGeo=new THREE.BoxGeometry(0.5,7,0.5), headGeo=new THREE.BoxGeometry(1.4,1,1.4);
+  if(!lampPos.length) return;
+  const poleGeo=new THREE.BoxGeometry(0.5,7,0.5), headGeo=new THREE.BoxGeometry(1.3,1,1.3);
   const poleMat=new THREE.MeshLambertMaterial({color:0x444a52});
-  const headMat=new THREE.MeshLambertMaterial({color:0xfff2c0, emissive:0xffcf66, emissiveIntensity:0.8});
-  const pole=new THREE.InstancedMesh(poleGeo,poleMat,lampPos.length);
-  const head=new THREE.InstancedMesh(headGeo,headMat,lampPos.length);
+  const headMat=new THREE.MeshLambertMaterial({color:0xfff2c0,emissive:0xffcf66,emissiveIntensity:0.8});
+  const pole=new THREE.InstancedMesh(poleGeo,poleMat,lampPos.length), head=new THREE.InstancedMesh(headGeo,headMat,lampPos.length);
   const m=new THREE.Matrix4();
-  lampPos.forEach((p,i)=>{ m.makeTranslation(p.x,3.5,p.z); pole.setMatrixAt(i,m);
-    m.makeTranslation(p.x,7.2,p.z); head.setMatrixAt(i,m); });
+  lampPos.forEach((p,i)=>{ m.makeTranslation(p.x,3.5,p.z); pole.setMatrixAt(i,m); m.makeTranslation(p.x,7.2,p.z); head.setMatrixAt(i,m); });
   world.add(pole); world.add(head);
 }
+// 欧式多球景观灯（广场，对应实拍 203）
+function buildGardenLamps(){
+  if(!gardenLampPos.length) return;
+  const poleMat=new THREE.MeshLambertMaterial({color:0x2b2f36});
+  const globeMat=new THREE.MeshLambertMaterial({color:0xfff4cf,emissive:0xffd87a,emissiveIntensity:0.85});
+  const pole=new THREE.InstancedMesh(new THREE.CylinderGeometry(0.22,0.3,9,8),poleMat,gardenLampPos.length);
+  const globe=new THREE.InstancedMesh(new THREE.SphereGeometry(0.7,8,6),globeMat,gardenLampPos.length*5);
+  const m=new THREE.Matrix4(); let gi=0;
+  const offs=[[0,9.4,0],[1.4,8.6,0],[-1.4,8.6,0],[0,8.6,1.4],[0,8.6,-1.4]];
+  gardenLampPos.forEach((p,i)=>{ m.makeTranslation(p.x,4.5,p.z); pole.setMatrixAt(i,m);
+    for(const o of offs){ m.makeTranslation(p.x+o[0],o[1],p.z+o[2]); globe.setMatrixAt(gi++,m); } });
+  world.add(pole); world.add(globe);
+}
 
-// ===================== 大门 + 旗杆 =====================
+// ===================== 校门（深色石材门柱 + 校名横梁 + 景墙） =====================
 function gate(){
-  const g=new THREE.Group(); g.position.set(0,0,168);
-  const wMat=new THREE.MeshLambertMaterial({color:0xe6e1d4});
-  // 两侧弧形连廊（用方块近似）
-  for(const side of [-1,1]){
-    const wing=new THREE.Mesh(new THREE.BoxGeometry(46,9,5), wMat);
-    wing.position.set(side*44, 4.5, 0); g.add(wing);
-    // 拱柱
-    for(let i=0;i<6;i++){ const col=new THREE.Mesh(new THREE.BoxGeometry(2,9,5),wMat);
-      col.position.set(side*(24+i*8), 4.5, 0); g.add(col); }
-    addCollider(side*44, 168, 46, 5);
-  }
-  // 中央门楼 + 校名
-  const lintel=new THREE.Mesh(new THREE.BoxGeometry(30,5,6), wMat); lintel.position.set(0,16,0); g.add(lintel);
-  for(const sx of [-13,13]){ const p=new THREE.Mesh(new THREE.BoxGeometry(4,16,6),wMat); p.position.set(sx,8,0); g.add(p);
-    addCollider(sx,168,4,6); }
-  // 校名牌
-  const c=document.createElement('canvas'); c.width=512; c.height=128; const cg=c.getContext('2d');
-  cg.fillStyle='#f2efe6'; cg.fillRect(0,0,512,128);
-  cg.fillStyle='#b22222'; cg.font='bold 76px "Microsoft YaHei"'; cg.textAlign='center'; cg.textBaseline='middle';
-  cg.fillText('麻城市第一中学',256,68);
+  const g=new THREE.Group(); g.position.set(0,0,GZ);
+  const stone=new THREE.MeshLambertMaterial({color:0x3c4148});
+  const lightStone=new THREE.MeshLambertMaterial({color:0x6b7178});
+  // 两侧大门柱（深色花岗岩）
+  for(const sx of [-16,16]){ const pillar=new THREE.Mesh(new THREE.BoxGeometry(6,15,6),stone);
+    pillar.position.set(sx,7.5,0); g.add(pillar);
+    const cap=new THREE.Mesh(new THREE.BoxGeometry(7,1.4,7),lightStone); cap.position.set(sx,15.3,0); g.add(cap);
+    addCollider(sx,GZ,6,6); }
+  // 横梁 + 校名
+  const beam=new THREE.Mesh(new THREE.BoxGeometry(38,3.4,4),lightStone); beam.position.set(0,16.5,0); g.add(beam);
+  const c=document.createElement('canvas'); c.width=1024; c.height=160; const cg=c.getContext('2d');
+  cg.fillStyle='#33383f'; cg.fillRect(0,0,1024,160);
+  cg.fillStyle='#ffd24a'; cg.font='bold 92px "Microsoft YaHei"'; cg.textAlign='center'; cg.textBaseline='middle';
+  cg.fillText('麻城市第一中学',512,86);
   const st=new THREE.CanvasTexture(c); st.colorSpace=THREE.SRGBColorSpace;
-  const sign=new THREE.Mesh(new THREE.BoxGeometry(28,4.4,0.6), new THREE.MeshBasicMaterial({map:st}));
-  sign.position.set(0,16,3.2); g.add(sign);
+  const sign=new THREE.Mesh(new THREE.BoxGeometry(34,3,0.4),new THREE.MeshBasicMaterial({map:st})); sign.position.set(0,16.5,2.1); g.add(sign);
+  // 两翼矮墙（深色石材 + 顶线）
+  for(const side of [-1,1]){ const wing=new THREE.Mesh(new THREE.BoxGeometry(40,6,3),stone);
+    wing.position.set(side*42,3,0); g.add(wing);
+    const top=new THREE.Mesh(new THREE.BoxGeometry(41,0.8,3.6),lightStone); top.position.set(side*42,6.2,0); g.add(top);
+    addCollider(side*42,GZ,40,3); }
   world.add(g);
-  mapShapes.push({x:0,z:168,w:90,d:5,c:'#e0d9c6'});
-  makeLabel('🏫 校门', 0, 24, 168, '#ffe08a');
-  teleports['gate']={x:0,z:150,y:EYE};
+  mapShapes.push({x:0,z:GZ,w:124,d:4,c:'#5a6068'});
+  makeLabel('🏫 校门',0,22,GZ,'#ffe08a');
+  teleports['gate']={x:0,z:GZ-22,y:EYE};
 }
-
-// 旗杆 + 国旗
-function flagpole(x,z){
+// 国旗台 + 旗杆
+function flagArea(x,z){
   const g=new THREE.Group(); g.position.set(x,0,z);
-  const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,20,8),
-    new THREE.MeshLambertMaterial({color:0xdedede})); pole.position.y=10; g.add(pole);
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(7,7,1,18), new THREE.MeshLambertMaterial({color:0xd9d4c6}));
+  base.position.y=0.5; g.add(base);
+  const base2=new THREE.Mesh(new THREE.CylinderGeometry(4.6,4.6,1.6,18), new THREE.MeshLambertMaterial({color:0xc0392b}));
+  base2.position.y=1.3; g.add(base2);
+  for(const ox of [-2.2,0,2.2]){ const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.22,20,8),
+    new THREE.MeshLambertMaterial({color:0xe2e2e2})); pole.position.set(ox,12,0); g.add(pole); }
   const flag=new THREE.Mesh(new THREE.PlaneGeometry(7,4.6),
-    new THREE.MeshLambertMaterial({color:0xd1141c, side:THREE.DoubleSide})); flag.position.set(3.7,17.5,0); g.add(flag);
-  world.add(g);
+    new THREE.MeshLambertMaterial({color:0xd1141c,side:THREE.DoubleSide})); flag.position.set(1.3+3.5,19,0); g.add(flag);
+  world.add(g); addCollider(x,z,9,9); mapShapes.push({x,z,w:9,d:9,c:'#c0392b'});
 }
 
-// ===================== 云朵（MC 风格漂浮方块） =====================
+// ===================== 云 =====================
 const clouds=new THREE.Group();
-(function(){ const m=new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.85});
-  for(let i=0;i<22;i++){ const c=new THREE.Mesh(new THREE.BoxGeometry(28+Math.random()*40,5,18+Math.random()*30),m);
-    c.position.set((Math.random()-0.5)*900, 150+Math.random()*40, (Math.random()-0.5)*900); clouds.add(c);} })();
+(function(){ const m=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.85});
+  for(let i=0;i<26;i++){ const c=new THREE.Mesh(new THREE.BoxGeometry(30+Math.random()*46,5,20+Math.random()*34),m);
+    c.position.set((Math.random()-0.5)*1200,180+Math.random()*50,(Math.random()-0.5)*1200); clouds.add(c);} })();
 scene.add(clouds);
 
 // =====================================================================
-//                        构 建 整 个 校 园
+//                          构 建 校 园
+//   坐标：+x 东，+z 南（校门一侧），-z 北，原点≈中央广场
 // =====================================================================
+const GZ = 205;                   // 南墙/校门 z
+const X0=-235, X1=235, ZN=-195, ZS=210;  // 校园边界
+
 // 1) 大地草坪
-const groundMat=new THREE.MeshLambertMaterial({map:(()=>{const t=grassTex.clone();t.needsUpdate=true;t.repeat.set(120,120);return t;})()});
-const ground=new THREE.Mesh(new THREE.PlaneGeometry(1000,1000),groundMat);
-ground.rotation.x=-Math.PI/2; scene.add(ground);
+const groundMat=new THREE.MeshLambertMaterial({map:(()=>{const t=grassTex.clone();t.needsUpdate=true;t.repeat.set(150,150);return t;})()});
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(1400,1400),groundMat); ground.rotation.x=-Math.PI/2; scene.add(ground);
 
-// 2) 主轴 + 广场 + 道路
-plane(roadTex, 8, 300, 0, 20, 0.03, [1,38]);          // 中央南北主路
-plane(roadTex, 360, 8, 0, 160, 0.03, [46,1]);         // 校门内横路
-plane(roadTex, 360, 8, 0, -140, 0.03,[46,1]);         // 北侧横路
-plane(roadTex, 8, 320, -170, 10, 0.03,[1,40]);        // 西环路
-plane(roadTex, 8, 320, 170, 10, 0.03, [1,40]);        // 东环路
+// 2) 道路网
+function road(w,d,x,z,rep){ plane(roadTex,w,d,x,z,0.03,rep); }
+road(12,400,0,5,[1,50]);                 // 中央南北主轴
+road(470,11,0,150,[60,1]);               // 入口横路
+road(470,11,0,15,[60,1]);                // 教学区横路
+road(470,11,0,-120,[60,1]);              // 北区横路
+road(11,400,-205,5,[1,50]);              // 西环路
+road(11,400,205,5,[1,50]);               // 东环路
+road(11,300,95,5,[1,38]);                // 东侧次轴（运动场/食堂之间）
 // 道路黄中线
-function laneLine(w,d,x,z,rot=false){ const m=new THREE.Mesh(new THREE.BoxGeometry(rot?d:0.5,0.05,rot?0.5:d),
-  new THREE.MeshLambertMaterial({color:0xe8c038})); m.position.set(x,0.06,z); world.add(m); }
-laneLine(0,300,0,20); laneLine(0,300,-170,10); laneLine(0,300,170,10);
-// 入口广场
-plane(paveTex, 80, 60, 0, 130, 0.04, [20,15]);
-// 中心大广场（圆顶报告厅前）
-plane(paveTex, 120, 70, 0, -100, 0.04,[30,18]);
-// 教学区庭院铺装
-plane(paveTex, 150, 40, -45, 30, 0.035,[38,10]);
+function laneLine(len,x,z,horiz=false){ const m=new THREE.Mesh(
+  new THREE.BoxGeometry(horiz?len:0.5,0.05,horiz?0.5:len), new THREE.MeshLambertMaterial({color:0xe8c038}));
+  m.position.set(x,0.06,z); world.add(m); }
+laneLine(400,0,5); laneLine(400,-205,5); laneLine(400,205,5);
+laneLine(470,0,150,true); laneLine(470,0,15,true); laneLine(470,0,-120,true);
 
-// 3) 校门 + 旗杆
+// 3) 广场铺装
+plane(paveTex,150,70,0,165,0.04,[40,18]);     // 入口广场
+plane(paveTex,90,150,0,75,0.04,[24,40]);      // 教学楼间中央广场
+plane(paveTex,120,60,-55,-60,0.04,[32,16]);   // 体育馆前广场
+// 中央广场三角花坛点缀
+function planter(x,z,r){ const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,0.6,3),
+  new THREE.MeshLambertMaterial({color:0x4f8235})); m.rotation.y=Math.PI/6; m.position.set(x,0.3,z); world.add(m); }
+planter(-22,110,5); planter(22,110,5); planter(-22,45,5); planter(22,45,5); planter(0,78,7);
+
+// 4) 校门 + 国旗
 gate();
-flagpole(-22,128); flagpole(22,128);
+flagArea(0,150);
 
-// 4) 教学楼群（红砖，5层，E-W 走向，两列三排）—— 对应卫星图中部密集楼群
-const teachW=64, teachD=14, teachFloors=5;
-const colX=[-92, -12];   // 两列
-const rowZ=[78, 26, -26];// 三排
-let tnum=0;
-colX.forEach(cx=>{ rowZ.forEach(rz=>{ tnum++;
-  building({x:cx,z:rz,w:teachW,d:teachD,floors:teachFloors,
-    label: tnum===1?'教学楼':null, labelColor:'#ffd8c8'});
-}); });
-// 列内连廊（拱门走廊）
-colX.forEach(cx=>{ corridor(cx,78-teachD/2, cx,26+teachD/2); corridor(cx,26-teachD/2, cx,-26+teachD/2); });
-makeLabel('🏫 教学区', -52, 30, 30, '#ffe6da');
+// 5) 中央教学楼群（红砖 E形，5 层，对称两组，开口向南）
+combBuilding({x:-95,z:25,spineLen:120,nWings:4,wingLen:38,floors:5,facade:brickFacade,dir:1,
+  label:'笃行楼 · 教学楼',labelColor:'#ffd8c8',mapColor:'#b85a4a'});
+combBuilding({x:95,z:25,spineLen:120,nWings:4,wingLen:38,floors:5,facade:brickFacade,dir:1,
+  label:'致远楼 · 教学楼',labelColor:'#ffd8c8',mapColor:'#b85a4a'});
+// 教学楼之间二层拱门连廊
+corridor(-35,30,35,30);
+corridor(-95,25-6.5, -95,-30);   // 与北侧公共楼方向的连廊（示意）
+makeLabel('🏫 教学区',0,30,75,'#ffe6da');
 
-// 5) 综合楼 / 图书馆（白色，6层，主轴北端两侧）
-building({x:-45,z:-60,w:40,d:20,floors:6,facade:whiteFacade,label:'综合楼',labelColor:'#e8f4ff',mapColor:'#cfd6e0'});
-building({x: 45,z:-60,w:40,d:20,floors:6,facade:whiteFacade,label:'图书馆',labelColor:'#e8f4ff',mapColor:'#cfd6e0'});
+// 6) 体育馆（白色拱顶大厅，中北部）
+gymHall(-55,-62,66,44,'体育馆 · 风雨操场');
+teleports['gym']={x:-55,z:-30,y:EYE};
+// 图书馆 / 报告厅（体育馆东侧，白色多层）
+building({x:55,z:-62,w:50,d:34,floors:4,facade:whiteFacade,label:'图书馆 · 报告厅',labelColor:'#e8f4ff',mapColor:'#cfd6e0'});
 
-// 6) 圆顶报告厅（主轴最北，广场尽头）
-domeHall(0,-115,18,'报告厅 / 体育馆');
-teleports['dome']={x:0,z:-78,y:EYE};
+// 7) 北侧宿舍楼群（米色梳齿，6 层，开口向南）
+combBuilding({x:-140,z:-150,spineLen:92,nWings:4,wingLen:32,floors:6,facade:dormFacade,dir:1,
+  label:'学生公寓',labelColor:'#ffeccf',mapColor:'#c9b78f'});
+combBuilding({x:-40,z:-150,spineLen:92,nWings:4,wingLen:32,floors:6,facade:dormFacade,dir:1,mapColor:'#c9b78f'});
+combBuilding({x:60,z:-150,spineLen:92,nWings:4,wingLen:32,floors:6,facade:dormFacade,dir:1,mapColor:'#c9b78f'});
+makeLabel('🛏 生活区',-40,40,-150,'#ffeccf');
+teleports['dorm']={x:-40,z:-112,y:EYE};
 
-// 7) 宿舍塔楼（东侧两列三排，11层）—— 对应卫星图右侧高层
-const dormX=[112,150], dormZ=[80,20,-40];
-let dnum=0;
-dormX.forEach(dx=>{ dormZ.forEach(dz=>{ dnum++;
-  building({x:dx,z:dz,w:20,d:16,floors:11,facade:dormFacade,
-    label: dnum===1?'宿舍楼':null, labelColor:'#ffeccf', mapColor:'#c9b78f'});
-}); });
-makeLabel('🛏 宿舍区',131,52,20,'#ffeccf');
-teleports['dorm']={x:131,z:120,y:EYE};
+// 8) 西南大型梳齿楼（实验/科技楼，红砖 5 层，开口向南）
+combBuilding({x:-160,z:95,spineLen:92,nWings:5,wingLen:40,floors:5,facade:brickFacade,dir:1,
+  label:'明德楼 · 实验楼',labelColor:'#ffd8c8',mapColor:'#b85a4a'});
 
-// 8) 食堂（东南，2层大跨度）
-building({x:120,z:135,w:56,d:34,floors:2,facade:whiteFacade,label:'食堂',labelColor:'#fff0d8',mapColor:'#d8cdb0'});
-teleports['canteen']={x:120,z:165,y:EYE};
+// 9) 食堂（东侧，白/红砖大跨，大玻璃幕，对应实拍 202）
+building({x:150,z:115,w:58,d:40,floors:3,facade:whiteFacade,label:'学生食堂',labelColor:'#fff0d8',mapColor:'#d8cdb0'});
+teleports['canteen']={x:150,z:80,y:EYE};
 
-// 9) 运动场（东北，红色跑道 + 足球场）
-const field=plane(fieldTex,128,82,118,-95,0.05);
-mapShapes.push({x:118,z:-95,w:128,d:82,c:'#b5483a'});
-makeLabel('🏃 田径场',118,10,-95,'#ffd8c8');
-teleports['field']={x:118,z:-50,y:EYE};
-// 篮球场（运动场南侧）
-const court=plane(courtTex,40,28,118,-32,0.05); mapShapes.push({x:118,z:-32,w:40,d:28,c:'#c98a3a'});
-makeLabel('🏀 篮球场',118,8,-32,'#ffe6c8');
+// 10) 东侧运动区
+// 400m 跑道 + 足球场
+planeMat(new THREE.MeshLambertMaterial({map:fieldTex}),96,176,165,-30,0.05);
+mapShapes.push({x:165,z:-30,w:96,d:176,c:'#b5483a'});
+makeLabel('🏃 田径场',165,12,-30,'#ffd8c8');
+teleports['field']={x:165,z:60,y:EYE};
+// 篮球场阵列（3×6）+ 篮球架
+planeMat(new THREE.MeshLambertMaterial({map:courtsTex}),150,72,150,-150,0.05);
+mapShapes.push({x:150,z:-150,w:150,d:72,c:'#2f7d56'});
+hoops(150-60,-150-24, 6,3, 24,24);
+makeLabel('🏀 篮球场',150,10,-150,'#ffe6c8');
+teleports['court']={x:150,z:-110,y:EYE};
+// 网球场（篮球场北）
+planeMat(new THREE.MeshLambertMaterial({map:tennisTex}),120,46,150,-188,0.05);
+mapShapes.push({x:150,z:-188,w:120,d:46,c:'#2d6f8a'});
+// 张拉膜看台（跑道西侧）
+grandstand(108,-30,120,'体育场看台');
 
-// 10) 围墙
-function wall(x1,z1,x2,z2,gapCenter=null,gapW=0){
+// 11) 围墙（灰砖）
+function wall(x1,z1,x2,z2){
   const dx=x2-x1,dz=z2-z1,len=Math.hypot(dx,dz),ang=Math.atan2(dx,dz);
-  const wm=new THREE.MeshLambertMaterial({color:0x9aa0a6});
-  const seg=(s,e)=>{ const cx=x1+dx*((s+e)/2/len), cz=z1+dz*((s+e)/2/len), L=e-s;
-    const m=new THREE.Mesh(new THREE.BoxGeometry(1,3.2,L),wm); m.position.set(cx,1.6,cz); m.rotation.y=ang; world.add(m);
-    addCollider(cx,cz, Math.abs(Math.cos(ang))*1+Math.abs(Math.sin(ang))*L, Math.abs(Math.cos(ang))*L+Math.abs(Math.sin(ang))*1); };
-  if(gapCenter==null){ seg(0,len); }
-  else { const gc=gapCenter; seg(0,Math.max(0,gc-gapW/2)); seg(gc+gapW/2,len); }
+  const wm=new THREE.MeshLambertMaterial({map:(()=>{const t=greyRoofTex.clone();t.needsUpdate=true;t.repeat.set(Math.max(1,len/4),1);return t;})()});
+  const m=new THREE.Mesh(new THREE.BoxGeometry(1,3.4,len),wm); m.position.set((x1+x2)/2,1.7,(z1+z2)/2); m.rotation.y=ang; world.add(m);
+  addCollider((x1+x2)/2,(z1+z2)/2, Math.abs(Math.cos(ang))*1+Math.abs(Math.sin(ang))*len, Math.abs(Math.cos(ang))*len+Math.abs(Math.sin(ang))*1);
 }
-const X0=-176,X1=176,Z0=-150,Z1=176;
-wall(X0,Z0,X1,Z0);                 // 北
-wall(X0,Z1,X1,Z1, (176-(-176)) , 0); // 南（占位，下面单独留门）
-// 南墙：在校门处留缺口
-(function(){ const wm=new THREE.MeshLambertMaterial({color:0x9aa0a6});
-  const mkS=(cx,L)=>{ const m=new THREE.Mesh(new THREE.BoxGeometry(L,3.2,1),wm); m.position.set(cx,1.6,Z1); world.add(m); addCollider(cx,Z1,L,1); };
-  mkS(-120,112); mkS(120,112); })();
-wall(X0,Z0,X0,Z1);                 // 西
-wall(X1,Z0,X1,Z1);                 // 东
+wall(X0,ZN,X1,ZN);            // 北墙
+wall(X0,ZN,X0,ZS);            // 西墙
+wall(X1,ZN,X1,ZS);            // 东墙
+// 南墙（校门处留缺口）
+wall(X0,ZS,-60,ZS); wall(60,ZS,X1,ZS);
 
-// 11) 行道树 & 路灯位置
-function lineProps(x1,z1,x2,z2,step,arr,jitter=0){
-  const dx=x2-x1,dz=z2-z1,len=Math.hypot(dx,dz),n=Math.floor(len/step);
-  for(let i=0;i<=n;i++){ const t=i/n; arr.push({x:x1+dx*t+(Math.random()-0.5)*jitter, z:z1+dz*t+(Math.random()-0.5)*jitter}); }
-}
-// 主轴两侧树
-lineProps(-7,165,-7,-125,16,treePos); lineProps(7,165,7,-125,16,treePos);
-// 横路 & 环路树
-lineProps(-150,150,150,150,18,treePos); lineProps(-150,-130,150,-130,18,treePos);
-lineProps(-162,150,-162,-120,18,treePos); lineProps(162,150,162,-120,18,treePos);
-// 教学区周边点缀
-for(let i=0;i<40;i++){ const x=-120+Math.random()*150, z=-30+Math.random()*120;
-  treePos.push({x,z}); }
+// 12) 行道树 & 路灯
+function lineProps(x1,z1,x2,z2,step,arr,jit=0){ const dx=x2-x1,dz=z2-z1,len=Math.hypot(dx,dz),n=Math.floor(len/step);
+  for(let i=0;i<=n;i++){ const t=i/n; arr.push({x:x1+dx*t+(Math.random()-0.5)*jit,z:z1+dz*t+(Math.random()-0.5)*jit}); } }
+// 主轴两侧 + 横路 + 环路
+lineProps(-8,200,-8,-160,15,treePos); lineProps(8,200,8,-160,15,treePos);
+lineProps(-200,150,200,150,18,treePos); lineProps(-200,15,200,15,18,treePos); lineProps(-200,-120,200,-120,18,treePos);
+lineProps(-200,150,-200,-160,18,treePos); lineProps(200,150,200,-160,18,treePos);
+lineProps(88,150,88,-110,16,treePos);
+// 散点绿化
+for(let i=0;i<46;i++){ treePos.push({x:-225+Math.random()*120,z:-30+Math.random()*220}); }
 buildTrees();
 // 路灯
-lineProps(-4,160,-4,-120,30,lampPos); lineProps(4,160,4,-120,30,lampPos);
-lineProps(-150,156,150,156,40,lampPos); lampPos.push({x:-40,z:-100},{x:40,z:-100},{x:0,z:130});
+lineProps(-5,195,-5,-150,32,lampPos); lineProps(5,195,5,-150,32,lampPos);
+lineProps(-195,148,195,148,42,lampPos); lineProps(-195,-118,195,-118,42,lampPos);
 buildLamps();
+// 广场欧式景观灯
+gardenLampPos.push({x:-30,z:165},{x:30,z:165},{x:-30,z:120},{x:30,z:120},{x:-30,z:55},{x:30,z:55});
+buildGardenLamps();
 
 // =====================================================================
-//                        控 制 与 移 动
+//                          控 制 与 移 动
 // =====================================================================
-camera.rotation.order='YXZ';
-scene.add(camera);
-camera.position.set(0,EYE,150);
-camera.lookAt(0,EYE,0);
+camera.rotation.order='YXZ'; scene.add(camera);
+camera.position.set(0,EYE,190); camera.lookAt(0,EYE,0);
 
-// —— 自写极简鼠标锁定控制（替代 PointerLockControls addon，免模块依赖）——
-const controls = (function(){
-  let locked=false; const euler=new THREE.Euler(0,0,0,'YXZ');
-  const evs={lock:[],unlock:[]};
-  function onMove(e){ if(!locked) return;
-    euler.setFromQuaternion(camera.quaternion);
-    euler.y -= e.movementX*0.0022; euler.x -= e.movementY*0.0022;
-    const lim=Math.PI/2-0.02; euler.x=Math.max(-lim,Math.min(lim,euler.x));
-    camera.quaternion.setFromEuler(euler);
-  }
-  document.addEventListener('mousemove', onMove);
-  document.addEventListener('pointerlockchange', ()=>{
-    locked = (document.pointerLockElement===renderer.domElement);
-    (locked?evs.lock:evs.unlock).forEach(f=>f());
-  });
-  const obj={ position: camera.position };
-  return {
-    getObject:()=>obj,
-    lock:()=>{ const p=renderer.domElement.requestPointerLock(); if(p&&p.catch)p.catch(()=>{}); },
-    addEventListener:(t,f)=>{ (evs[t]||[]).push(f); },
-    get isLocked(){ return locked; }
-  };
+const controls=(function(){
+  let locked=false; const euler=new THREE.Euler(0,0,0,'YXZ'); const evs={lock:[],unlock:[]};
+  function onMove(e){ if(!locked) return; euler.setFromQuaternion(camera.quaternion);
+    euler.y-=e.movementX*0.0022; euler.x-=e.movementY*0.0022;
+    const lim=Math.PI/2-0.02; euler.x=Math.max(-lim,Math.min(lim,euler.x)); camera.quaternion.setFromEuler(euler); }
+  document.addEventListener('mousemove',onMove);
+  document.addEventListener('pointerlockchange',()=>{ locked=(document.pointerLockElement===renderer.domElement);
+    (locked?evs.lock:evs.unlock).forEach(f=>f()); });
+  const obj={position:camera.position};
+  return { getObject:()=>obj, lock:()=>{ const p=renderer.domElement.requestPointerLock(); if(p&&p.catch)p.catch(()=>{}); },
+    addEventListener:(t,f)=>{ (evs[t]||[]).push(f); }, get isLocked(){return locked;} };
 })();
 
-const overlay=document.getElementById('overlay');
-const startBtn=document.getElementById('startBtn');
+const overlay=document.getElementById('overlay'), startBtn=document.getElementById('startBtn');
 startBtn.addEventListener('click',()=>controls.lock());
 controls.addEventListener('lock',()=>overlay.style.display='none');
 controls.addEventListener('unlock',()=>overlay.style.display='flex');
 
-const keys={};
-let fly=false;
-addEventListener('keydown',e=>{
-  keys[e.code]=true;
+const keys={}; let fly=false;
+const tpMap={Digit1:'gate',Digit2:'teach',Digit3:'gym',Digit4:'dorm',Digit5:'field',Digit6:'court',Digit7:'canteen',Digit8:'exp'};
+teleports['teach']={x:0,z:90,y:EYE};
+teleports['exp']={x:-160,z:150,y:EYE};
+function teleport(name){ const p=teleports[name]; if(!p) return; const o=controls.getObject().position; o.set(p.x,p.y,p.z); vy=0; toast('已传送'); }
+addEventListener('keydown',e=>{ keys[e.code]=true;
   if(e.code==='KeyF'){ fly=!fly; vy=0; toast(fly?'✈ 飞行模式':'🚶 步行模式'); document.getElementById('modeline').textContent=fly?'✈ 飞行模式':'🚶 步行模式'; }
-  const tp={Digit1:'gate',Digit2:'dome',Digit3:'dorm',Digit4:'field',Digit5:'canteen',Digit6:'dorm'};
-  if(tp[e.code]&&teleports[tp[e.code]]){ const p=teleports[tp[e.code]]; const o=controls.getObject().position;
-    o.set(p.x,p.y,p.z); vy=0; toast('已传送'); }
-});
+  if(tpMap[e.code]) teleport(tpMap[e.code]); });
 addEventListener('keyup',e=>keys[e.code]=false);
 
-function collide(px,pz){
-  for(const b of colliders){
-    if(px>b.minx-PLAYER_R && px<b.maxx+PLAYER_R && pz>b.minz-PLAYER_R && pz<b.maxz+PLAYER_R) return true;
-  }
-  return false;
-}
+// 传送快捷条
+const tpbar=document.getElementById('tpbar');
+[['校门','gate'],['教学楼','teach'],['体育馆','gym'],['宿舍','dorm'],['田径场','field'],['篮球场','court'],['食堂','canteen'],['实验楼','exp']]
+.forEach(([t,n],i)=>{ const b=document.createElement('button'); b.textContent=(i+1)+' '+t;
+  b.addEventListener('click',()=>{ teleport(n); if(controls.isLocked) controls.lock(); }); tpbar.appendChild(b); });
+
+function collide(px,pz){ for(const b of colliders){ if(px>b.minx-PLAYER_R&&px<b.maxx+PLAYER_R&&pz>b.minz-PLAYER_R&&pz<b.maxz+PLAYER_R) return true; } return false; }
 
 let vy=0;
 const fwd=new THREE.Vector3(), right=new THREE.Vector3(), tmp=new THREE.Vector3();
 function update(dt){
   const o=controls.getObject().position;
-  const sprint = keys['ShiftLeft']||keys['ShiftRight'];
-  let speed = (fly?42:(sprint?34:15));
-  // 方向
+  const sprint=keys['ShiftLeft']||keys['ShiftRight'];
+  const speed=(fly?48:(sprint?36:16));
   camera.getWorldDirection(fwd); fwd.y=0; fwd.normalize();
-  right.crossVectors(fwd, new THREE.Vector3(0,1,0)).normalize();
+  right.crossVectors(fwd,new THREE.Vector3(0,1,0)).normalize();
   let mx=0,mz=0;
-  if(keys['KeyW']) mz+=1; if(keys['KeyS']) mz-=1;
-  if(keys['KeyD']) mx+=1; if(keys['KeyA']) mx-=1;
-  tmp.set(0,0,0);
-  tmp.addScaledVector(fwd, mz).addScaledVector(right, mx);
-  if(tmp.lengthSq()>0) tmp.normalize();
+  if(keys['KeyW'])mz+=1; if(keys['KeyS'])mz-=1; if(keys['KeyD'])mx+=1; if(keys['KeyA'])mx-=1;
+  tmp.set(0,0,0); tmp.addScaledVector(fwd,mz).addScaledVector(right,mx); if(tmp.lengthSq()>0) tmp.normalize();
   const dx=tmp.x*speed*dt, dz=tmp.z*speed*dt;
-  // 分轴碰撞滑动
   if(!collide(o.x+dx,o.z)) o.x+=dx;
   if(!collide(o.x,o.z+dz)) o.z+=dz;
-  // 垂直
-  if(fly){
-    if(keys['Space']) o.y+=speed*dt;
-    if(keys['ControlLeft']||keys['ControlRight']) o.y-=speed*dt;
-    o.y=Math.max(EYE,o.y);
-  } else {
-    if(keys['Space'] && Math.abs(o.y-EYE)<0.05) vy=9.5;
-    vy-=26*dt; o.y+=vy*dt;
-    if(o.y<EYE){ o.y=EYE; vy=0; }
-  }
-  // 限制在校园外圈内
-  o.x=Math.max(-185,Math.min(185,o.x)); o.z=Math.max(-160,Math.min(186,o.z));
+  if(fly){ if(keys['Space']) o.y+=speed*dt; if(keys['ControlLeft']||keys['ControlRight']) o.y-=speed*dt; o.y=Math.max(EYE,o.y); }
+  else { if(keys['Space']&&Math.abs(o.y-EYE)<0.05) vy=9.5; vy-=26*dt; o.y+=vy*dt; if(o.y<EYE){o.y=EYE;vy=0;} }
+  o.x=Math.max(X0+3,Math.min(X1-3,o.x)); o.z=Math.max(ZN+3,Math.min(ZS+3,o.z));
 }
 
 // ===================== 小地图 =====================
 const mm=document.getElementById('minimap'), mg=mm.getContext('2d');
-const MM=190, MAP_MIN=-190, MAP_MAX=190, MAP_SPAN=MAP_MAX-MAP_MIN;
+const MM=200, MAP_MIN=-250, MAP_MAX=250, MAP_SPAN=MAP_MAX-MAP_MIN;
 function w2m(v){ return (v-MAP_MIN)/MAP_SPAN*MM; }
 function drawMinimap(){
-  mg.clearRect(0,0,MM,MM);
-  mg.fillStyle='#3d6b34'; mg.fillRect(0,0,MM,MM);
+  mg.clearRect(0,0,MM,MM); mg.fillStyle='#3d6b34'; mg.fillRect(0,0,MM,MM);
   for(const s of mapShapes){ mg.fillStyle=s.c;
-    mg.fillRect(w2m(s.x-s.w/2), w2m(s.z-s.d/2), Math.max(2,s.w/MAP_SPAN*MM), Math.max(2,s.d/MAP_SPAN*MM)); }
-  // 玩家
-  const o=controls.getObject().position;
-  const px=w2m(o.x), pz=w2m(o.z);
-  camera.getWorldDirection(fwd);
-  mg.strokeStyle='#fff'; mg.lineWidth=2; mg.beginPath(); mg.moveTo(px,pz);
-  mg.lineTo(px+fwd.x*12, pz+fwd.z*12); mg.stroke();
+    mg.fillRect(w2m(s.x-s.w/2),w2m(s.z-s.d/2),Math.max(2,s.w/MAP_SPAN*MM),Math.max(2,s.d/MAP_SPAN*MM)); }
+  const o=controls.getObject().position; const px=w2m(o.x),pz=w2m(o.z); camera.getWorldDirection(fwd);
+  mg.strokeStyle='#fff'; mg.lineWidth=2; mg.beginPath(); mg.moveTo(px,pz); mg.lineTo(px+fwd.x*12,pz+fwd.z*12); mg.stroke();
   mg.fillStyle='#ff3b3b'; mg.beginPath(); mg.arc(px,pz,3.5,0,Math.PI*2); mg.fill();
 }
 
-// ===================== Toast / HUD =====================
+// ===================== Toast / HUD / 主循环 =====================
 const toastEl=document.getElementById('toast'); let toastT;
-function toast(t){ toastEl.textContent=t; toastEl.style.opacity=1; clearTimeout(toastT);
-  toastT=setTimeout(()=>toastEl.style.opacity=0,1200); }
+function toast(t){ toastEl.textContent=t; toastEl.style.opacity=1; clearTimeout(toastT); toastT=setTimeout(()=>toastEl.style.opacity=0,1200); }
 const locEl=document.getElementById('loc'), fpsEl=document.getElementById('fps');
-let fpsAcc=0,fpsFrames=0,fpsTime=0;
-
-// ===================== 主循环 =====================
+let fpsFrames=0,fpsTime=0;
 const clock=new THREE.Clock();
-function animate(){
-  requestAnimationFrame(animate);
-  const dt=Math.min(0.05, clock.getDelta());
+function animate(){ requestAnimationFrame(animate);
+  const dt=Math.min(0.05,clock.getDelta());
   if(controls.isLocked) update(dt);
-  clouds.position.x = (clock.elapsedTime*2)%200 - 100;
-  // HUD
+  clouds.position.x=(clock.elapsedTime*2)%240-120;
   const o=controls.getObject().position;
   locEl.textContent=`x ${o.x.toFixed(0)}  z ${o.z.toFixed(0)}  y ${o.y.toFixed(0)}`;
   drawMinimap();
@@ -635,14 +652,12 @@ function animate(){
   renderer.render(scene,camera);
 }
 animate();
-
-addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth,innerHeight); });
+addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
 
 // ===================== 调试钩子 =====================
-window.__mc = { scene, camera, controls, colliders, mapShapes, teleports,
-  go(name){ const p=teleports[name]; if(p){ controls.getObject().position.set(p.x,p.y,p.z); } } };
-if(TEST){ console.log('[test] mc ready. teleports:', Object.keys(teleports), 'colliders:', colliders.length); }
+window.__mc={ scene,camera,controls,colliders,mapShapes,teleports,
+  go(name){ const p=teleports[name]; if(p) controls.getObject().position.set(p.x,p.y,p.z); } };
+if(TEST){ console.log('[test] mc ready. teleports:',Object.keys(teleports),'colliders:',colliders.length,'mapShapes:',mapShapes.length); }
 })();
 </script>
 </body>
