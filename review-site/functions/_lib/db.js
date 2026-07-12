@@ -370,6 +370,8 @@ export async function ensureNotepadSchema(env) {
      )`
   ).run();
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_notepad_books_owner ON notepad_books(owner, sort)').run();
+  // cover：封面样式 id（对应 assets/notepad-covers/cover-XX.svg），空=纯色（用 color 列）。懒迁移加列
+  try { await env.DB.prepare("ALTER TABLE notepad_books ADD COLUMN cover TEXT NOT NULL DEFAULT ''").run(); } catch {}
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS notepad_pages (
        id         INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -255,7 +255,7 @@
     "file": "notepad",
     "title": "手写笔记",
     "subject": "笔记",
-    "description": "仿 GoodNotes 分页手写笔记 · Apple Pencil/触控笔压感笔迹，手指滚动不误触 · 钢笔/荧光笔/橡皮 + 多页管理 · 云端自动同步，Windows 与 iPad 通用",
+    "description": "仿 GoodNotes 分页手写笔记 · Apple Pencil 压感 + 插图缩放裁切 + Markdown 文本块 · 5 种纸张模板/笔记本封面 · 导入 PDF 批注、导出整本 PDF · 云端自动同步，Windows 与 iPad 通用",
     "icon": "✍️",
     "color": "#b4690e",
     "kind": "html",

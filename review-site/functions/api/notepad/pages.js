@@ -1,6 +1,7 @@
 // 页面元数据 CRUD（笔画数据本身在 page-data.js，走 R2）。
 import { ensureNotepadSchema } from '../../_lib/db.js';
 import { getOwner } from '../../_lib/auth.js';
+import { PAPERS, deletePageBlobs } from '../../_lib/notepad.js';
 
 async function requireOwner(request, env) {
   const owner = await getOwner(request, env);
@@ -39,7 +40,7 @@ export async function onRequestPost({ request, env }) {
   const book = await ownsBook(env, owner, bookId);
   if (!book) return Response.json({ error: 'not found' }, { status: 404 });
 
-  const paper = ['blank', 'lined', 'grid', 'dotted'].includes(body?.paper) ? body.paper : book.paper;
+  const paper = PAPERS.includes(body?.paper) ? body.paper : book.paper;
   const top = await env.DB.prepare('SELECT COALESCE(MAX(idx),-1) AS m FROM notepad_pages WHERE book_id = ?').bind(bookId).first();
   const idx = (top?.m ?? -1) + 1;
   const now = Date.now();
@@ -62,7 +63,7 @@ export async function onRequestPut({ request, env }) {
 
   let body;
   try { body = await request.json(); } catch { return Response.json({ error: 'invalid body' }, { status: 400 }); }
-  if (!['blank', 'lined', 'grid', 'dotted'].includes(body?.paper)) return Response.json({ error: 'invalid paper' }, { status: 400 });
+  if (!PAPERS.includes(body?.paper)) return Response.json({ error: 'invalid paper' }, { status: 400 });
   await env.DB.prepare('UPDATE notepad_pages SET paper = ?, updated_at = ? WHERE id = ?').bind(body.paper, Date.now(), id).run();
   return Response.json({ ok: true });
 }
@@ -80,7 +81,7 @@ export async function onRequestDelete({ request, env }) {
   const count = await env.DB.prepare('SELECT COUNT(*) AS c FROM notepad_pages WHERE book_id = ?').bind(page.book_id).first();
   if ((count?.c || 0) <= 1) return Response.json({ error: '笔记本至少保留一页' }, { status: 400 });
 
-  try { await env.FILES.delete(`notepad/${owner}/page-${id}.json`); } catch {}
+  await deletePageBlobs(env, owner, id); // 页面 JSON + 引用的图片资产一起清
   await env.DB.prepare('DELETE FROM notepad_pages WHERE id = ? AND owner = ?').bind(id, owner).run();
   // 紧凑后续页的 idx，避免出现空洞
   await env.DB.prepare('UPDATE notepad_pages SET idx = idx - 1 WHERE book_id = ? AND idx > ?').bind(page.book_id, page.idx).run();
