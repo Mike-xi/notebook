@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>手写笔记</title>
+<script>
+  // 跟随站点主题（与 xiangqi/gomoku 等自包含页同一套习惯）
+  (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
+</script>
+<style>
+  :root{
+    --bg:#f3f1eb; --panel:#ffffff; --fg:#1c1b1f; --muted:#6b6772; --line:#e1dcd0;
+    --accent:#b4690e; --on-accent:#fff; --chip:#efeae0; --danger:#b3261e; --shadow:rgba(20,15,5,.12);
+  }
+  html[data-theme="dark"]{
+    --bg:#121212; --panel:#1c1c1e; --fg:#e6e1e5; --muted:#a9a3b0; --line:#302e2a;
+    --accent:#e2a75a; --on-accent:#241a08; --chip:#26241f; --danger:#f2777a; --shadow:rgba(0,0,0,.5);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  [hidden]{display:none!important}
+  body{
+    background:var(--bg); color:var(--fg); height:100vh; overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  button{font:inherit}
+  .icon-btn{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;border:1px solid transparent;background:transparent;color:var(--fg);cursor:pointer;flex:0 0 auto}
+  .icon-btn:hover{background:var(--chip)}
+  .icon-btn.on{background:var(--accent);color:var(--on-accent)}
+  .icon-btn:disabled{opacity:.35;cursor:default;background:transparent!important;color:var(--fg)!important}
+  .icon-btn .ic{display:block}
+
+  /* ---------- 书架首页 ---------- */
+  #shelf-view{height:100%;display:flex;flex-direction:column}
+  #shelf-view header{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+  #shelf-view header a.back{color:var(--fg);text-decoration:none;font-size:21px;line-height:1;padding:4px 6px;border-radius:8px}
+  #shelf-view header a.back:hover{background:var(--chip)}
+  #shelf-view header .title{font-weight:700;font-size:16.5px;flex:1 1 auto}
+  #new-book-btn{margin-left:auto;display:flex;align-items:center;gap:6px;border:none;border-radius:999px;background:var(--accent);color:var(--on-accent);padding:8px 16px 8px 12px;font-weight:600;font-size:14px;cursor:pointer}
+  #new-book-btn:hover{filter:brightness(1.05)}
+  #shelf-scroll{flex:1 1 auto;overflow-y:auto;padding:18px}
+  #book-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:18px 16px;max-width:960px;margin:0 auto}
+  .book-card{cursor:pointer;position:relative}
+  .book-cover{aspect-ratio:3/4;border-radius:10px 12px 12px 10px;box-shadow:0 6px 16px var(--shadow), inset 4px 0 0 rgba(0,0,0,.16);display:flex;align-items:flex-end;padding:12px;position:relative;overflow:hidden;transition:.15s}
+  .book-card:hover .book-cover{transform:translateY(-2px);box-shadow:0 10px 22px var(--shadow), inset 4px 0 0 rgba(0,0,0,.16)}
+  .book-cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.92}
+  .book-cover .bc-icon{position:relative;z-index:1;opacity:.85;color:#fff}
+  .book-meta{margin-top:8px;font-size:13.5px;font-weight:600;line-height:1.3}
+  .book-sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .book-del{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:8px;border:none;background:rgba(0,0,0,.35);color:#fff;display:none;align-items:center;justify-content:center;cursor:pointer}
+  .book-card:hover .book-del{display:flex}
+  .book-del:hover{background:rgba(0,0,0,.55)}
+  .book-card.new .book-cover{align-items:center;justify-content:center;border:2px dashed var(--line);box-shadow:none;background:transparent;color:var(--muted)}
+  .empty-hint{text-align:center;color:var(--muted);font-size:13.5px;margin-top:60px}
+
+  /* ---------- 页面编辑视图 ---------- */
+  #page-view{height:100%;display:flex;flex-direction:column}
+  #toolbar{flex:0 0 auto;display:flex;align-items:center;gap:4px;padding:8px 10px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap;position:relative;z-index:5}
+  #toolbar .sep{width:1px;align-self:stretch;background:var(--line);margin:4px 6px}
+  #book-title{font-weight:700;font-size:14.5px;margin-right:4px;max-width:26vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tool-group{display:flex;gap:2px}
+  #pager{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin:0 4px}
+  #pager button{background:none;border:none;color:var(--fg);font-size:19px;cursor:pointer;padding:2px 4px;border-radius:6px}
+  #pager button:hover{background:var(--chip)}
+  #pager button:disabled{opacity:.3;cursor:default}
+  .spacer{flex:1 1 auto}
+  .swatch{width:22px;height:22px;border-radius:50%;border:2px solid var(--panel);box-shadow:0 0 0 1px var(--line);cursor:pointer;flex:0 0 auto}
+  .swatch.on{box-shadow:0 0 0 2px var(--accent)}
+  #cur-color{width:20px;height:20px;border-radius:50%;box-shadow:0 0 0 1px var(--line)}
+
+  .popover{position:absolute;top:52px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 30px var(--shadow);padding:14px;z-index:20;width:220px}
+  .popover h4{margin:0 0 8px;font-size:11.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+  .swatch-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .size-row{display:flex;gap:6px}
+  .size-opt{flex:1;border:1.5px solid var(--line);background:none;border-radius:9px;padding:9px 0;cursor:pointer;color:var(--fg);display:flex;align-items:center;justify-content:center}
+  .size-opt .dot{background:currentColor;border-radius:50%}
+  .size-opt.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
+  .paper-row{display:flex;flex-direction:column;gap:4px}
+  .paper-opt{display:flex;align-items:center;gap:8px;border:none;background:none;padding:8px 6px;border-radius:8px;cursor:pointer;color:var(--fg);font-size:13.5px;text-align:left}
+  .paper-opt:hover{background:var(--chip)}
+  .paper-opt.on{color:var(--accent);font-weight:700}
+
+  #page-surface-wrap{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;padding:16px;display:flex;justify-content:center}
+  .page-surface{position:relative;width:min(100%,720px);aspect-ratio:1240/1754;height:fit-content;box-shadow:0 4px 22px var(--shadow);border-radius:6px;overflow:hidden;background:#fff}
+  .page-surface canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:pan-y}
+  #ink-canvas{touch-action:none}
+
+  #page-strip{flex:0 0 auto;display:flex;align-items:center;gap:10px;overflow-x:auto;padding:10px 14px;background:var(--panel);border-top:1px solid var(--line)}
+  .thumb{position:relative;flex:0 0 auto;width:52px;aspect-ratio:1240/1754;border-radius:5px;border:2px solid transparent;overflow:hidden;background:#fff;cursor:pointer;box-shadow:0 1px 4px var(--shadow)}
+  .thumb.on{border-color:var(--accent)}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .thumb .idx{position:absolute;bottom:1px;right:3px;font-size:8.5px;color:var(--muted);background:rgba(255,255,255,.75);border-radius:3px;padding:0 2px}
+  html[data-theme="dark"] .thumb .idx{background:rgba(0,0,0,.55);color:#ddd}
+  .thumb .del{position:absolute;top:1px;right:1px;width:15px;height:15px;border-radius:4px;background:rgba(0,0,0,.5);color:#fff;border:none;display:none;font-size:10px;line-height:15px;padding:0;cursor:pointer}
+  .thumb:hover .del{display:block}
+  .thumb.add{display:flex;align-items:center;justify-content:center;border:1.5px dashed var(--line);color:var(--muted)}
+
+  .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:50}
+  .modal{background:var(--panel);border-radius:16px;padding:20px;width:min(90vw,340px);box-shadow:0 20px 50px var(--shadow)}
+  .modal h3{margin:0 0 14px;font-size:16px}
+  .modal input[type=text]{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);font-size:14.5px;margin-bottom:14px}
+  .modal .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+  .modal .actions button{border:none;border-radius:999px;padding:9px 18px;font-size:14px;cursor:pointer}
+  .modal .actions .cancel{background:var(--chip);color:var(--fg)}
+  .modal .actions .ok{background:var(--accent);color:var(--on-accent);font-weight:600}
+
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#111;color:#fff;padding:8px 16px;border-radius:999px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60}
+  .toast.show{opacity:.92}
+</style>
+</head>
+<body>
+
+  <div id="shelf-view">
+    <header>
+      <a class="back" href="/" title="返回">‹</a>
+      <div class="title">手写笔记</div>
+      <button id="new-book-btn"><span class="ic" data-icon="plus" data-icon-size="16"></span>新建笔记本</button>
+    </header>
+    <div id="shelf-scroll">
+      <div id="book-grid"></div>
+      <div class="empty-hint" id="shelf-empty" hidden>还没有笔记本，点右上角新建一个吧</div>
+    </div>
+  </div>
+
+  <div id="page-view" hidden>
+    <div id="toolbar">
+      <button class="icon-btn" id="btn-back" title="返回书架"><span class="ic" data-icon="back" data-icon-size="18"></span></button>
+      <div id="book-title"></div>
+      <div class="sep"></div>
+      <div class="tool-group">
+        <button class="icon-btn" id="tool-pen" title="钢笔"><span class="ic" data-icon="pen" data-icon-size="18"></span></button>
+        <button class="icon-btn" id="tool-highlighter" title="荧光笔"><span class="ic" data-icon="highlighter" data-icon-size="18"></span></button>
+        <button class="icon-btn" id="tool-eraser" title="橡皮"><span class="ic" data-icon="eraser" data-icon-size="18"></span></button>
+      </div>
+      <button class="icon-btn" id="btn-style" title="颜色/粗细"><span id="cur-color"></span></button>
+      <div class="sep"></div>
+      <button class="icon-btn" id="btn-undo" title="撤销"><span class="ic" data-icon="undo" data-icon-size="18"></span></button>
+      <button class="icon-btn" id="btn-redo" title="重做"><span class="ic" data-icon="undo" data-icon-size="18" style="transform:scaleX(-1)"></span></button>
+      <div class="sep"></div>
+      <button class="icon-btn" id="btn-paper" title="纸张样式"><span class="ic" data-icon="gridfour" data-icon-size="18"></span></button>
+      <div class="spacer"></div>
+      <div id="pager">
+        <button id="pg-prev">‹</button>
+        <span id="pg-label">1 / 1</span>
+        <button id="pg-next">›</button>
+      </div>
+      <button class="icon-btn" id="btn-addpage" title="新增一页"><span class="ic" data-icon="plus" data-icon-size="18"></span></button>
+
+      <div class="popover" id="pop-style" hidden>
+        <h4>颜色</h4>
+        <div class="swatch-row" id="color-row"></div>
+        <h4>粗细</h4>
+        <div class="size-row" id="size-row"></div>
+      </div>
+      <div class="popover" id="pop-paper" hidden>
+        <h4>纸张样式</h4>
+        <div class="paper-row" id="paper-row"></div>
+      </div>
+    </div>
+
+    <div id="page-surface-wrap">
+      <div class="page-surface">
+        <canvas id="bg-canvas"></canvas>
+        <canvas id="ink-canvas"></canvas>
+      </div>
+    </div>
+
+    <div id="page-strip"></div>
+  </div>
+
+  <div class="modal-mask" id="new-book-modal" hidden>
+    <div class="modal">
+      <h3>新建笔记本</h3>
+      <input type="text" id="nb-title" maxlength="60" placeholder="笔记本名称">
+      <h4 style="margin:0 0 8px;font-size:11.5px;color:var(--muted);font-weight:700;text-transform:uppercase">封面颜色</h4>
+      <div class="swatch-row" id="nb-color-row"></div>
+      <div class="actions">
+        <button class="cancel" id="nb-cancel">取消</button>
+        <button class="ok" id="nb-ok">创建</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="/assets/icons.js?v=20260712a"></script>
+  <script type="module" src="/assets/notepad.js?v=20260712a"></script>
+</body>
+</html>

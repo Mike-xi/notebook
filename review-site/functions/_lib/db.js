@@ -352,6 +352,39 @@ export async function ensureAppleSchema(env) {
   appleReady = true;
 }
 
+// 手写笔记：owner=登录密码哈希（见 auth.js hashOwnerId），三个密码各自一份笔记本，互不可见。
+// 笔画数据本身不进 D1（可能较大），存 R2（key=notepad/<owner>/page-<id>.json）；这里只存元数据+缩略图。
+let notepadReady = false;
+export async function ensureNotepadSchema(env) {
+  if (notepadReady) return;
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS notepad_books (
+       id         INTEGER PRIMARY KEY AUTOINCREMENT,
+       owner      TEXT NOT NULL,
+       title      TEXT NOT NULL DEFAULT '未命名笔记本',
+       color      TEXT NOT NULL DEFAULT '#f2c14e',
+       paper      TEXT NOT NULL DEFAULT 'blank',
+       sort       INTEGER NOT NULL DEFAULT 0,
+       created_at INTEGER NOT NULL,
+       updated_at INTEGER NOT NULL
+     )`
+  ).run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_notepad_books_owner ON notepad_books(owner, sort)').run();
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS notepad_pages (
+       id         INTEGER PRIMARY KEY AUTOINCREMENT,
+       book_id    INTEGER NOT NULL,
+       owner      TEXT NOT NULL,
+       idx        INTEGER NOT NULL DEFAULT 0,
+       paper      TEXT NOT NULL DEFAULT 'blank',
+       thumb      TEXT NOT NULL DEFAULT '',
+       updated_at INTEGER NOT NULL
+     )`
+  ).run();
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_notepad_pages_book ON notepad_pages(book_id, idx)').run();
+  notepadReady = true;
+}
+
 const APPLE_HISTORY_MAX_PER = 400;   // 每个产品最多保留 400 条价格历史点（兜底防膨胀）
 // 记录一次价格观测：仅当与该产品最近一条历史价不同（或首次）才写入，避免每日重复点。
 // 返回 'new' | 'down' | 'up' | 'same'（相对上一价的变化方向，供调用方统计）。

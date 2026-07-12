@@ -1,4 +1,4 @@
-import { createSessionToken, makeAuthCookie } from '../_lib/auth.js';
+import { createSessionToken, makeAuthCookie, hashOwnerId } from '../_lib/auth.js';
 import { logEvent } from '../_lib/db.js';
 
 // 逗号分隔的多密码 -> 去空数组
@@ -29,7 +29,8 @@ export async function onRequestPost({ request, env }) {
     return jsonResp({ ok: false }, 401);
   }
 
-  const token = await createSessionToken(env, role);
+  const owner = await hashOwnerId(pw);
+  const token = await createSessionToken(env, role, owner);
   // 记录登录日志（仅时间 + 浏览器标识，不存 IP）；失败不影响登录
   await logEvent(env, 'login', `${role} · ${(request.headers.get('User-Agent') || '').slice(0, 100)}`);
   return new Response(JSON.stringify({ ok: true, role }), {
