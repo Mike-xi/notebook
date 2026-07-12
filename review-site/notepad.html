@@ -67,6 +67,12 @@
   #pager button{background:none;border:none;color:var(--fg);font-size:19px;cursor:pointer;padding:2px 4px;border-radius:6px}
   #pager button:hover{background:var(--chip)}
   #pager button:disabled{opacity:.3;cursor:default}
+  #pg-label{cursor:pointer;border-radius:6px;padding:2px 4px}
+  #pg-label:hover{background:var(--chip)}
+  #zoom-ctl{display:flex;align-items:center;gap:2px;margin:0 2px}
+  #zoom-ctl button{background:none;border:none;color:var(--fg);cursor:pointer;border-radius:7px;padding:4px 7px;font-size:15px;line-height:1}
+  #zoom-ctl button:hover{background:var(--chip)}
+  #zoom-label{font-size:12px!important;color:var(--muted)!important;min-width:44px}
   .spacer{flex:1 1 auto}
   .swatch{width:22px;height:22px;border-radius:50%;border:2px solid var(--panel);box-shadow:0 0 0 1px var(--line);cursor:pointer;flex:0 0 auto}
   .swatch.on{box-shadow:0 0 0 2px var(--accent)}
@@ -86,15 +92,20 @@
   .menu-opt .ic{color:var(--muted)}
   .menu-opt.on .ic{color:var(--accent)}
 
-  #page-surface-wrap{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;padding:16px;display:flex;justify-content:center}
-  .page-surface{position:relative;width:min(100%,720px);aspect-ratio:1240/1754;height:fit-content;box-shadow:0 4px 22px var(--shadow);border-radius:6px;overflow:hidden;background:#fff}
-  .page-surface canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:pan-y}
-  #ink-canvas{touch-action:none;z-index:3}
+  #page-surface-wrap{flex:1 1 auto;overflow-y:auto;overflow-x:auto;padding:16px}
+  #pages-col{display:flex;flex-direction:column;align-items:center;gap:22px;width:max-content;min-width:100%}
+  .page-slot{position:relative;aspect-ratio:1240/1754;box-shadow:0 4px 22px var(--shadow);border-radius:6px;overflow:hidden;background:#fffdf8;flex:0 0 auto}
+  .page-slot .slot-preview{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+  .page-slot .slot-num{position:absolute;right:8px;bottom:6px;font-size:11px;color:#8a857c;background:rgba(255,253,248,.8);border-radius:4px;padding:0 5px;pointer-events:none}
+  .page-surface{position:absolute;inset:0;background:#fffdf8}
+  .page-surface canvas{position:absolute;inset:0;width:100%;height:100%}
+  /* 手指在页面上要能滚动（浏览器原生 pan），笔/鼠标由 pointer 事件接管 */
+  #ink-canvas{touch-action:manipulation;z-index:3}
   body.tool-select #ink-canvas{pointer-events:none}
 
   /* items 层：逻辑坐标 1240x1754，用 transform scale 适配显示宽度 */
   #items-layer{position:absolute;left:0;top:0;width:1240px;height:1754px;transform-origin:0 0;z-index:2;pointer-events:none}
-  .np-item{position:absolute;pointer-events:none;user-select:none;-webkit-user-select:none}
+  .np-item{position:absolute;pointer-events:none;user-select:none;-webkit-user-select:none;touch-action:none}
   body.tool-select .np-item{pointer-events:auto;cursor:move}
   .np-item .np-imgbox{position:absolute;inset:0;overflow:hidden;border-radius:2px}
   .np-item img{position:absolute;max-width:none;pointer-events:none;-webkit-user-drag:none}
@@ -145,6 +156,10 @@
   .thumb .del{position:absolute;top:1px;right:1px;width:15px;height:15px;border-radius:4px;background:rgba(0,0,0,.5);color:#fff;border:none;display:none;font-size:10px;line-height:15px;padding:0;cursor:pointer}
   .thumb:hover .del{display:block}
   .thumb.add{display:flex;align-items:center;justify-content:center;border:1.5px dashed var(--line);color:var(--muted)}
+  .thumb{touch-action:none}
+  .thumb.dragging{opacity:.4}
+  .thumb.drop-before{box-shadow:-3px 0 0 var(--accent), 0 1px 4px var(--shadow)}
+  .thumb.drop-after{box-shadow:3px 0 0 var(--accent), 0 1px 4px var(--shadow)}
 
   /* 禅模式：全屏只留文档 + 左上角四分之一圆展开钮 */
   body.np-zen #toolbar,body.np-zen #page-strip{display:none}
@@ -215,11 +230,17 @@
       <button class="icon-btn" id="btn-thumbs" title="页面缩略图"><span class="ic" data-icon="squaresfour" data-icon-size="18"></span></button>
       <button class="icon-btn" id="btn-zen" title="收起工具栏（专注模式）"><span class="ic" data-icon="cornersout" data-icon-size="18"></span></button>
       <div class="spacer"></div>
+      <div id="zoom-ctl">
+        <button id="zoom-out" title="缩小">−</button>
+        <button id="zoom-label" title="点击恢复 100%">100%</button>
+        <button id="zoom-in" title="放大">+</button>
+      </div>
       <div id="pager">
         <button id="pg-prev">‹</button>
-        <span id="pg-label">1 / 1</span>
+        <span id="pg-label" title="点击跳转到指定页">1 / 1</span>
         <button id="pg-next">›</button>
       </div>
+      <button class="icon-btn" id="btn-viewset" title="视图设置"><span class="ic" data-icon="gear" data-icon-size="18"></span></button>
 
       <div class="popover" id="pop-style" hidden>
         <h4>颜色</h4>
@@ -234,14 +255,20 @@
         <h4>本页纸张样式</h4>
         <div class="menu-row" id="paper-row"></div>
       </div>
+      <div class="popover" id="pop-view" hidden>
+        <h4>翻页方式</h4>
+        <div class="menu-row" id="flip-row"></div>
+      </div>
     </div>
 
     <div id="page-surface-wrap">
-      <div class="page-surface" id="page-surface">
-        <canvas id="bg-canvas"></canvas>
-        <div id="items-layer"></div>
-        <canvas id="ink-canvas"></canvas>
-      </div>
+      <div id="pages-col"></div>
+    </div>
+    <!-- 活动页编辑器（JS 会把它挂进当前页的 slot 里） -->
+    <div class="page-surface" id="page-surface" style="display:none">
+      <canvas id="bg-canvas"></canvas>
+      <div id="items-layer"></div>
+      <canvas id="ink-canvas"></canvas>
     </div>
 
     <div id="page-strip" hidden></div>
@@ -281,8 +308,8 @@
 
   <div class="toast" id="toast"></div>
 
-  <script src="/assets/icons.js?v=20260712b"></script>
-  <script src="/assets/md.js?v=20260712b"></script>
-  <script type="module" src="/assets/notepad.js?v=20260712b"></script>
+  <script src="/assets/icons.js?v=20260712c"></script>
+  <script src="/assets/md.js?v=20260712c"></script>
+  <script type="module" src="/assets/notepad.js?v=20260712c"></script>
 </body>
 </html>

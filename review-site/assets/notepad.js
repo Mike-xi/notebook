@@ -1,11 +1,13 @@
-// 手写笔记 v2：书架 + 分页 Canvas 笔记（仿 GoodNotes）。
-// - 压感笔迹：perfect-freehand；触控笔/鼠标画，手指仅滚动（palm rejection）
-// - 页面元素 items：图片（可移动/缩放/裁切）与 Markdown 文本块，DOM 层夹在纸张与墨迹之间
-// - 纸张模板 blank/lined/grid/dotted/cornell；笔记本可选 SVG 封面
+// 手写笔记 v3：书架 + 分页 Canvas 笔记（仿 GoodNotes）。
+// - 压感笔迹：perfect-freehand；触控笔/鼠标画，手指滚动/手势（palm rejection）
+// - 页面元素 items：图片（拖动/角柄或双指捏合缩放/裁切）与 Markdown 文本块
+// - 视图：竖直滚动（默认，多页纵向堆叠、滚动自动切页）/ 水平翻页 两种模式；−/+ 缩放
+// - 新增页插入到当前页之后；缩略图条可拖拽换序；双指轻点=撤销、三指=重做
 // - 导出整本 PDF（jsPDF）；导入 PDF（pdf.js 每页转图片作页面底图）
 // - 数据按登录密码隔离（owner），自动保存到 /api/notepad/*；图片字节存 R2 asset
 import { getStroke } from 'https://esm.sh/perfect-freehand@1.2.2';
 import { clampRect, applyCrop, resizeKeepAspect } from './notepad-geom.js';
+import { createMultiTapDetector } from './notepad-gestures.js';
 
 const PAGE_W = 1240, PAGE_H = 1754; // 逻辑坐标系（A4 比例），显示尺寸靠 CSS/transform 缩放
 const PALETTE = ['#1c1c1e', '#f5f0e6', '#e53935', '#1e88e5', '#43a047', '#fb8c00', '#8e24aa', '#00acc1'];
@@ -17,6 +19,9 @@ const PAPERS = [
 const COVERS = ['cover-01', 'cover-02', 'cover-03', 'cover-04', 'cover-05', 'cover-06', 'cover-07', 'cover-08'];
 const ERASE_R = 26;
 const SAVE_DEBOUNCE = 900;
+const THUMB_W = 320;
+const PREVIEW_W = 640;
+const ZOOM_MIN = 0.5, ZOOM_MAX = 2.5, ZOOM_STEP = 0.1;
 const PDFJS_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.7.76/build/pdf.min.mjs';
 const PDFJS_WORKER = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.7.76/build/pdf.worker.min.mjs';
 const JSPDF_URL = 'https://esm.sh/jspdf@2.5.2';
@@ -47,6 +52,12 @@ const state = {
   editingId: null,
   crop: null,        // { itemId, rect:{rx,ry,rw,rh} }
   layerScale: 1,
+};
+
+// 视图偏好（跨会话记忆；禅模式收起工具栏也不影响）
+const view = {
+  flip: localStorage.getItem('np-flip') === 'h' ? 'h' : 'v',       // v=竖直滚动 h=水平翻页
+  zoom: Math.min(Math.max(parseFloat(localStorage.getItem('np-zoom')) || 1, ZOOM_MIN), ZOOM_MAX),
 };
 
 async function api(path, opts) {
@@ -161,7 +172,6 @@ function paperPreviewCanvas(paper, w = 60) {
 function renderBookModalGrids() {
   const cg = $('#nb-cover-grid');
   cg.innerHTML = '';
-  // 纯色选项（用调色板后 6 色）+ 8 张 SVG 封面
   PALETTE.slice(2).forEach((c) => {
     const el = document.createElement('div');
     el.className = 'cover-opt' + (!bookModal.cover && bookModal.color === c ? ' on' : '');
@@ -217,51 +227,233 @@ async function submitBookModal() {
   }
 }
 
+/* ------------------------------ 视图系统：slot / 双模式 / 缩放 ------------------------------ */
+
+const previewCache = new Map(); // pageId -> dataURL（PREVIEW_W 宽合成图）
+let previewIO = null;           // 懒合成邻页预览
+let previewBusy = false;
+const previewQueue = [];
+
+function pageCssW() {
+  const wrap = $('#page-surface-wrap');
+  const base = Math.min((wrap.clientWidth || 720) - 32, 720);
+  return Math.max(200, Math.round(base * view.zoom));
+}
+
+function slotFor(idx) { return $('#pages-col').querySelector(`.page-slot[data-idx="${idx}"]`); }
+
+function detachSurface() {
+  const surf = $('#page-surface');
+  if (surf.parentElement && surf.parentElement.classList.contains('page-slot')) {
+    const slot = surf.parentElement;
+    const img = slot.querySelector('.slot-preview');
+    if (img) { img.hidden = false; refreshSlotPreview(slot); }
+  }
+  surf.style.display = 'none';
+  document.body.appendChild(surf);
+}
+
+function mountSurface(idx) {
+  const slot = slotFor(idx);
+  if (!slot) return;
+  detachSurface();
+  const img = slot.querySelector('.slot-preview');
+  if (img) img.hidden = true;
+  const surf = $('#page-surface');
+  slot.appendChild(surf);
+  surf.style.display = 'block';
+  syncLayerScale();
+}
+
+function slotPreviewSrc(page) {
+  return previewCache.get(page.id) || page.thumb || '';
+}
+
+function refreshSlotPreview(slot) {
+  const idx = parseInt(slot.dataset.idx, 10);
+  const page = state.pages[idx];
+  if (!page) return;
+  const img = slot.querySelector('.slot-preview');
+  if (img) img.src = slotPreviewSrc(page);
+}
+
+// 竖直模式渲染全部页 slot；水平模式只渲染当前页一个 slot
+function renderSlots() {
+  detachSurface();
+  const col = $('#pages-col');
+  col.innerHTML = '';
+  if (previewIO) { previewIO.disconnect(); previewIO = null; }
+  const w = pageCssW();
+  const idxs = view.flip === 'v' ? state.pages.map((_, i) => i) : [state.currentPageIdx];
+  for (const i of idxs) {
+    const slot = document.createElement('div');
+    slot.className = 'page-slot';
+    slot.dataset.idx = i;
+    slot.style.width = w + 'px';
+    const img = document.createElement('img');
+    img.className = 'slot-preview';
+    img.src = slotPreviewSrc(state.pages[i]) || '';
+    slot.appendChild(img);
+    slot.insertAdjacentHTML('beforeend', `<span class="slot-num">${i + 1}</span>`);
+    // 笔/鼠标点到预览页 → 先激活该页
+    slot.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'touch') return;
+      const idx = parseInt(slot.dataset.idx, 10);
+      if (idx !== state.currentPageIdx || !slot.contains($('#page-surface'))) activatePage(idx, { scroll: false });
+    });
+    col.appendChild(slot);
+  }
+  mountSurface(state.currentPageIdx);
+  if (view.flip === 'v') observePreviews();
+}
+
+function observePreviews() {
+  previewIO = new IntersectionObserver((entries) => {
+    for (const en of entries) {
+      if (!en.isIntersecting) continue;
+      const idx = parseInt(en.target.dataset.idx, 10);
+      const page = state.pages[idx];
+      if (!page || previewCache.has(page.id) || idx === state.currentPageIdx) continue;
+      previewQueue.push(page.id);
+      pumpPreviewQueue();
+    }
+  }, { root: $('#page-surface-wrap'), rootMargin: '150% 0px' });
+  $('#pages-col').querySelectorAll('.page-slot').forEach((s) => previewIO.observe(s));
+}
+
+async function pumpPreviewQueue() {
+  if (previewBusy) return;
+  previewBusy = true;
+  while (previewQueue.length) {
+    const pageId = previewQueue.shift();
+    if (previewCache.has(pageId)) continue;
+    const idx = state.pages.findIndex((p) => p.id === pageId);
+    if (idx < 0 || idx === state.currentPageIdx) continue;
+    try {
+      const d = await api('/api/notepad/page-data?id=' + pageId);
+      const canvas = await composePage({ paper: state.pages[idx].paper || 'blank', strokes: d.strokes, items: d.items }, PREVIEW_W);
+      previewCache.set(pageId, canvas.toDataURL('image/jpeg', 0.7));
+      const slot = slotFor(idx);
+      if (slot && idx !== state.currentPageIdx) refreshSlotPreview(slot);
+    } catch {}
+  }
+  previewBusy = false;
+}
+
+function applyWidths() {
+  const w = pageCssW();
+  $('#pages-col').querySelectorAll('.page-slot').forEach((s) => { s.style.width = w + 'px'; });
+  syncLayerScale();
+}
+
+function zoomTo(z) {
+  view.zoom = Math.min(Math.max(Math.round(z * 10) / 10, ZOOM_MIN), ZOOM_MAX);
+  localStorage.setItem('np-zoom', String(view.zoom));
+  $('#zoom-label').textContent = Math.round(view.zoom * 100) + '%';
+  applyWidths();
+  reinitCanvases();
+}
+
+// 画布物理分辨率随缩放提高，放大后笔迹依然锐利
+function canvasFactor() {
+  return Math.min((window.devicePixelRatio || 1) * Math.max(1, view.zoom), 3);
+}
+function reinitCanvases() {
+  const f = canvasFactor();
+  bgCtx = setupCanvas($('#bg-canvas'), f);
+  inkCtx = setupCanvas($('#ink-canvas'), f);
+  if (state.currentPageId) { drawPaperTo(bgCtx, state.paper); redrawInk(); }
+}
+
+// 激活某页为「编辑中」页面。scroll=false 用于滚动驱动的激活（避免抢滚动）。
+let activating = false;
+let pendingActivate = null;
+async function activatePage(idx, { scroll = true, smooth = false, force = false } = {}) {
+  if (idx < 0 || idx >= state.pages.length) return;
+  if (activating) { pendingActivate = { idx, opts: { scroll, smooth, force } }; return; }
+  if (!force && idx === state.currentPageIdx && slotFor(idx)?.contains($('#page-surface'))) {
+    if (scroll && view.flip === 'v') slotFor(idx)?.scrollIntoView({ block: 'start', behavior: smooth ? 'smooth' : 'auto' });
+    return;
+  }
+  activating = true;
+  try {
+    await flushSave();
+    state.currentPageIdx = idx;
+    const page = state.pages[idx];
+    state.currentPageId = page.id;
+    state.paper = page.paper || state.currentBook.paper || 'blank';
+    state.selectedId = null; state.editingId = null; state.crop = null;
+    localStorage.setItem('notepad-last-' + state.currentBook.id, String(idx));
+
+    const data = await api('/api/notepad/page-data?id=' + page.id);
+    state.strokes = data.strokes || [];
+    state.items = data.items || [];
+    state.undo = []; state.redo = [];
+
+    if (view.flip === 'h') renderSlots();
+    else mountSurface(idx);
+    drawPaperTo(bgCtx, state.paper);
+    redrawInk();
+    renderItems();
+    syncUndoButtons();
+    updatePagerLabel();
+    renderPageStrip();
+    if (scroll && view.flip === 'v') slotFor(idx)?.scrollIntoView({ block: 'start', behavior: smooth ? 'smooth' : 'auto' });
+  } finally {
+    activating = false;
+    if (pendingActivate) { const p = pendingActivate; pendingActivate = null; activatePage(p.idx, p.opts); }
+  }
+}
+
+// 滚动驱动：视口中心最近的 slot 成为活动页
+let scrollTimer = null;
+function onWrapScroll() {
+  if (view.flip !== 'v') return;
+  clearTimeout(scrollTimer);
+  scrollTimer = setTimeout(() => {
+    const wrap = $('#page-surface-wrap');
+    const mid = wrap.getBoundingClientRect().top + wrap.clientHeight / 2;
+    let best = -1, bestDist = Infinity;
+    $('#pages-col').querySelectorAll('.page-slot').forEach((s) => {
+      const r = s.getBoundingClientRect();
+      const d = Math.abs((r.top + r.bottom) / 2 - mid);
+      if (d < bestDist) { bestDist = d; best = parseInt(s.dataset.idx, 10); }
+    });
+    if (best >= 0 && best !== state.currentPageIdx) activatePage(best, { scroll: false });
+  }, 140);
+}
+
 /* ------------------------------ 笔记本 / 页面 ------------------------------ */
 
 async function openBook(book) {
   state.currentBook = book;
   const { pages } = await api('/api/notepad/pages?book_id=' + book.id);
   state.pages = pages;
+  previewCache.clear();
   $('#shelf-view').hidden = true;
   $('#page-view').hidden = false;
   $('#book-title').textContent = book.title;
   const lastIdx = parseInt(localStorage.getItem('notepad-last-' + book.id) || '0', 10);
-  await openPage(Math.min(Math.max(lastIdx, 0), pages.length - 1));
+  const target = Math.min(Math.max(lastIdx, 0), pages.length - 1);
+  state.currentPageIdx = target;
+  renderSlots();
+  await activatePage(target, { scroll: true, force: true });
   renderPageStrip();
 }
 
 async function backToShelf() {
   await flushSave();
   exitZen();
+  detachSurface();
   state.currentBook = null;
   state.selectedId = null; state.editingId = null; state.crop = null;
+  previewCache.clear();
   $('#page-view').hidden = true;
   $('#shelf-view').hidden = false;
   await loadShelf();
 }
 
-async function openPage(idx) {
-  if (idx < 0 || idx >= state.pages.length) return;
-  await flushSave();
-  state.currentPageIdx = idx;
-  const page = state.pages[idx];
-  state.currentPageId = page.id;
-  state.paper = page.paper || state.currentBook.paper || 'blank';
-  state.selectedId = null; state.editingId = null; state.crop = null;
-  localStorage.setItem('notepad-last-' + state.currentBook.id, String(idx));
-
-  const data = await api('/api/notepad/page-data?id=' + page.id);
-  state.strokes = data.strokes || [];
-  state.items = data.items || [];
-  state.undo = []; state.redo = [];
-  drawPaperTo(bgCtx, state.paper);
-  redrawInk();
-  renderItems();
-  syncUndoButtons();
-  updatePagerLabel();
-  renderPageStrip();
-}
+function openPage(idx) { return activatePage(idx, { scroll: true, smooth: view.flip === 'v' }); }
 
 function updatePagerLabel() {
   $('#pg-label').textContent = `${state.currentPageIdx + 1} / ${state.pages.length}`;
@@ -269,34 +461,130 @@ function updatePagerLabel() {
   $('#pg-next').disabled = state.currentPageIdx >= state.pages.length - 1;
 }
 
+// 页面列表变化后统一走这里：重建 slot + 激活目标页
+async function pagesChanged(targetIdx) {
+  const { pages } = await api('/api/notepad/pages?book_id=' + state.currentBook.id);
+  state.pages = pages;
+  renderSlots();
+  await activatePage(Math.min(Math.max(targetIdx, 0), pages.length - 1), { scroll: true, force: true });
+  renderPageStrip();
+}
+
+// 新页插入到当前页之后（符合直觉），返回后激活新页
 async function addPage(paper) {
-  const { id, idx, paper: p } = await api('/api/notepad/pages', {
+  const after = state.currentPageIdx;
+  await api('/api/notepad/pages', {
     method: 'POST',
-    body: JSON.stringify({ book_id: state.currentBook.id, paper: paper || state.paper }),
+    body: JSON.stringify({ book_id: state.currentBook.id, paper: paper || state.paper, after }),
   });
-  state.pages.push({ id, idx, paper: p, thumb: '', updated_at: Date.now() });
-  await openPage(state.pages.length - 1);
-  return id;
+  await pagesChanged(after + 1);
+}
+
+// 复制当前页（codex 建议采纳）。图片资产也复制一份新 key——两页共用同一 asset 会被删页 GC 误删。
+async function duplicatePage() {
+  await flushSave();
+  toast('复制中…', 8000);
+  const items = [];
+  for (const it of state.items) {
+    const copy = JSON.parse(JSON.stringify(it));
+    copy.id = uid();
+    if (copy.type === 'image' && copy.src) {
+      try {
+        const blob = await fetch(assetUrl(copy.src)).then((r) => r.blob());
+        const ext = copy.src.split('.').pop();
+        const r = await fetch('/api/notepad/asset?ext=' + ext, { method: 'POST', body: blob });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'asset copy failed');
+        copy.src = d.key;
+      } catch { continue; } // 单张图复制失败就跳过它，不整页失败
+    }
+    items.push(copy);
+  }
+  const strokes = JSON.parse(JSON.stringify(state.strokes));
+  const after = state.currentPageIdx;
+  const pg = await api('/api/notepad/pages', {
+    method: 'POST',
+    body: JSON.stringify({ book_id: state.currentBook.id, paper: state.paper, after }),
+  });
+  const thumb = state.pages[after]?.thumb || '';
+  await api('/api/notepad/page-data?id=' + pg.id, { method: 'PUT', body: JSON.stringify({ strokes, items, thumb }) });
+  await pagesChanged(after + 1);
+  toast('已复制到下一页');
 }
 
 async function deletePage(pageId) {
   if (state.pages.length <= 1) { toast('笔记本至少保留一页'); return; }
   if (!confirm('删除这一页？此操作不可恢复。')) return;
   await api('/api/notepad/pages?id=' + pageId, { method: 'DELETE' });
-  const { pages } = await api('/api/notepad/pages?book_id=' + state.currentBook.id);
-  state.pages = pages;
-  await openPage(Math.min(state.currentPageIdx, pages.length - 1));
+  previewCache.delete(pageId);
+  await pagesChanged(Math.min(state.currentPageIdx, state.pages.length - 2));
 }
 
+async function movePage(pageId, to) {
+  await api('/api/notepad/pages?id=' + pageId, { method: 'PUT', body: JSON.stringify({ move_to: to }) });
+  const keepId = state.currentPageId;
+  const { pages } = await api('/api/notepad/pages?book_id=' + state.currentBook.id);
+  state.pages = pages;
+  const newIdx = pages.findIndex((p) => p.id === keepId);
+  renderSlots();
+  await activatePage(newIdx >= 0 ? newIdx : 0, { scroll: true, force: true });
+  renderPageStrip();
+}
+
+/* ---- 缩略图条（含拖拽换序） ---- */
+
+let stripDrag = null; // {pageId, fromIdx, startX, startY, moved, to}
 function renderPageStrip() {
   const strip = $('#page-strip');
   strip.innerHTML = '';
   state.pages.forEach((p, i) => {
     const el = document.createElement('div');
     el.className = 'thumb' + (i === state.currentPageIdx ? ' on' : '');
+    el.dataset.idx = i;
     el.innerHTML = `${p.thumb ? `<img src="${p.thumb}">` : ''}<span class="idx">${i + 1}</span><button class="del">${icon('close', 10)}</button>`;
-    el.addEventListener('click', (e) => { if (e.target.closest('.del')) return; openPage(i); });
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('.del')) return;
+      if (stripDrag && stripDrag.suppressClick) { stripDrag = null; return; }
+      openPage(i);
+    });
     el.querySelector('.del').addEventListener('click', (e) => { e.stopPropagation(); deletePage(p.id); });
+    // 拖拽换序
+    el.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('.del')) return;
+      stripDrag = { pageId: p.id, fromIdx: i, startX: e.clientX, startY: e.clientY, moved: false, to: i, el };
+      try { el.setPointerCapture(e.pointerId); } catch {}
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!stripDrag || stripDrag.el !== el) return;
+      if (!stripDrag.moved && Math.hypot(e.clientX - stripDrag.startX, e.clientY - stripDrag.startY) < 8) return;
+      stripDrag.moved = true;
+      el.classList.add('dragging');
+      const thumbs = [...strip.querySelectorAll('.thumb:not(.add)')];
+      let to = thumbs.length - 1;
+      for (let k = 0; k < thumbs.length; k++) {
+        const r = thumbs[k].getBoundingClientRect();
+        if (e.clientX < r.left + r.width / 2) { to = k; break; }
+      }
+      stripDrag.to = to;
+      thumbs.forEach((t, k) => {
+        t.classList.toggle('drop-before', stripDrag.moved && k === to && to !== stripDrag.fromIdx);
+      });
+    });
+    const endDrag = async (e) => {
+      if (!stripDrag || stripDrag.el !== el) return;
+      const d = stripDrag;
+      strip.querySelectorAll('.thumb').forEach((t) => t.classList.remove('dragging', 'drop-before'));
+      if (d.moved) {
+        d.suppressClick = true;
+        // 目标插入位换算：拖到自己右边时目标索引要 -1（先移除再插入）
+        let to = d.to;
+        if (to > d.fromIdx) to -= 1;
+        if (to !== d.fromIdx) await movePage(d.pageId, to);
+        else stripDrag = null;
+      } else stripDrag = null;
+    };
+    el.addEventListener('pointerup', endDrag);
+    el.addEventListener('pointercancel', () => { strip.querySelectorAll('.thumb').forEach((t) => t.classList.remove('dragging', 'drop-before')); stripDrag = null; });
     strip.appendChild(el);
   });
   const add = document.createElement('div');
@@ -323,12 +611,12 @@ function openAddPageModal() {
 /* ------------------------------ 画布 ------------------------------ */
 
 let bgCtx, inkCtx;
-function setupCanvas(cv) {
-  const dpr = window.devicePixelRatio || 1;
-  cv.width = PAGE_W * dpr;
-  cv.height = PAGE_H * dpr;
+function setupCanvas(cv, factor) {
+  const f = factor || (window.devicePixelRatio || 1);
+  cv.width = Math.round(PAGE_W * f);
+  cv.height = Math.round(PAGE_H * f);
   const ctx = cv.getContext('2d');
-  ctx.scale(dpr, dpr);
+  ctx.scale(f, f);
   return ctx;
 }
 
@@ -380,7 +668,7 @@ function eraseAt(pt) {
 
 let activePointerId = null;
 function onDown(e) {
-  if (e.pointerType === 'touch') return; // 手指仅滚动，不画（palm rejection）
+  if (e.pointerType === 'touch') return; // 手指仅滚动/手势，不画（palm rejection）
   e.preventDefault();
   const ink = $('#ink-canvas');
   try { ink.setPointerCapture(e.pointerId); } catch {} // 合成指针可能拒绝捕获，不影响绘制
@@ -420,7 +708,6 @@ function pushOp(op) {
 }
 function findItem(id) { return state.items.find((x) => x.id === id); }
 function applyOp(op, dir) {
-  // dir: 'undo' | 'redo'
   if (op.type === 'add') {
     if (dir === 'undo') { const i = state.strokes.indexOf(op.stroke); if (i >= 0) state.strokes.splice(i, 1); }
     else state.strokes.push(op.stroke);
@@ -521,34 +808,53 @@ function renderItems() {
     }
 
     if (it.id === state.selectedId && state.editingId !== it.id && !(state.crop && state.crop.itemId === it.id)) {
-      const bar = document.createElement('div');
-      bar.className = 'np-float';
-      bar.style.transformOrigin = 'left top';
-      bar.style.transform = 'scale(var(--inv))';
-      bar.style.top = 'calc(-56px * var(--inv))';
-      bar.innerHTML = it.type === 'image'
-        ? `<button data-act="crop">${icon('crop', 15)}裁切</button><button class="danger" data-act="del">${icon('trash', 15)}删除</button>`
-        : `<button data-act="edit">${icon('edit', 15)}编辑</button><button class="danger" data-act="del">${icon('trash', 15)}删除</button>`;
-      el.appendChild(bar);
-      const handle = document.createElement('div');
-      handle.className = 'np-handle';
-      handle.style.width = 'calc(28px * var(--inv))';
-      handle.style.height = 'calc(28px * var(--inv))';
-      handle.style.right = 'calc(-14px * var(--inv))';
-      handle.style.bottom = 'calc(-14px * var(--inv))';
-      el.appendChild(handle);
+      buildSelectionUi(el, it);
     }
 
     if (state.crop && state.crop.itemId === it.id) buildCropOverlay(el, it);
 
     layer.appendChild(el);
   }
-  // 文本块渲染后量高（offsetHeight 不受 transform 影响，即逻辑单位）
   requestAnimationFrame(() => {
     for (const it of state.items) {
       if (it.type !== 'text' || state.editingId === it.id) continue;
       const el = layer.querySelector(`[data-id="${it.id}"]`);
       if (el) it.h = el.offsetHeight;
+    }
+  });
+}
+
+// 选中态 UI（浮动操作条 + 缩放角柄）
+function buildSelectionUi(el, it) {
+  const bar = document.createElement('div');
+  bar.className = 'np-float';
+  bar.style.transformOrigin = 'left top';
+  bar.style.transform = 'scale(var(--inv))';
+  bar.style.top = 'calc(-56px * var(--inv))';
+  bar.innerHTML = it.type === 'image'
+    ? `<button data-act="crop">${icon('crop', 15)}裁切</button><button class="danger" data-act="del">${icon('trash', 15)}删除</button>`
+    : `<button data-act="edit">${icon('edit', 15)}编辑</button><button class="danger" data-act="del">${icon('trash', 15)}删除</button>`;
+  el.appendChild(bar);
+  const handle = document.createElement('div');
+  handle.className = 'np-handle';
+  handle.style.width = 'calc(28px * var(--inv))';
+  handle.style.height = 'calc(28px * var(--inv))';
+  handle.style.right = 'calc(-14px * var(--inv))';
+  handle.style.bottom = 'calc(-14px * var(--inv))';
+  el.appendChild(handle);
+}
+
+// 外科手术式切换选中：不重建 DOM（重建会把正在跟手的元素换掉，导致「选中即拖动」失灵）
+function applySelection(id) {
+  state.selectedId = id;
+  const layer = $('#items-layer');
+  layer.querySelectorAll('.np-item').forEach((el) => {
+    const isSel = el.dataset.id === id;
+    el.classList.toggle('sel', isSel);
+    if (!isSel) { el.querySelector('.np-float')?.remove(); el.querySelector('.np-handle')?.remove(); }
+    else if (!el.querySelector('.np-handle')) {
+      const it = findItem(id);
+      if (it && state.editingId !== id && !(state.crop && state.crop.itemId === id)) buildSelectionUi(el, it);
     }
   });
 }
@@ -564,9 +870,9 @@ function positionCroppedImg(img, it) {
   img.style.top = (-c.sy * it.h / c.sh) + 'px';
 }
 
-/* ---- 选择 / 拖动 / 缩放（select 工具） ---- */
+/* ---- 选择 / 拖动 / 缩放 / 双指捏合（select 工具） ---- */
 
-let drag = null; // {mode:'move'|'resize', id, startX, startY, orig:{...}}
+let drag = null; // {mode:'move'|'resize'|'pinch', id, start, orig, ptrs:Map, d0, c0}
 function layerPt(e) {
   const layer = $('#items-layer');
   const rect = layer.getBoundingClientRect();
@@ -580,13 +886,23 @@ function onItemPointerDown(e) {
   const id = itemEl.dataset.id;
   const it = findItem(id);
   if (!it) return;
-  if (e.target.closest('.np-float') || e.target.closest('.np-crop-bar')) return; // 按钮走 click
-  if (state.crop && state.crop.itemId === id) return;                             // 裁切模式有自己的手柄
-  if (state.editingId === id) return;                                             // 编辑中的文本不拖
+  if (e.target.closest('.np-float') || e.target.closest('.np-crop-bar')) return;
+  if (state.crop && state.crop.itemId === id) return;
+  if (state.editingId === id) return;
   e.preventDefault();
-  if (state.selectedId !== id) { state.selectedId = id; state.editingId = null; renderItems(); }
+  if (state.selectedId !== id) { state.editingId = null; applySelection(id); }
+  const pt = layerPt(e);
+  // 第二根手指落在同一图片上 → 进入捏合缩放
+  if (drag && drag.id === id && it.type === 'image' && e.pointerType === 'touch' && drag.ptrs.size === 1) {
+    drag.ptrs.set(e.pointerId, pt);
+    const pts = [...drag.ptrs.values()];
+    drag.mode = 'pinch';
+    drag.d0 = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+    drag.pinchOrig = snapItem(it);
+    return;
+  }
   const isHandle = !!e.target.closest('.np-handle');
-  drag = { mode: isHandle ? 'resize' : 'move', id, start: layerPt(e), orig: snapItem(it) };
+  drag = { mode: isHandle ? 'resize' : 'move', id, start: pt, orig: snapItem(it), ptrs: new Map([[e.pointerId, pt]]) };
   try { e.target.setPointerCapture(e.pointerId); } catch {}
 }
 function onItemPointerMove(e) {
@@ -594,8 +910,27 @@ function onItemPointerMove(e) {
   const it = findItem(drag.id);
   if (!it) { drag = null; return; }
   const pt = layerPt(e);
-  const dx = pt.x - drag.start.x, dy = pt.y - drag.start.y;
+  if (drag.ptrs.has(e.pointerId)) drag.ptrs.set(e.pointerId, pt);
   const el = $('#items-layer').querySelector(`[data-id="${drag.id}"]`);
+  if (drag.mode === 'pinch') {
+    const pts = [...drag.ptrs.values()];
+    if (pts.length < 2) return;
+    const d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+    const o = drag.pinchOrig;
+    const r = resizeKeepAspect({ w: o.w, h: o.h }, o.w * (d / drag.d0), 60, PAGE_W);
+    // 保持捏合中心不动（用原中心即可，视觉足够稳）
+    it.w = r.w; it.h = r.h;
+    it.x = Math.round(o.x + o.w / 2 - r.w / 2);
+    it.y = Math.round(o.y + o.h / 2 - r.h / 2);
+    if (el) {
+      el.style.left = it.x + 'px'; el.style.top = it.y + 'px';
+      el.style.width = it.w + 'px'; el.style.height = it.h + 'px';
+      const img = el.querySelector('img');
+      if (img) positionCroppedImg(img, it);
+    }
+    return;
+  }
+  const dx = pt.x - drag.start.x, dy = pt.y - drag.start.y;
   if (drag.mode === 'move') {
     it.x = Math.round(Math.min(Math.max(drag.orig.x + dx, -it.w * 0.6), PAGE_W - it.w * 0.4));
     it.y = Math.round(Math.min(Math.max(drag.orig.y + dy, -it.h * 0.6), PAGE_H - 40));
@@ -615,14 +950,19 @@ function onItemPointerMove(e) {
     }
   }
 }
-function onItemPointerUp() {
+function onItemPointerUp(e) {
   if (!drag) return;
+  if (e && drag.ptrs) drag.ptrs.delete(e.pointerId);
+  if (drag.mode === 'pinch' && drag.ptrs.size >= 1) {
+    // 一根手指抬起：结束捏合并提交
+  } else if (drag.ptrs && drag.ptrs.size > 0) return; // 还有手指按着（不应发生于非捏合）
   const it = findItem(drag.id);
   if (it) {
+    const base = drag.mode === 'pinch' ? drag.pinchOrig : drag.orig;
     const after = snapItem(it);
-    if (JSON.stringify(after) !== JSON.stringify(drag.orig)) {
-      pushOp({ type: 'item-mod', id: it.id, before: drag.orig, after });
-      if (it.type === 'text') renderItems(); // 重新量高
+    if (JSON.stringify(after) !== JSON.stringify(base)) {
+      pushOp({ type: 'item-mod', id: it.id, before: base, after });
+      if (it.type === 'text') renderItems();
     }
   }
   drag = null;
@@ -747,7 +1087,6 @@ function addTextItem() {
 async function insertImageFile(file) {
   if (!file || !file.type.startsWith('image/')) { toast('请选择图片文件'); return; }
   toast('图片处理中…', 8000);
-  // 大图客户端压一遍（最长边 2000px、JPEG q0.85）；小 PNG 保留原样（可能带透明）
   let blob = file, ext = 'jpg';
   const bmp = await createImageBitmap(file).catch(() => null);
   if (!bmp) { toast('无法读取这张图片'); return; }
@@ -767,7 +1106,6 @@ async function insertImageFile(file) {
   const r = await fetch('/api/notepad/asset?ext=' + ext, { method: 'POST', body: blob });
   const d = await r.json().catch(() => ({}));
   if (!r.ok) { toast(d.error || '上传失败'); return; }
-  // 实际入库的像素尺寸（压缩后）
   const upBmp = await createImageBitmap(blob).catch(() => null);
   const natural = upBmp ? { nw: upBmp.width, nh: upBmp.height } : { nw, nh };
   upBmp && upBmp.close && upBmp.close();
@@ -780,7 +1118,7 @@ async function insertImageFile(file) {
   setTool('select');
   state.selectedId = item.id;
   renderItems();
-  toast('已插入图片，可拖动/角柄缩放/裁切');
+  toast('已插入图片：拖动移动 · 角柄/双指捏合缩放 · 「裁切」剪裁');
 }
 
 /* ------------------------------ 自动保存 & 页面合成 ------------------------------ */
@@ -798,7 +1136,6 @@ function loadImage(src) {
   return imgCache.get(src);
 }
 
-// 文本块 → SVG foreignObject 栅格化（失败降级为纯文本行）
 async function rasterizeText(it) {
   const html = window.renderMarkdown ? window.renderMarkdown(it.md) : escapeHtml(it.md);
   const css = 'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,PingFang SC,Microsoft YaHei,sans-serif;font-size:30px;line-height:1.5;color:#1c1c1e;word-break:break-word;padding:6px 10px;box-sizing:border-box;width:100%;height:100%;overflow:hidden';
@@ -833,7 +1170,6 @@ async function composePage({ paper, strokes, items }, widthPx) {
           const im = await rasterizeText(it);
           ctx.drawImage(im, it.x * s, it.y * s, it.w * s, it.h * s);
         } catch {
-          // 降级：逐行画纯文本
           ctx.fillStyle = '#1c1c1e';
           ctx.font = `${30 * s}px sans-serif`;
           String(it.md).split('\n').forEach((ln, i) => ctx.fillText(ln, (it.x + 10) * s, (it.y + 40 + i * 45) * s));
@@ -860,18 +1196,19 @@ async function flushSave() {
   state.dirty = false;
   let thumb = '';
   try {
-    const tc = await composePage({ paper: state.paper, strokes: state.strokes, items: state.items }, 180);
-    thumb = tc.toDataURL('image/jpeg', 0.62);
+    const tc = await composePage({ paper: state.paper, strokes: state.strokes, items: state.items }, THUMB_W);
+    thumb = tc.toDataURL('image/jpeg', 0.55);
   } catch {}
   try {
     await api('/api/notepad/page-data?id=' + pageId, { method: 'PUT', body: JSON.stringify({ strokes: state.strokes, items: state.items, thumb }) });
+    previewCache.delete(pageId); // 内容变了，滚动预览重新合成
     const p = state.pages.find((x) => x.id === pageId);
     if (p) { p.thumb = thumb; p.updated_at = Date.now(); }
     if (state.currentPageId === pageId && !$('#page-strip').hidden) renderPageStrip();
   } catch { state.dirty = true; }
 }
 
-/* ------------------------------ 导出 PDF ------------------------------ */
+/* ------------------------------ 导出 / 导入 PDF ------------------------------ */
 
 async function exportPdf() {
   if (!state.currentBook) return;
@@ -901,8 +1238,6 @@ async function exportPdf() {
   }
 }
 
-/* ------------------------------ 导入 PDF ------------------------------ */
-
 async function importPdfFile(file) {
   const ext = (file.name.split('.').pop() || '').toLowerCase();
   if (ext === 'ppt' || ext === 'pptx') {
@@ -924,7 +1259,7 @@ async function importPdfFile(file) {
       const page = await doc.getPage(i);
       const vp0 = page.getViewport({ scale: 1 });
       const fit = Math.min(PAGE_W / vp0.width, PAGE_H / vp0.height);
-      const vp = page.getViewport({ scale: (PAGE_W / vp0.width) * 1.3 }); // 1.3x 渲染更清晰
+      const vp = page.getViewport({ scale: (PAGE_W / vp0.width) * 1.3 });
       const c = document.createElement('canvas');
       c.width = Math.round(vp.width); c.height = Math.round(vp.height);
       await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
@@ -932,24 +1267,21 @@ async function importPdfFile(file) {
       const r = await fetch('/api/notepad/asset?ext=jpg', { method: 'POST', body: blob });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || '上传失败');
-      // 建页并写入整页底图
       const pg = await api('/api/notepad/pages', { method: 'POST', body: JSON.stringify({ book_id: state.currentBook.id, paper: 'blank' }) });
       const w = Math.round(vp0.width * fit), h = Math.round(vp0.height * fit);
       const item = { id: uid(), type: 'image', src: d.key, x: Math.round((PAGE_W - w) / 2), y: 0, w, h, crop: null, natural: { nw: c.width, nh: c.height } };
       const tc = document.createElement('canvas');
-      tc.width = 180; tc.height = Math.round(180 * PAGE_H / PAGE_W);
+      tc.width = THUMB_W; tc.height = Math.round(THUMB_W * PAGE_H / PAGE_W);
       const tctx = tc.getContext('2d');
       tctx.fillStyle = '#fffdf8'; tctx.fillRect(0, 0, tc.width, tc.height);
-      const ts = 180 / PAGE_W;
+      const ts = THUMB_W / PAGE_W;
       tctx.drawImage(c, item.x * ts, item.y * ts, w * ts, h * ts);
       await api('/api/notepad/page-data?id=' + pg.id, {
         method: 'PUT',
-        body: JSON.stringify({ strokes: [], items: [item], thumb: tc.toDataURL('image/jpeg', 0.6) }),
+        body: JSON.stringify({ strokes: [], items: [item], thumb: tc.toDataURL('image/jpeg', 0.55) }),
       });
     }
-    const { pages } = await api('/api/notepad/pages?book_id=' + state.currentBook.id);
-    state.pages = pages;
-    await openPage(state.pages.length - 1);
+    await pagesChanged(state.pages.length + total - 1);
     toast(`已导入 ${total} 页，可直接在上面手写批注`);
   } catch (e) {
     toast('导入失败：' + e.message, 3500);
@@ -971,6 +1303,14 @@ function renderSwatchRow(container, current, onPick) {
 
 function renderStylePopover() {
   renderSwatchRow($('#color-row'), state.color, (c) => { state.color = c; $('#cur-color').style.background = c; renderStylePopover(); });
+  // 自定义颜色（codex 建议采纳）：色板后追加一个取色器
+  const picker = document.createElement('input');
+  picker.type = 'color';
+  picker.value = /^#[0-9a-fA-F]{6}$/.test(state.color) ? state.color : '#1c1c1e';
+  picker.title = '自定义颜色';
+  picker.style.cssText = 'width:22px;height:22px;border:none;border-radius:50%;padding:0;background:none;cursor:pointer';
+  picker.addEventListener('input', () => { state.color = picker.value; $('#cur-color').style.background = picker.value; });
+  $('#color-row').appendChild(picker);
   const row = $('#size-row'); row.innerHTML = '';
   SIZES.forEach((s) => {
     const btn = document.createElement('button');
@@ -986,7 +1326,8 @@ function renderInsertMenu() {
   const menu = $('#insert-menu');
   menu.innerHTML = '';
   const opts = [
-    { icon: 'file', label: '新增一页', act: () => openAddPageModal() },
+    { icon: 'file', label: '新增一页（插到本页后）', act: () => openAddPageModal() },
+    { icon: 'stack', label: '复制本页', act: () => duplicatePage() },
     { icon: 'image', label: '插入图片', act: () => $('#file-img').click() },
     { icon: 'textt', label: '插入文本（Markdown）', act: () => addTextItem() },
     { icon: 'filepdf', label: '导入 PDF（转为可批注页面）', act: () => $('#file-pdf').click() },
@@ -1013,8 +1354,27 @@ function renderPaperPopover() {
       const page = state.pages[state.currentPageIdx];
       page.paper = p.v;
       try { await api('/api/notepad/pages?id=' + page.id, { method: 'PUT', body: JSON.stringify({ paper: p.v }) }); } catch {}
-      scheduleSave(); // 缩略图跟着换纸
+      scheduleSave();
       renderPaperPopover();
+    });
+    row.appendChild(btn);
+  });
+}
+
+function renderViewPopover() {
+  const row = $('#flip-row'); row.innerHTML = '';
+  [{ v: 'v', label: '竖直滚动（向下翻页）', ic: 'arrowup' }, { v: 'h', label: '水平翻页（向右翻页）', ic: 'back' }].forEach((o) => {
+    const btn = document.createElement('button');
+    btn.className = 'menu-opt' + (view.flip === o.v ? ' on' : '');
+    btn.innerHTML = `<span class="ic" style="transform:rotate(180deg)">${icon(o.ic, 16)}</span>${o.label}`;
+    btn.addEventListener('click', () => {
+      if (view.flip !== o.v) {
+        view.flip = o.v;
+        localStorage.setItem('np-flip', o.v);
+        renderSlots();
+        activatePage(state.currentPageIdx, { scroll: true, force: true });
+      }
+      closePopovers();
     });
     row.appendChild(btn);
   });
@@ -1027,7 +1387,7 @@ function setTool(tool) {
   if (tool !== 'select') { state.selectedId = null; state.editingId = null; state.crop = null; renderItems(); }
 }
 
-function closePopovers() { $('#pop-style').hidden = true; $('#pop-paper').hidden = true; $('#pop-insert').hidden = true; }
+function closePopovers() { $('#pop-style').hidden = true; $('#pop-paper').hidden = true; $('#pop-insert').hidden = true; $('#pop-view').hidden = true; }
 
 function togglePopover(id, anchorId, onOpen) {
   const pop = $(id);
@@ -1046,11 +1406,12 @@ function togglePopover(id, anchorId, onOpen) {
 function enterZen() {
   document.body.classList.add('np-zen');
   $('#expand-btn').hidden = false;
+  requestAnimationFrame(() => { applyWidths(); });
 }
 function exitZen() {
   document.body.classList.remove('np-zen');
   $('#expand-btn').hidden = true;
-  requestAnimationFrame(syncLayerScale);
+  requestAnimationFrame(() => { applyWidths(); });
 }
 function toggleStrip(force) {
   const strip = $('#page-strip');
@@ -1072,8 +1433,9 @@ function bindToolbar() {
   $('#btn-style').addEventListener('click', (e) => { e.stopPropagation(); togglePopover('#pop-style', '#btn-style', renderStylePopover); });
   $('#btn-insert').addEventListener('click', (e) => { e.stopPropagation(); togglePopover('#pop-insert', '#btn-insert', renderInsertMenu); });
   $('#btn-paper').addEventListener('click', (e) => { e.stopPropagation(); togglePopover('#pop-paper', '#btn-paper', renderPaperPopover); });
+  $('#btn-viewset').addEventListener('click', (e) => { e.stopPropagation(); togglePopover('#pop-view', '#btn-viewset', renderViewPopover); });
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('.popover') && !e.target.closest('#btn-style') && !e.target.closest('#btn-paper') && !e.target.closest('#btn-insert')) closePopovers();
+    if (!e.target.closest('.popover') && !e.target.closest('#btn-style') && !e.target.closest('#btn-paper') && !e.target.closest('#btn-insert') && !e.target.closest('#btn-viewset')) closePopovers();
   });
   $('#btn-undo').addEventListener('click', doUndo);
   $('#btn-redo').addEventListener('click', doRedo);
@@ -1083,12 +1445,31 @@ function bindToolbar() {
   $('#expand-btn').addEventListener('click', exitZen);
   $('#pg-prev').addEventListener('click', () => openPage(state.currentPageIdx - 1));
   $('#pg-next').addEventListener('click', () => openPage(state.currentPageIdx + 1));
+  $('#pg-label').addEventListener('click', () => {
+    const n = parseInt(prompt(`跳转到页码（1-${state.pages.length}）`, String(state.currentPageIdx + 1)) || '', 10);
+    if (n >= 1 && n <= state.pages.length) openPage(n - 1);
+  });
+  $('#zoom-in').addEventListener('click', () => zoomTo(view.zoom + ZOOM_STEP));
+  $('#zoom-out').addEventListener('click', () => zoomTo(view.zoom - ZOOM_STEP));
+  $('#zoom-label').addEventListener('click', () => zoomTo(1));
 
   const ink = $('#ink-canvas');
   ink.addEventListener('pointerdown', onDown);
   ink.addEventListener('pointermove', onMove);
   ink.addEventListener('pointerup', onUp);
   ink.addEventListener('pointercancel', onUp);
+
+  // 双指轻点=撤销 / 三指轻点=重做（GoodNotes 手势；滚动会产生位移自动不触发）
+  const det = createMultiTapDetector({ onTwoFingerTap: doUndo, onThreeFingerTap: doRedo });
+  const wrap = $('#page-surface-wrap');
+  wrap.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'touch' || e.target.closest('.np-item')) return;
+    det.down(e.pointerId, e.clientX, e.clientY, performance.now());
+  });
+  wrap.addEventListener('pointermove', (e) => { if (e.pointerType === 'touch') det.move(e.pointerId, e.clientX, e.clientY, performance.now()); });
+  wrap.addEventListener('pointerup', (e) => { if (e.pointerType === 'touch') det.up(e.pointerId, performance.now()); });
+  wrap.addEventListener('pointercancel', () => det.cancel());
+  wrap.addEventListener('scroll', onWrapScroll, { passive: true });
 
   // items 层交互（事件委托到 layer；点按钮走 click）
   const layer = $('#items-layer');
@@ -1127,14 +1508,30 @@ function bindToolbar() {
     if (it && it.type === 'text' && state.editingId !== it.id) { state.editingId = it.id; renderItems(); }
   });
   // 点空白处取消选中
-  $('#page-surface-wrap').addEventListener('pointerdown', (e) => {
+  wrap.addEventListener('pointerdown', (e) => {
     if (state.tool !== 'select') return;
     if (e.target.closest('.np-item') || e.target.closest('.popover')) return;
     if (state.selectedId || state.editingId) { state.selectedId = null; state.editingId = null; state.crop = null; renderItems(); }
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { if (state.crop) { state.crop = null; renderItems(); } else if (state.selectedId) { state.selectedId = null; renderItems(); } }
-    else if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedId && !state.editingId && !e.target.closest('textarea,input')) deleteItem(state.selectedId);
+    // e.target 可能是 document 本身（无 closest 方法），要防御
+    const typing = e.target && e.target.closest ? e.target.closest('textarea,input') : null;
+    if (e.key === 'Escape') { if (state.crop) { state.crop = null; renderItems(); } else if (state.selectedId) { state.selectedId = null; renderItems(); } return; }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedId && !state.editingId && !typing) { deleteItem(state.selectedId); return; }
+    // 快捷键（codex 建议采纳）：Ctrl/Cmd+Z 撤销、Ctrl+Shift+Z / Ctrl+Y 重做；输入时不响应
+    if ((e.ctrlKey || e.metaKey) && !typing) {
+      const k = e.key.toLowerCase();
+      if (k === 'z' && !e.shiftKey) { e.preventDefault(); doUndo(); return; }
+      if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); doRedo(); return; }
+    }
+    // 单键换工具：P 钢笔 / H 荧光笔 / E 橡皮 / V 选择
+    if (!typing && !e.ctrlKey && !e.metaKey && !e.altKey && state.currentBook) {
+      const k = e.key.toLowerCase();
+      if (k === 'p') setTool('pen');
+      else if (k === 'h') setTool('highlighter');
+      else if (k === 'e') setTool('eraser');
+      else if (k === 'v') setTool('select');
+    }
   });
 
   $('#file-img').addEventListener('change', (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) insertImageFile(f); });
@@ -1146,26 +1543,27 @@ function bindToolbar() {
   $('#ap-cancel').addEventListener('click', () => { $('#addpage-modal').hidden = true; });
 
   document.addEventListener('visibilitychange', () => { if (document.hidden) flushSave(); });
-  window.addEventListener('resize', syncLayerScale);
+  window.addEventListener('resize', () => { applyWidths(); });
 }
 
 /* ------------------------------ 初始化 ------------------------------ */
 
 async function init() {
-  bgCtx = setupCanvas($('#bg-canvas'));
-  inkCtx = setupCanvas($('#ink-canvas'));
+  bgCtx = setupCanvas($('#bg-canvas'), canvasFactor());
+  inkCtx = setupCanvas($('#ink-canvas'), canvasFactor());
   $('#cur-color').style.background = state.color;
+  $('#zoom-label').textContent = Math.round(view.zoom * 100) + '%';
   setTool('pen');
   bindToolbar();
-  syncLayerScale();
   if (localStorage.getItem('np-strip') === '1') toggleStrip(true);
-  new ResizeObserver(syncLayerScale).observe($('#page-surface'));
+  new ResizeObserver(() => syncLayerScale()).observe($('#page-surface'));
   try { await loadShelf(); } catch (e) { toast('加载失败：' + e.message); }
 }
 init();
 
 window.__notepad = {
-  state, doUndo, doRedo, flushSave, openBook, openPage, addPage,
+  state, view, doUndo, doRedo, flushSave, openBook, openPage, addPage, movePage, duplicatePage,
   addTextItem, deleteItem, startCrop, commitCrop, setTool, composePage,
   enterZen, exitZen, toggleStrip, insertImageFile, importPdfFile, exportPdf,
+  zoomTo, renderSlots, activatePage, pagesChanged,
 };

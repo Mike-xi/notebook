@@ -42,7 +42,16 @@ export async function onRequestPost({ request, env }) {
 
   const paper = PAPERS.includes(body?.paper) ? body.paper : book.paper;
   const top = await env.DB.prepare('SELECT COALESCE(MAX(idx),-1) AS m FROM notepad_pages WHERE book_id = ?').bind(bookId).first();
-  const idx = (top?.m ?? -1) + 1;
+  const maxIdx = top?.m ?? -1;
+  // after：插入到第 after 页之后（新页 idx=after+1，后续页后移）；缺省/越界=追加到末尾
+  let idx;
+  const after = Number.isInteger(body?.after) ? body.after : NaN;
+  if (after >= 0 && after <= maxIdx) {
+    await env.DB.prepare('UPDATE notepad_pages SET idx = idx + 1 WHERE book_id = ? AND idx > ?').bind(bookId, after).run();
+    idx = after + 1;
+  } else {
+    idx = maxIdx + 1;
+  }
   const now = Date.now();
   const res = await env.DB.prepare(
     `INSERT INTO notepad_pages (book_id, owner, idx, paper, thumb, updated_at) VALUES (?, ?, ?, ?, '', ?)`
@@ -58,11 +67,28 @@ export async function onRequestPut({ request, env }) {
   const url = new URL(request.url);
   const id = parseInt(url.searchParams.get('id') || '', 10);
   if (!id) return Response.json({ error: 'missing id' }, { status: 400 });
-  const page = await env.DB.prepare('SELECT id FROM notepad_pages WHERE id = ? AND owner = ?').bind(id, owner).first();
+  const page = await env.DB.prepare('SELECT id, book_id, idx FROM notepad_pages WHERE id = ? AND owner = ?').bind(id, owner).first();
   if (!page) return Response.json({ error: 'not found' }, { status: 404 });
 
   let body;
   try { body = await request.json(); } catch { return Response.json({ error: 'invalid body' }, { status: 400 }); }
+
+  // 重排：move_to = 目标位置（0 起）。读出有序 id 列表，本地挪位后按新顺序批量回写 idx。
+  if (Number.isInteger(body?.move_to)) {
+    const rows = await env.DB.prepare('SELECT id FROM notepad_pages WHERE book_id = ? ORDER BY idx ASC').bind(page.book_id).all();
+    const ids = (rows.results || []).map((r) => r.id);
+    const from = ids.indexOf(id);
+    const to = Math.min(Math.max(body.move_to, 0), ids.length - 1);
+    if (from < 0) return Response.json({ error: 'not found' }, { status: 404 });
+    if (from !== to) {
+      ids.splice(to, 0, ids.splice(from, 1)[0]);
+      const stmt = env.DB.prepare('UPDATE notepad_pages SET idx = ? WHERE id = ?');
+      await env.DB.batch(ids.map((pid, i) => stmt.bind(i, pid)));
+      await env.DB.prepare('UPDATE notepad_books SET updated_at = ? WHERE id = ?').bind(Date.now(), page.book_id).run();
+    }
+    return Response.json({ ok: true, to });
+  }
+
   if (!PAPERS.includes(body?.paper)) return Response.json({ error: 'invalid paper' }, { status: 400 });
   await env.DB.prepare('UPDATE notepad_pages SET paper = ?, updated_at = ? WHERE id = ?').bind(body.paper, Date.now(), id).run();
   return Response.json({ ok: true });
