@@ -57,6 +57,18 @@
     "tags": ["苹果", "比价", "价格走势", "AI顾问", "购物"]
   },
   {
+    "file": "dachuang",
+    "title": "蛟人 · 水下机器人综合演示",
+    "subject": "大创 IPP32027",
+    "description": "水下半潜式机器人自主巡航与多机协同 · 交互仿真/综合巡航/图论一致性编队三场景可切换 · 装机同款 Python 算法经 Pyodide 浏览器在线运行",
+    "icon": "🤿",
+    "color": "#2C6FD6",
+    "kind": "html",
+    "category": "explore",
+    "link": "/dc/",
+    "tags": ["大创", "水下机器人", "编队控制", "ILOS", "Python"]
+  },
+  {
     "file": "osiris.html",
     "title": "OSIRIS 全球情报大屏",
     "subject": "OSINT",

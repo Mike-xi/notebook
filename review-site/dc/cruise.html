@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,">
+<title>蛟人自主巡航 · 综合场景演示（Python 核心）</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden;
+    font-family:"Microsoft YaHei","PingFang SC",sans-serif; background:#061420; color:#dceaf5; }
+  #c3d { position:absolute; inset:0; }
+  .panel { position:absolute; background:rgba(8,20,34,.85); border:1px solid rgba(110,180,255,.25);
+    border-radius:12px; padding:10px 12px; font-size:12.5px; backdrop-filter:blur(5px); }
+
+  #titlebar { left:50%; top:10px; transform:translateX(-50%); text-align:center; padding:8px 26px; }
+  #titlebar h1 { font-size:17px; color:#7fd0ff; letter-spacing:1px; }
+  #titlebar p { font-size:11.5px; color:#9fc3e0; margin-top:2px; }
+
+  /* 左侧：引擎管线（感知→决策→控制）＋判定逻辑 */
+  #pipe { left:12px; top:74px; width:262px; max-height:calc(100% - 330px); overflow-y:auto; }
+  #pipe h3 { font-size:13px; color:#7fd0ff; margin-bottom:6px; }
+  .layer { border:1px solid rgba(110,180,255,.22); border-left:3px solid #56b8e6;
+    border-radius:8px; padding:7px 9px; margin:6px 0; background:rgba(12,32,50,.55); }
+  .layer h4 { font-size:12.5px; color:#bfe3ff; margin-bottom:4px; }
+  .layer .row { display:flex; justify-content:space-between; margin:2px 0; color:#9fc3e0; }
+  .layer .row b { color:#ffd479; font-weight:600; font-variant-numeric:tabular-nums; text-align:right; }
+  .layer.decide { border-left-color:#e8b64c; }
+  .layer.logic  { border-left-color:#e2604c; }
+  .layer.control { border-left-color:#3fbf8f; }
+  .flow { text-align:center; color:#56b8e6; font-size:12px; line-height:0.8; opacity:.8; }
+  .bar { height:7px; background:#0c2030; border-radius:4px; overflow:hidden; margin:2px 0 4px; }
+  .bar i { display:block; height:100%; background:linear-gradient(90deg,#2c6fd6,#6fd3ff); width:50%; }
+  .badge { display:inline-block; padding:1px 9px; border-radius:9px; font-size:11.5px;
+    background:#274; color:#cfe; }
+  #d_logic div { color:#cfe0ee; margin:3px 0; line-height:1.5; font-size:11.8px; }
+  #d_logic b { color:#ffd479; }
+  #d_logic .warn { color:#f0a090; }
+
+  /* 右侧：任务指标 + 操控 */
+  #dash { right:12px; top:74px; width:252px; max-height:calc(100% - 90px); overflow-y:auto; }
+  #dash h3 { font-size:13px; color:#7fd0ff; margin:8px 0 5px; }
+  #dash h3:first-child { margin-top:0; }
+  .kgrid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .kpi { background:rgba(12,32,50,.55); border:1px solid rgba(110,180,255,.18);
+    border-radius:8px; padding:5px 8px; }
+  .kpi span { display:block; font-size:10.5px; color:#8fb0cc; }
+  .kpi b { font-size:14.5px; color:#ffd479; font-variant-numeric:tabular-nums; font-weight:600; }
+  .kpi b em { font-style:normal; font-size:10px; color:#9fc3e0; }
+  select,button { width:100%; background:#0c2438; color:#dceaf5; border:1px solid rgba(110,180,255,.3);
+    border-radius:6px; padding:6px 8px; font-size:12.5px; margin:2px 0; cursor:pointer; }
+  button:hover { background:#14324c; }
+  button.on { background:#2c6fd6; border-color:#6fd3ff; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .btnrow { display:flex; gap:5px; } .btnrow button { flex:1; }
+  label.sl { display:block; margin:4px 0 2px; color:#9fc3e0; font-size:12px; }
+  label.sl span { color:#ffd479; float:right; }
+  input[type=range] { width:100%; accent-color:#4a9eff; }
+
+  /* 机载相机画中画（左下角） */
+  #pipFrame { position:absolute; left:12px; bottom:12px; width:300px; height:225px;
+    border:1px solid rgba(110,180,255,.45); border-radius:8px; overflow:hidden;
+    background:transparent; pointer-events:none; display:block; z-index:30; }
+  #pipFrame canvas { position:absolute; inset:0; width:100%; height:100%; }
+  #pipFrame .cap { position:absolute; left:0; right:0; top:0; padding:2px 8px; font-size:11px;
+    color:#bfe3ff; background:rgba(8,20,34,.65); }
+
+  /* 底部事件流（右移让开画中画） */
+  #elog { left:50%; bottom:12px; transform:translateX(-50%); width:520px; max-width:calc(100% - 660px);
+    padding:7px 12px; font-size:12px; line-height:1.65; pointer-events:none; }
+  #elog div { color:#9fc3e0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #elog div:first-child { color:#dceaf5; }
+  #elog b { color:#ffd479; font-weight:600; }
+
+  .overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    background:rgba(4,12,20,.72); z-index:50; }
+  .card { background:rgba(10,26,42,.96); border:1px solid rgba(110,180,255,.35); border-radius:16px;
+    padding:28px 38px; max-width:640px; text-align:center; box-shadow:0 12px 60px rgba(0,0,0,.5); }
+  .card h1 { font-size:22px; color:#7fd0ff; letter-spacing:2px; }
+  .card h2 { font-size:14px; color:#bfe3ff; font-weight:normal; margin:8px 0 12px; }
+  .card p { font-size:12.5px; color:#9fc3e0; line-height:1.85; text-align:left; margin:4px 0; }
+  .card .go { margin-top:14px; font-size:15px; padding:10px; background:#2c6fd6; border-color:#6fd3ff; }
+  .card .kgrid { margin:14px 0 4px; text-align:left; }
+  .card small { color:#6f93b0; display:block; margin-top:10px; }
+  #pyState { margin-top:12px; padding:8px 10px; border-radius:8px; background:rgba(12,32,50,.7);
+    border:1px solid rgba(110,180,255,.25); font-size:12.5px; color:#9fc3e0; text-align:left; line-height:1.7; }
+  #pyState b { color:#7fd0ff; }
+  #btnPickCore { display:none; margin-top:8px; }
+  #doneOverlay { display:none; }
+  #flash { position:absolute; inset:0; pointer-events:none; background:radial-gradient(ellipse at center,
+    transparent 55%, rgba(226,96,76,.5)); opacity:0; transition:opacity .2s; z-index:40; }
+  #loadfail { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+    background:#061420; z-index:99; text-align:center; line-height:2; }
+</style>
+</head>
+<body>
+<div id="c3d"></div>
+<div id="loadfail"><div><h2>Three.js 加载失败</h2>请检查网络后刷新（首次打开需联网加载 3D 引擎）</div></div>
+<div id="flash"></div>
+
+<div class="panel" id="titlebar">
+  <h1>蛟人半潜器 · 自主巡航综合演示</h1>
+  <p>算法 = 文件夹内 <b style="color:#ffd479">蛟人核心</b> Python 包（装机同款）｜ 网页只做水池仿真与渲染 ｜ IPP32027</p>
+</div>
+
+<div class="panel" id="pipe">
+  <h3>🧠 引擎管线（Python 实时）</h3>
+  <div class="layer">
+    <h4>① 感知层 · 多模态融合</h4>
+    <div class="row"><span>视惯压融合定位</span><b id="p_slam">–</b></div>
+    <div class="row"><span>定位漂移(有界)</span><b id="p_drift">–</b></div>
+    <div class="row"><span>深度计 MS5837</span><b id="p_z">–</b></div>
+    <div class="row"><span>IMU 航向/俯仰</span><b id="p_att">–</b></div>
+    <div class="row"><span>视觉目标跟踪</span><b id="p_vis">0 个</b></div>
+  </div>
+  <div class="flow">▼</div>
+  <div class="layer decide">
+    <h4>② 决策层 · 制导与规避</h4>
+    <div class="row"><span>状态机</span><span class="badge" id="d_state">待命</span></div>
+    <div class="row"><span>航点进度</span><b id="d_wp">–</b></div>
+    <div class="row"><span>ILOS 期望航向</span><b id="d_psid">–</b></div>
+    <div class="row"><span>目标深度</span><b id="d_zref">–</b></div>
+    <div class="row"><span>经济油门基值</span><b id="d_base">–</b></div>
+  </div>
+  <div class="flow">▼</div>
+  <div class="layer logic">
+    <h4>⚖ 判定逻辑（决策依据）</h4>
+    <div id="d_logic"><div>等待任务开始…</div></div>
+  </div>
+  <div class="flow">▼</div>
+  <div class="layer control">
+    <h4>③ 控制层 · M1 双闭环+浮潜协同</h4>
+    <div class="row"><span>左桨</span></div><div class="bar"><i id="c_l"></i></div>
+    <div class="row"><span>右桨</span></div><div class="bar"><i id="c_r"></i></div>
+    <div class="row"><span>尾舵 δ / 俯仰指令</span><b id="c_rud">–</b></div>
+    <div class="row"><span>压载注水</span><b id="c_bal">–</b></div>
+    <div class="row"><span>推进功率</span><b id="c_pw">–</b></div>
+  </div>
+</div>
+
+<div class="panel" id="dash">
+  <h3>📊 任务指标</h3>
+  <div class="kgrid">
+    <div class="kpi"><span>任务用时</span><b id="k_time">0.0<em> s</em></b></div>
+    <div class="kpi"><span>航点进度</span><b id="k_wp">0 / 5</b></div>
+    <div class="kpi"><span>平均横偏</span><b id="k_xte">–</b></div>
+    <div class="kpi"><span>平均深度误差</span><b id="k_zerr">–</b></div>
+    <div class="kpi"><span>累计能耗</span><b id="k_e">0<em> J</em></b></div>
+    <div class="kpi"><span>能耗 / 米</span><b id="k_epm">–</b></div>
+    <div class="kpi"><span>规避机动</span><b id="k_avoid">0<em> 次</em></b></div>
+    <div class="kpi"><span>最小会遇距离</span><b id="k_clear">–</b></div>
+  </div>
+  <h3>🎬 演示操控</h3>
+  <div class="btnrow">
+    <button id="btnGo" disabled>▶ 开始</button>
+    <button id="btnReset">↺ 复位</button>
+    <button id="btnSpd">1×</button>
+  </div>
+  <div class="btnrow">
+    <button id="camCine" class="on">电影</button>
+    <button id="camFollow">跟随</button>
+    <button id="camTop">俯瞰</button>
+  </div>
+  <button id="btnFov" class="on">👁 判定图形与航路：显示</button>
+  <button id="pipBtn" class="on">📷 机载相机：开</button>
+  <label class="sl">河流流速（中泓） <span id="curV">0.18 m/s</span></label>
+  <input type="range" id="curSl" min="0" max="0.30" step="0.01" value="0.18">
+  <h3>🌊 场景要素（皆与航线冲突）</h3>
+  <div style="font-size:11.5px;color:#8fb0cc;line-height:1.8">
+    🪵 漂流木 ×3：刷在<b style="color:#e8b64c">航线正前方</b>顺流漂来 → 下潜穿越<br>
+    🚤 渡船 ×2：机器人临近才<b style="color:#e8b64c">离岸横穿</b>（必然会遇）<br>
+    🌉 桥墩窄门 / 礁石 ×2：全水深 → 绕行规避<br>
+    ⚓ 5 巡逻点按序（变深 0.5↔1.5 m）＋抛物线流速剖面
+  </div>
+</div>
+
+<div id="pipFrame">
+  <canvas id="pipOv" width="600" height="450"></canvas>
+  <span class="cap">📷 机载相机（艏部单目 70°）· 检测/跟踪叠加</span>
+</div>
+
+<div class="panel" id="elog"><div>—— 事件流 ——</div></div>
+
+<div class="overlay" id="startOverlay">
+  <div class="card">
+    <h1>水下半潜机器人自主巡航</h1>
+    <h2>动态河流综合演示 —— 网页仿真水池，算法在 Python（蛟人核心，装机同款）</h2>
+    <p><b style="color:#56b8e6">① 感知</b>：JY901 + MS5837 + 艏部单目 → 视惯压融合定位、目标检测-跟踪（Lib/StateEstimation.py、Lib/Vision.py）</p>
+    <p><b style="color:#e8b64c">② 决策</b>：航点状态机 + ILOS 抗流制导 + 双通道规避：漂浮物<b>下潜穿越</b>、全水深障碍<b>绕行</b>（Lib/Guidance.py）</p>
+    <p><b style="color:#3fbf8f">③ 控制</b>：M1 整定航向环 + 浮潜协同变深级联（Lib/Control.py）</p>
+    <div id="pyState">⏳ 正在准备 Python 运行环境…</div>
+    <button id="btnPickCore">📁 选择"蛟人核心"文件夹（直接双击打开本页时用）</button>
+    <input type="file" id="coreDir" webkitdirectory multiple style="display:none">
+    <button class="go" id="btnStart" disabled>▶ 开始演示</button>
+    <small>阶段一（建模与控制）＋阶段二（多模态感知）成果 ｜ 上海交通大学大创 IPP32027</small>
+  </div>
+</div>
+
+<div class="overlay" id="doneOverlay">
+  <div class="card">
+    <h1>✅ 巡航任务完成</h1>
+    <h2>5 个巡逻点按序抵达，机器人已上浮待回收</h2>
+    <div class="kgrid">
+      <div class="kpi"><span>任务用时</span><b id="f_time">–</b></div>
+      <div class="kpi"><span>巡航里程</span><b id="f_dist">–</b></div>
+      <div class="kpi"><span>平均横偏</span><b id="f_xte">–</b></div>
+      <div class="kpi"><span>平均深度误差</span><b id="f_zerr">–</b></div>
+      <div class="kpi"><span>累计能耗</span><b id="f_e">–</b></div>
+      <div class="kpi"><span>能耗 / 米</span><b id="f_epm">–</b></div>
+      <div class="kpi"><span>规避机动</span><b id="f_avoid">–</b></div>
+      <div class="kpi"><span>最小会遇距离</span><b id="f_clear">–</b></div>
+    </div>
+    <button class="go" id="btnAgain">↺ 重新演示</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<script>
+if (typeof THREE === 'undefined') document.write('<scr'+'ipt src="https://unpkg.com/three@0.149.0/build/three.min.js"><\/scr'+'ipt>');
+</script>
+<script>
+if (typeof THREE === 'undefined') {
+  document.getElementById('loadfail').style.display = 'flex';
+  throw new Error('THREE not loaded');
+}
+/* =====================================================================
+   蛟人自主巡航 · 综合场景演示（Python 核心版）
+   ---------------------------------------------------------------
+   本网页只负责：水池物理（jiaoren_sim 同参数）、传感器仿真（含噪声）、
+   动态场景编排、三维渲染与指标评估。
+   感知融合 / 目标跟踪 / 制导决策 / 运动控制 全部调用同文件夹
+   蛟人核心\（sim_entry.py + Lib\），即装机运行的同一份算法。
+   加载方式：① 启动演示.bat（本地 http，自动加载）
+             ② 直接双击本页 → 点「选择蛟人核心文件夹」
+   ===================================================================== */
+const D2R = Math.PI/180, R2D = 180/Math.PI;
+const $ = id => document.getElementById(id);
+const clamp = (v,lo,hi) => Math.max(lo, Math.min(hi, v));
+const wrap = a => { a=(a+Math.PI)%(2*Math.PI)-Math.PI; return a<-Math.PI?a+2*Math.PI:a; };
+function gauss(sg){ return sg*Math.sqrt(-2*Math.log(Math.random()+1e-12))*Math.cos(6.2832*Math.random()); }
+
+/* ---------- 物理参数（与 jiaoren_sim/params.py 同步） ---------- */
+const P = {
+  m:3.0, maX:0.15, maYZ:3.5, Iy:0.0756, maQ:0.0885, Iz:0.0756, maR:0.0885,
+  dqX:2.86, dlX:0.3, dqYZ:27.2, dlYZ:1.5, dqRot:0.15, dlRot:0.04,
+  tMax:1.5, thrY:0.06, thrTau:0.15,
+  rudK:0.5*1000*0.004*(2*Math.PI*0.7), rudX:-0.28, rudStall:25*D2R, rudMax:90*D2R, rudRate:180*D2R,
+  balF:1000*9.81*60e-6, balRate:0.25, kPitch:0.294,
+  zFloat:0.05, zSurf:0.09, kWp:55,
+  L:0.55, D:0.09
+};
+const MARGIN = 1.35;                     // 与 Lib/Params.py 一致（仅用于画安全圈）
+
+/* ---------- 动态河流 ---------- */
+const RIVER = { len:40, wid:10, dep:2.2 };
+const START = [2, 5, 0.4, 0];            // x y z psi（NED，psi=0 朝下游）
+const WPS = [ [7,2.5,0.5], [13,7.2,1.4], [21,3.0,0.6], [28,7.0,1.5], [35,5.0,0.8] ];
+let U0 = 0.18;
+function currentAt(x, y, t){
+  const f = 4*(y/RIVER.wid)*(1 - y/RIVER.wid);
+  const pul = 1 + 0.15*Math.sin(0.35*t + 0.2*x);
+  return [ U0*Math.max(0,f)*pul, 0.15*U0*Math.sin(0.4*x + 0.15*t)*f ];
+}
+/* 计划航线在 x 处的 y 坐标（漂流木刷在航线正前方用） */
+const ROUTE_PTS = [[START[0],START[1]], ...WPS.map(w=>[w[0],w[1]])];
+function routeYatX(x){
+  for(let i=0;i<ROUTE_PTS.length-1;i++){
+    const [x0,y0]=ROUTE_PTS[i], [x1,y1]=ROUTE_PTS[i+1];
+    if(x>=x0 && x<=x1) return y0+(y1-y0)*(x-x0)/(x1-x0);
+  }
+  return x<ROUTE_PTS[0][0] ? ROUTE_PTS[0][1] : ROUTE_PTS[ROUTE_PTS.length-1][1];
+}
+
+/* ---------- 障碍编排：每个移动物都对巡航构成挑战 ----------
+   rock/pylon：全水深、挡在航线上 → 绕行；
+   log：初始就刷在航线正前方、顺流漂来，被追上→下潜穿越；漂出后在
+        机器人前方 7m 的航线上重生（保持每段航路都有会遇）；
+   boat：触发式渡船——机器人进入触发区才离岸横穿，航线必然交叉。 */
+const OB_NAME = { rock:'礁石', pylon:'桥墩', log:'漂流木', boat:'渡船' };
+let obstacles = [];
+function makeObstacles(){
+  obstacles = [
+    { type:'rock',  x:10,   y:4.6, r:0.50, full:true },
+    { type:'pylon', x:17,   y:3.3, r:0.45, full:true },
+    { type:'pylon', x:17,   y:7.1, r:0.45, full:true },
+    { type:'rock',  x:25,   y:3.9, r:0.55, full:true },
+    // 漂流木：直接放在航线上（routeYatX），顺当地流速下漂
+    { type:'log',  x:6.5,  y:routeYatX(6.5),  r:0.55, draft:0.45, vx:0, vy:0 },
+    { type:'log',  x:19,   y:routeYatX(19),   r:0.55, draft:0.45, vx:0, vy:0 },
+    { type:'log',  x:30.5, y:routeYatX(30.5), r:0.55, draft:0.45, vx:0, vy:0 },
+    // 触发式渡船：wait→(机器人进触发区)cross→dwell→return→wait
+    { type:'boat', x:11.5, y:1.4, r:0.50, draft:0.35, vx:0, vy:0,
+      homeY:1.4, farY:8.6, speed:0.30, phase:'wait', trig:[8.0,10.5] },
+    { type:'boat', x:32.5, y:8.6, r:0.50, draft:0.35, vx:0, vy:0,
+      homeY:8.6, farY:1.4, speed:0.30, phase:'wait', trig:[28.5,31.0] },
+  ];
+  obstacles.forEach((o,i)=>o.id=i+1);
+}
+function stepObstacles(dt, t){
+  const rx = sim.s[0], mission = MSTATE();
+  for(const o of obstacles){
+    if(o.type==='log'){
+      const c = currentAt(o.x, o.y, t);
+      o.vx = c[0]; o.vy = c[1];
+      o.x += o.vx*dt; o.y = clamp(o.y + o.vy*dt, 0.8, RIVER.wid-0.8);
+      // 漂出河道 / 被机器人甩在身后 5m → 若任务仍在进行，重生到前方航线上
+      if(o.x > RIVER.len+1 || (mission==='TRANSIT' && o.x < rx-5)){
+        if(mission==='TRANSIT' && rx+7 < RIVER.len-3){
+          const ahead = obstacles.filter(q=>q.type==='log' && q.x>rx && q.x<rx+12).length;
+          if(ahead < 2){ o.x = rx+7; o.y = clamp(routeYatX(o.x)+gauss(0.25), 0.8, RIVER.wid-0.8); }
+          else o.x = RIVER.len+2;      // 前方已够热闹，先停在界外待命
+        } else o.x = RIVER.len+2;
+      }
+    } else if(o.type==='boat'){
+      const dir = Math.sign(o.farY - o.homeY);
+      if(o.phase==='wait'){
+        o.vy = 0;
+        if(mission==='TRANSIT' && rx>=o.trig[0] && rx<=o.trig[1]){
+          o.phase='cross'; o.vy = dir*o.speed;
+          logEvent('🛳 渡船 #'+o.id+' 离岸横穿（x='+o.x.toFixed(1)+'）');
+        }
+      } else if(o.phase==='cross'){
+        o.y += o.vy*dt;
+        if((dir>0&&o.y>=o.farY)||(dir<0&&o.y<=o.farY)){ o.y=o.farY; o.phase='dwell'; o.dw=0; o.vy=0; }
+      } else if(o.phase==='dwell'){
+        o.dw += dt;
+        if(o.dw>12){ o.phase='return'; o.vy = -dir*o.speed; }
+      } else if(o.phase==='return'){
+        o.y += o.vy*dt;
+        if((dir>0&&o.y<=o.homeY)||(dir<0&&o.y>=o.homeY)){ o.y=o.homeY; o.phase='wait'; o.vy=0; }
+      }
+    }
+  }
+}
+
+/* ---------- 半潜器动力学（RK2，dt=0.01；与 可视化.html 完全一致） ---------- */
+class SubSim {
+  constructor(x,y,z,psi){ this.reset(x,y,z,psi); }
+  reset(x,y,z,psi){
+    this.s=[x,y,z,0,psi,0,0,0,0,0,0.5,0]; // x y z th psi u v w q r sbal delta
+    this.TL=0; this.TR=0; this.t=0;
+  }
+  deriv(s,cmd,cur){
+    const [x,y,z,th,ps,u,v,w,q,r,sb,de] = s;
+    const [nL,nR,dCmd,sCmd] = cmd;
+    const TLc = clamp(nL,-1,1)*P.tMax, TRc = clamp(nR,-1,1)*P.tMax;
+    this.dTL=(TLc-this.TL)/P.thrTau; this.dTR=(TRc-this.TR)/P.thrTau;
+    const dc = clamp(dCmd,-P.rudMax,P.rudMax);
+    const dde = clamp((dc-de)/0.05,-P.rudRate,P.rudRate);
+    const sc = clamp(sCmd,0,1);
+    const dsb = clamp((sc-sb)/0.2,-P.balRate,P.balRate);
+    const cth=Math.cos(th), sth=Math.sin(th), cps=Math.cos(ps), sps=Math.sin(ps);
+    const ucb = cth*(cps*cur[0]+sps*cur[1]), vcb = -sps*cur[0]+cps*cur[1];
+    const ur=u-ucb, vr=v-vcb, wr=w-sth*(cps*cur[0]+sps*cur[1]);
+    const dragX=P.dqX*ur*Math.abs(ur)+P.dlX*ur, dragY=P.dqYZ*vr*Math.abs(vr)+P.dlYZ*vr;
+    const dragZ=P.dqYZ*wr*Math.abs(wr)+P.dlYZ*wr;
+    const dragQ=P.dqRot*q*Math.abs(q)+P.dlRot*q, dragR=P.dqRot*r*Math.abs(r)+P.dlRot*r;
+    const deEff=clamp(de,-P.rudStall,P.rudStall);
+    const fRud=P.rudK*deEff*ur*Math.abs(ur), mRud=fRud*(-P.rudX);
+    let fz=P.balF*(sb-0.5);
+    if (z<P.zSurf) fz += P.kWp*(P.zFloat-z)*(1-z/P.zSurf);
+    const mx=P.m+P.maX, myz=P.m+P.maYZ;
+    const du=(this.TL+this.TR-dragX-fz*(-sth))/mx + vr*r - wr*q;
+    const dv=(-dragY)/myz - ur*r;
+    const dw=(fz*cth-dragZ+fRud)/myz + ur*q;
+    const dq=(mRud-P.kPitch*sth-dragQ)/(P.Iy+P.maQ);
+    const dr=(P.thrY*(this.TL-this.TR)-dragR)/(P.Iz+P.maR);
+    return [cps*cth*u-sps*v+cps*sth*w, sps*cth*u+cps*v+sps*sth*w, -sth*u+cth*w,
+            q, r/Math.max(0.2,cth), du,dv,dw,dq,dr, dsb, dde];
+  }
+  step(cmd,cur,dt){
+    const s=this.s, k1=this.deriv(s,cmd,cur);
+    const s2=s.map((v,i)=>v+dt/2*k1[i]), k2=this.deriv(s2,cmd,cur);
+    for(let i=0;i<12;i++) s[i]+=dt*k2[i];
+    this.acc=[k2[5],k2[6],k2[7]];
+    this.TL+=this.dTL*dt; this.TR+=this.dTR*dt;
+    if(s[0]<0){s[0]=0;s[5]=Math.max(0,s[5]);} if(s[0]>RIVER.len){s[0]=RIVER.len;s[5]=Math.min(0,s[5]);}
+    if(s[1]<0.3){s[1]=0.3;s[6]=Math.max(0,s[6]);} if(s[1]>RIVER.wid-0.3){s[1]=RIVER.wid-0.3;s[6]=Math.min(0,s[6]);}
+    if(s[2]<0){s[2]=0;s[7]=Math.max(0,s[7]);} if(s[2]>RIVER.dep){s[2]=RIVER.dep;s[7]=Math.min(0,s[7]);}
+    this.t+=dt;
+  }
+}
+const sim = new SubSim(...START);
+
+/* =====================================================================
+   传感器仿真（网页侧只造"带噪测量"，融合与判断全在 Python）
+   ===================================================================== */
+const VFOV_H = 35*D2R, VRANGE = 7;      // 艏部单目：HFOV 70°、量程 7 m
+const SENSIM = {
+  bx:0, by:0, _dep:null, _depT:-9,
+  reset(){ this.bx=0; this.by=0; this._dep=null; this._depT=-9; },
+  /* 视觉里程计定位漂移（有界随机游走，τ=40s；对应阶段二"深度锚使漂移有界"） */
+  stepDrift(dt){
+    this.bx += gauss(0.02*Math.sqrt(dt)) - this.bx*dt/40;
+    this.by += gauss(0.02*Math.sqrt(dt)) - this.by*dt/40;
+    this.bx = clamp(this.bx,-0.25,0.25); this.by = clamp(this.by,-0.25,0.25);
+  },
+  imu(){
+    const s=sim.s;
+    return { yaw:s[4]+gauss(0.5*D2R), pitch:s[3]+gauss(0.2*D2R),
+             q:s[8]+gauss(0.3*D2R), r:s[9]+gauss(0.3*D2R) };
+  },
+  depth(){                               // MS5837 25Hz 采样保持
+    if(sim.t-this._depT>=0.04||this._dep===null){
+      this._dep={depth:Math.max(0,sim.s[2])+gauss(0.003)}; this._depT=sim.t;
+    }
+    return this._dep;
+  },
+  vo(){                                  // 视惯压融合定位的原始输出（Python 再滤波）
+    const s=sim.s, cps=Math.cos(s[4]), sps=Math.sin(s[4]), cth=Math.cos(s[3]);
+    return { x:s[0]+this.bx, y:s[1]+this.by,
+             vx:cps*cth*s[5]-sps*s[6]+gauss(0.015), vy:sps*cth*s[5]+cps*s[6]+gauss(0.015) };
+  },
+  dets(){                                // 目标检测前端输出（体轴系，含噪；10Hz 调用）
+    const px=sim.s[0], py=sim.s[1], psi=sim.s[4], out=[];
+    for(const o of obstacles){
+      if(o.x>RIVER.len) continue;        // 界外待命的漂流木
+      const dx=o.x-px, dy=o.y-py, rg=Math.hypot(dx,dy);
+      if(rg>VRANGE || rg<0.3) continue;
+      const brg = wrap(Math.atan2(dy,dx)-psi);
+      if(Math.abs(brg)>VFOV_H) continue;
+      out.push({ rg:rg+gauss(0.02*rg+0.03), brg:brg+gauss(1.5*D2R),
+                 type:o.type, r:o.r, draft:o.draft||0, full:!!o.full });
+    }
+    return out;
+  },
+  drift(){ return Math.hypot(this.bx,this.by); }
+};
+
+/* =====================================================================
+   蛟人核心加载（Pyodide）：http 下自动 fetch；file:// 下选文件夹
+   ===================================================================== */
+const CORE_DIR='core';
+const CORE_FILES=['sim_entry.py','Lib/__init__.py','Lib/Params.py','Lib/StateEstimation.py',
+  'Lib/Vision.py','Lib/Guidance.py','Lib/Control.py','Lib/Sensors.py','Lib/Actuators.py'];
+const PY={ ready:false, mod:null, pyodide:null,
+  status(html){ $('pyState').innerHTML=html; },
+  async ensurePyodide(){
+    if(this.pyodide) return this.pyodide;
+    this.status('⏳ 正在加载 Python 运行环境（Pyodide，首次联网约 20MB）…');
+    await new Promise((res,rej)=>{
+      const sc=document.createElement('script');
+      sc.src='https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js';
+      sc.onload=res; sc.onerror=()=>rej(new Error('Pyodide 下载失败，请检查网络'));
+      document.head.appendChild(sc);
+    });
+    this.pyodide=await loadPyodide();
+    return this.pyodide;
+  },
+  async boot(files){                     // files: Map(相对路径 -> 源码)
+    const py=await this.ensurePyodide();
+    try{ py.FS.mkdirTree('/jrcore/Lib'); }catch(e){}
+    for(const [rel,src] of files) py.FS.writeFile('/jrcore/'+rel, src);
+    py.runPython(
+`import sys
+if '/jrcore' not in sys.path: sys.path.insert(0,'/jrcore')
+for m in [k for k in list(sys.modules) if k=='sim_entry' or k.startswith('Lib')]:
+    del sys.modules[m]
+import sim_entry`);
+    this.mod=py.pyimport('sim_entry');
+    this.mod.engine_init(JSON.stringify({waypoints:WPS, width:RIVER.wid, start:START, loop:false}));
+    this.ready=true;
+    this.status('✅ 蛟人核心已加载：<b>'+files.size+' 个 .py</b>（sim_entry + Lib 类库，装机同款算法）');
+    $('btnStart').disabled=false; $('btnGo').disabled=false;
+    if(location.search.includes('auto=1')) startDemo();
+  },
+  async autoLoad(){
+    if(location.protocol.startsWith('http')){
+      try{
+        const files=new Map();
+        for(const f of CORE_FILES){
+          const r=await fetch(CORE_DIR+'/'+f, {cache:'no-store'});
+          if(!r.ok) throw new Error(f+' HTTP '+r.status);
+          files.set(f, await r.text());
+        }
+        await this.boot(files);
+        return;
+      }catch(err){
+        this.status('❌ 自动加载失败：'+err.message+'<br>请确认本页与 蛟人核心\\ 在同一文件夹');
+        $('btnPickCore').style.display='block';
+      }
+    }else{
+      this.status('本页以 <b>file://</b> 打开，浏览器不允许自动读取文件夹。<br>'+
+        '推荐：双击同文件夹的 <b>启动演示.bat</b>（自动加载）；<br>'+
+        '或点下方按钮手动选择 <b>蛟人核心</b> 文件夹。');
+      $('btnPickCore').style.display='block';
+      await this.ensurePyodide().catch(e=>this.status('❌ '+e.message));
+    }
+  },
+  async fromPicker(fileList){
+    const all=[...fileList].filter(f=>f.name.endsWith('.py'));
+    const entry=all.find(f=>f.name==='sim_entry.py');
+    if(!entry){ this.status('❌ 所选文件夹里没有 sim_entry.py —— 请选择"蛟人核心"文件夹'); return; }
+    const prefix=(entry.webkitRelativePath||entry.name).replace(/sim_entry\.py$/,'');
+    const files=new Map();
+    for(const f of all){
+      const rel=(f.webkitRelativePath||f.name).slice(prefix.length);
+      if(rel==='sim_entry.py'||rel.startsWith('Lib/')) files.set(rel, await f.text());
+    }
+    this.status('⏳ 正在启动 Python 核心…');
+    try{ await this.boot(files); }
+    catch(err){ this.status('❌ 核心启动失败：'+err.message); }
+  },
+  step(inp){ return JSON.parse(this.mod.engine_step(JSON.stringify(inp))); }
+};
+$('btnPickCore').onclick=()=>$('coreDir').click();
+$('coreDir').addEventListener('change',ev=>{ if(ev.target.files.length) PY.fromPicker(ev.target.files); });
+
+/* =====================================================================
+   世界推进：传感器仿真 → Python 核心 → 执行器指令 → 水池物理
+   ===================================================================== */
+let DBG=null, lastCmd=[0,0,0,0.5], nextVis=0;
+const MSTATE=()=>DBG&&DBG.mission?DBG.mission.state:'IDLE';
+function stepWorld(dt){
+  stepObstacles(dt, sim.t);
+  SENSIM.stepDrift(dt);
+  let dets=null;
+  if(sim.t>=nextVis){ dets=SENSIM.dets(); nextVis=sim.t+0.1; }
+  const out=PY.step({ t:sim.t, dt, imu:SENSIM.imu(), depth:SENSIM.depth(),
+                      vo:SENSIM.vo(), dets });
+  lastCmd=out.cmd; DBG=out.debug;
+  for(const ev of out.events) logEvent(ev);
+  sim.step(lastCmd, currentAt(sim.s[0],sim.s[1],sim.t), dt);
+  METRICS.step(dt, lastCmd);
+  if(MSTATE()==='DONE' && sim.s[2]<0.12 && !doneShown) showDone();
+}
+function resetWorld(){
+  sim.reset(...START); sim.t=0; makeObstacles(); buildObstacleMeshes();
+  SENSIM.reset(); METRICS.reset();
+  if(PY.ready){ PY.mod.engine_reset(); }
+  DBG=null; lastCmd=[0,0,0,0.5]; nextVis=0; doneShown=false;
+  EVENTS.length=0; $('elog').innerHTML='<div>—— 事件流 ——</div>';
+  $('doneOverlay').style.display='none';
+}
+
+/* ---------- 评估指标（真值，仅评估用；算法侧只见传感器） ---------- */
+const METRICS = {
+  xteSum:0, zerrSum:0, n:0, energy:0, dist:0, minClear:Infinity, collisions:0, power:0,
+  reset(){ this.xteSum=0; this.zerrSum=0; this.n=0; this.energy=0; this.dist=0;
+    this.minClear=Infinity; this.collisions=0; this.power=0; this._colT=-9; this.clearInfo=null; },
+  step(dt, cmd){
+    const st=MSTATE();
+    if(st==='IDLE'||st==='DONE') return;
+    const pump = Math.abs(sim.s[10]-clamp(cmd[3],0,1))>0.01 ? 1.5 : 0;
+    this.power = 6*(Math.abs(cmd[0])**1.5+Math.abs(cmd[1])**1.5) + pump;
+    this.energy += this.power*dt;
+    const cps=Math.cos(sim.s[4]), cth=Math.cos(sim.s[3]);
+    const vx=cps*cth*sim.s[5]-Math.sin(sim.s[4])*sim.s[6], vy=Math.sin(sim.s[4])*cth*sim.s[5]+cps*sim.s[6];
+    this.dist += Math.hypot(vx,vy)*dt;
+    // 真值横偏/深度误差（用 Python 决策快照给出的当前航段几何）
+    if(DBG && DBG.mission.state==='TRANSIT'){
+      const m=DBG.mission, wp=WPS[Math.min(m.wp_i,WPS.length-1)];
+      const dx=wp[0]-m.leg_from[0], dy=wp[1]-m.leg_from[1], lp=Math.hypot(dx,dy)||1e-6;
+      const ex=sim.s[0]-m.leg_from[0], ey=sim.s[1]-m.leg_from[1];
+      this.xteSum += Math.abs((ey*dx-ex*dy)/lp);
+      this.zerrSum += Math.abs(sim.s[2]-wp[2]);
+      this.n++;
+    }
+    for(const o of obstacles){
+      if(o.x>RIVER.len) continue;
+      const overlap = o.full || sim.s[2] < (o.draft+0.08);
+      if(!overlap) continue;
+      const clr = Math.hypot(o.x-sim.s[0], o.y-sim.s[1]) - o.r - 0.28;
+      if(clr < this.minClear){ this.minClear = clr;
+        this.clearInfo = { t:+sim.t.toFixed(1), type:o.type, id:o.id }; }
+      if(clr < 0 && sim.t-this._colT>3){
+        this.collisions++; this._colT=sim.t;
+        logEvent('💥 <b>碰撞警告</b>：'+OB_NAME[o.type]+' #'+o.id);
+        $('flash').style.opacity=1; setTimeout(()=>$('flash').style.opacity=0, 400);
+      }
+    }
+  }
+};
+
+/* ---------- 事件流 ---------- */
+const EVENTS = [];
+function logEvent(html){
+  EVENTS.push({t:sim.t, html});
+  const box=$('elog');
+  const d=document.createElement('div');
+  d.innerHTML='<b>['+sim.t.toFixed(1)+'s]</b> '+html;
+  box.insertBefore(d, box.firstChild);
+  while(box.children.length>6) box.removeChild(box.lastChild);
+}
+
+/* =====================================================================
+   三维场景
+   ===================================================================== */
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight); renderer.setPixelRatio(devicePixelRatio);
+renderer.shadowMap.enabled=true;
+$('c3d').appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x9cc4de);
+scene.fog=new THREE.FogExp2(0x9cc4de,0.014);
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.05,600);
+scene.add(new THREE.AmbientLight(0xbfd4e6,0.75));
+const sun=new THREE.DirectionalLight(0xfff2dd,1.1);
+sun.position.set(14,20,8); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=-30; sun.shadow.camera.right=30; sun.shadow.camera.top=30; sun.shadow.camera.bottom=-30;
+scene.add(sun);
+const N2T=(x,y,z)=>new THREE.Vector3(y,-z,x);
+
+/* ---- 河道 ---- */
+let waterGeo=null;
+(function buildRiver(){
+  const {len,wid,dep}=RIVER;
+  const bed=new THREE.Mesh(new THREE.PlaneGeometry(wid,len),
+    new THREE.MeshStandardMaterial({color:0x3a5a4e,roughness:0.95}));
+  bed.rotation.x=-Math.PI/2; bed.position.set(wid/2,-dep,len/2); bed.receiveShadow=true; scene.add(bed);
+  const grid=new THREE.GridHelper(len,len,0x4a7a68,0x40685c);
+  grid.position.set(wid/2,-dep+0.01,len/2); scene.add(grid);
+  const bankMat=new THREE.MeshStandardMaterial({color:0x4e7a4a,roughness:0.95});
+  [[-0.05,-1],[wid+0.05,1]].forEach(([xe,sgn])=>{
+    const bank=new THREE.Mesh(new THREE.PlaneGeometry(6,len+16),bankMat);
+    bank.rotation.x=-Math.PI/2; bank.rotation.y=sgn*0.22;
+    bank.position.set(xe+sgn*2.9,0.55,len/2); bank.receiveShadow=true; scene.add(bank);
+  });
+  const trunkMat=new THREE.MeshStandardMaterial({color:0x6a4a30}),
+        leafMat=new THREE.MeshStandardMaterial({color:0x3c6b3a,roughness:0.9});
+  for(let i=0;i<14;i++){
+    const side=i%2? -2.2 : wid+2.2, zz=2+ (i*2.9)%len;
+    const g=new THREE.Group();
+    const tr=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.1,0.9),trunkMat); tr.position.y=0.45; g.add(tr);
+    const lf=new THREE.Mesh(new THREE.ConeGeometry(0.55,1.5,8),leafMat); lf.position.y=1.5; lf.castShadow=true; g.add(lf);
+    g.position.set(side+gauss(0.6),0.75+Math.abs(side<0?side+2.2:side-wid-2.2)*0.2,zz); scene.add(g);
+  }
+  const stoneMat=new THREE.MeshStandardMaterial({color:0x7d8a92,roughness:0.9});
+  for(let i=0;i<26;i++){
+    const side=i%2?0:wid, st=new THREE.Mesh(new THREE.SphereGeometry(0.12+Math.random()*0.1,8,6),stoneMat);
+    st.position.set(side+(i%2?-0.15:0.15),0.06,(i*1.7)%len); scene.add(st);
+  }
+  const deck=new THREE.Mesh(new THREE.BoxGeometry(wid+5,0.18,1.7),
+    new THREE.MeshStandardMaterial({color:0x8a949c,roughness:0.7}));
+  deck.position.set(wid/2,0.75,17); deck.castShadow=true; scene.add(deck);
+  [[-0.75],[0.75]].forEach(([off])=>{
+    const rail=new THREE.Mesh(new THREE.BoxGeometry(wid+5,0.3,0.05),
+      new THREE.MeshStandardMaterial({color:0xaab4bc}));
+    rail.position.set(wid/2,1.0,17+off); scene.add(rail);
+  });
+  waterGeo=new THREE.PlaneGeometry(wid,len,24,60);
+  const water=new THREE.Mesh(waterGeo,new THREE.MeshStandardMaterial({
+    color:0x2e7fb8,transparent:true,opacity:0.55,metalness:0.35,roughness:0.2,side:THREE.DoubleSide}));
+  water.rotation.x=-Math.PI/2; water.position.set(wid/2,0,len/2); scene.add(water);
+})();
+
+/* ---- 航点浮标 ---- */
+const wpBalls=[];
+WPS.forEach(wp=>{
+  const buoy=new THREE.Group();
+  const ball=new THREE.Mesh(new THREE.SphereGeometry(0.14,16,12),
+    new THREE.MeshStandardMaterial({color:0xffd045,emissive:0x664400}));
+  buoy.add(ball);
+  const line=new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,wp[2]),
+    new THREE.MeshStandardMaterial({color:0xffe9a0,transparent:true,opacity:0.5}));
+  line.position.y=-wp[2]/2; buoy.add(line);
+  const tgt=new THREE.Mesh(new THREE.SphereGeometry(0.08,12,8),
+    new THREE.MeshStandardMaterial({color:0xff7043,emissive:0x552200}));
+  tgt.position.y=-wp[2]; buoy.add(tgt);
+  buoy.position.copy(N2T(wp[0],wp[1],0));
+  scene.add(buoy); wpBalls.push(ball);
+});
+
+/* ---- 障碍物网格 ---- */
+let obMeshes=[];
+function buildObstacleMeshes(){
+  obMeshes.forEach(m=>scene.remove(m.mesh)); obMeshes=[];
+  const rockMat=new THREE.MeshStandardMaterial({color:0x6f7d86,roughness:0.95});
+  const pylMat=new THREE.MeshStandardMaterial({color:0x8a949c,roughness:0.8});
+  const logMat=new THREE.MeshStandardMaterial({color:0x7a4f2c,roughness:0.9});
+  for(const o of obstacles){
+    let mesh;
+    if(o.type==='rock'){
+      mesh=new THREE.Mesh(new THREE.DodecahedronGeometry(o.r,1),rockMat);
+      mesh.scale.y=1.6; mesh.position.copy(N2T(o.x,o.y,RIVER.dep-0.8));
+    } else if(o.type==='pylon'){
+      mesh=new THREE.Mesh(new THREE.CylinderGeometry(o.r,o.r+0.06,RIVER.dep+0.8,18),pylMat);
+      mesh.position.set(o.y,(0.8-RIVER.dep)/2,o.x);
+    } else if(o.type==='log'){
+      mesh=new THREE.Group();
+      const c=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.14,2.2,10),logMat);
+      c.rotation.x=Math.PI/2; mesh.add(c);
+      const c2=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.04,0.5,8),logMat);
+      c2.rotation.z=0.6; c2.position.set(0.1,0.1,0.4); mesh.add(c2);
+    } else {
+      mesh=new THREE.Group();
+      const hull=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.22,1.1),
+        new THREE.MeshStandardMaterial({color:0xc8552f,roughness:0.6}));
+      mesh.add(hull);
+      const cab=new THREE.Mesh(new THREE.BoxGeometry(0.34,0.2,0.4),
+        new THREE.MeshStandardMaterial({color:0xe8e2d4}));
+      cab.position.set(0,0.2,-0.1); mesh.add(cab);
+      mesh.rotation.y=Math.PI/2;
+    }
+    mesh.castShadow=true; scene.add(mesh);
+    obMeshes.push({o, mesh});
+  }
+}
+function updateObstacleMeshes(t){
+  for(const {o,mesh} of obMeshes){
+    if(o.type==='rock'||o.type==='pylon') continue;
+    mesh.visible = o.x<=RIVER.len;
+    const bob = 0.02*Math.sin(1.3*t+o.id);
+    mesh.position.set(o.y, -0.06+bob, o.x);
+    if(o.type==='log') mesh.rotation.y = 0.15*Math.sin(0.4*t+o.id*2);
+    if(o.type==='boat') mesh.rotation.y = (o.vy>=0? Math.PI:0);
+  }
+}
+
+/* ---- 机器人模型（可视化.html v2 同款外观） ---- */
+function buildSubMesh(color=0xff8c42,finColor=0x16385c){
+  const g=new THREE.Group();
+  const hullMat=new THREE.MeshStandardMaterial({color,roughness:0.45,metalness:0.35});
+  const finMat=new THREE.MeshStandardMaterial({color:finColor,roughness:0.5,metalness:0.3});
+  const darkMat=new THREE.MeshStandardMaterial({color:0x2b3640,roughness:0.5,metalness:0.4});
+  const hull=new THREE.Mesh(new THREE.CylinderGeometry(P.D/2,P.D/2,P.L*0.78,24),hullMat);
+  hull.rotation.x=Math.PI/2; hull.castShadow=true; g.add(hull);
+  const nose=new THREE.Mesh(new THREE.SphereGeometry(P.D/2,20,14,0,Math.PI*2,0,Math.PI/2),
+    new THREE.MeshStandardMaterial({color:0x9fd4f0,roughness:0.15,metalness:0.1,side:THREE.DoubleSide}));
+  nose.rotation.x=Math.PI/2; nose.position.z=P.L*0.39; nose.castShadow=true; g.add(nose);
+  const lens=new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.015,0.006,14),
+    new THREE.MeshStandardMaterial({color:0x0d1c28,roughness:0.2,metalness:0.6}));
+  lens.rotation.x=Math.PI/2; lens.position.z=P.L*0.39+P.D/2-0.004; g.add(lens);
+  const tail=new THREE.Mesh(new THREE.ConeGeometry(P.D/2,P.L*0.18,20),hullMat);
+  tail.rotation.x=-Math.PI/2; tail.position.z=-P.L*0.48; tail.castShadow=true; g.add(tail);
+  const mast=new THREE.Mesh(new THREE.CylinderGeometry(0.008,0.008,0.147),
+    new THREE.MeshStandardMaterial({color:0xd0dae2}));
+  mast.position.set(0,0.093,P.L*0.1); g.add(mast);
+  const flag=new THREE.Mesh(new THREE.BoxGeometry(0.005,0.03,0.05),
+    new THREE.MeshStandardMaterial({color:0xff5544,emissive:0x441111,side:THREE.DoubleSide}));
+  flag.position.set(0,0.152,P.L*0.1-0.025); g.add(flag);
+  const props=[];
+  const bladeMat=new THREE.MeshStandardMaterial({color:0xb8ccd8,roughness:0.35,metalness:0.55,side:THREE.DoubleSide});
+  const bladeShape=new THREE.Shape();
+  bladeShape.moveTo(0,0.004);
+  bladeShape.quadraticCurveTo(0.014,0.012,0.011,0.030);
+  bladeShape.quadraticCurveTo(0.004,0.035,-0.004,0.028);
+  bladeShape.quadraticCurveTo(-0.008,0.014,0,0.004);
+  const bladeGeo=new THREE.ExtrudeGeometry(bladeShape,{depth:0.0016,bevelEnabled:false});
+  [-1,1].forEach(side=>{
+    const pg=new THREE.Group();
+    const pod=new THREE.Mesh(new THREE.CylinderGeometry(0.011,0.011,0.05,12),darkMat);
+    pod.rotation.x=Math.PI/2; pod.position.z=0.02; pg.add(pod);
+    const strut=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.006,0.02),darkMat);
+    strut.position.set(-side*0.03,0,0.02); pg.add(strut);
+    const duct=new THREE.Mesh(new THREE.CylinderGeometry(0.037,0.039,0.032,24,1,true),
+      new THREE.MeshStandardMaterial({color:0x24455e,roughness:0.6,metalness:0.3,side:THREE.DoubleSide}));
+    duct.rotation.x=Math.PI/2; duct.position.z=-0.012; pg.add(duct);
+    const spin=new THREE.Group(); spin.position.z=-0.012;
+    const spinner=new THREE.Mesh(new THREE.ConeGeometry(0.008,0.02,12),darkMat);
+    spinner.rotation.x=-Math.PI/2; spinner.position.z=-0.008; spin.add(spinner);
+    const hub=new THREE.Mesh(new THREE.CylinderGeometry(0.009,0.009,0.014,12),darkMat);
+    hub.rotation.x=Math.PI/2; spin.add(hub);
+    for(let i=0;i<3;i++){
+      const holder=new THREE.Group(); holder.rotation.z=i*2*Math.PI/3;
+      const bl=new THREE.Mesh(bladeGeo,bladeMat);
+      bl.rotation.y=0.55*side; bl.position.y=0.006; holder.add(bl); spin.add(holder);
+    }
+    pg.add(spin);
+    pg.position.set(side*P.thrY,-0.01,-P.L*0.42); g.add(pg); props.push(spin);
+  });
+  const rud=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.006,0.055),finMat);
+  rud.position.set(0,0,-P.L*0.52); g.add(rud);
+  const fin=new THREE.Mesh(new THREE.BoxGeometry(0.005,0.05,0.05),finMat);
+  fin.position.set(0,0.045,-P.L*0.46); g.add(fin);
+  return {group:g, props, rudder:rud};
+}
+const rob=buildSubMesh(); scene.add(rob.group);
+
+/* ---- 轨迹尾迹 ---- */
+const TRAIL_MAX=4000; let trailN=0;
+const trailGeo=new THREE.BufferGeometry();
+trailGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(TRAIL_MAX*3),3));
+trailGeo.setDrawRange(0,0);
+scene.add(new THREE.Line(trailGeo,new THREE.LineBasicMaterial({color:0xff8c42,transparent:true,opacity:0.75})));
+function pushTrail(){
+  const attr=trailGeo.attributes.position;
+  if(trailN>=TRAIL_MAX){
+    for(let i=0;i<TRAIL_MAX/2;i++)
+      attr.setXYZ(i,attr.getX(i+TRAIL_MAX/2),attr.getY(i+TRAIL_MAX/2),attr.getZ(i+TRAIL_MAX/2));
+    trailN=TRAIL_MAX/2;
+  }
+  const p=N2T(sim.s[0],sim.s[1],sim.s[2]);
+  attr.setXYZ(trailN,p.x,p.y,p.z); trailN++;
+  trailGeo.setDrawRange(0,trailN); attr.needsUpdate=true;
+}
+
+/* ---- 判定图形：航线 / FOV / 跟踪线 / 安全圈 / 偏移线 / 期望航向 ---- */
+const fovShape=new THREE.Shape();
+fovShape.moveTo(0,0); fovShape.absarc(0,0,VRANGE,-VFOV_H+Math.PI/2,VFOV_H+Math.PI/2,false); fovShape.lineTo(0,0);
+const fovMesh=new THREE.Mesh(new THREE.ShapeGeometry(fovShape,24),
+  new THREE.MeshBasicMaterial({color:0x56b8e6,transparent:true,opacity:0.13,side:THREE.DoubleSide,depthWrite:false}));
+fovMesh.rotation.x=-Math.PI/2; scene.add(fovMesh);
+/* 完整计划航线（起点→5 航点，各画在目标深度） */
+const planGeo=new THREE.BufferGeometry();
+planGeo.setFromPoints([N2T(START[0],START[1],START[2]), ...WPS.map(w=>N2T(w[0],w[1],w[2]))]);
+scene.add(new THREE.Line(planGeo,new THREE.LineBasicMaterial({color:0xffd045,transparent:true,opacity:0.7})));
+/* 水面投影航线（虚线感：细线灰黄，方便俯瞰看航路走廊） */
+const planTopGeo=new THREE.BufferGeometry();
+planTopGeo.setFromPoints([N2T(START[0],START[1],0.01), ...WPS.map(w=>N2T(w[0],w[1],0.01))]);
+scene.add(new THREE.Line(planTopGeo,new THREE.LineBasicMaterial({color:0xffe9a0,transparent:true,opacity:0.3})));
+/* 当前目标航段线（机器人→当前航点，白色） */
+const tgtGeo=new THREE.BufferGeometry();
+tgtGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(6),3));
+const tgtLine=new THREE.Line(tgtGeo,new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:0.45}));
+scene.add(tgtLine);
+/* 规避偏移线（橙色，eT≠0 时显示） */
+const offGeo=new THREE.BufferGeometry();
+offGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(6),3));
+const offLine=new THREE.Line(offGeo,new THREE.LineBasicMaterial({color:0xff8030,transparent:true,opacity:0.95,depthTest:false}));
+scene.add(offLine);
+/* 期望航向箭头（绿色） */
+const psiArrow=new THREE.ArrowHelper(new THREE.Vector3(0,0,1),new THREE.Vector3(),1.3,0x3fbf8f,0.28,0.14);
+scene.add(psiArrow);
+/* 跟踪线 + 预测线 */
+const MAXSEG=24;
+const segGeo=new THREE.BufferGeometry();
+segGeo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(MAXSEG*6),3));
+segGeo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(MAXSEG*6),3));
+segGeo.setDrawRange(0,0);
+scene.add(new THREE.LineSegments(segGeo,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.95,depthTest:false})));
+/* 安全圈池（跟踪目标的 r+MARGIN 判定圈） */
+const RINGN=12, rings=[];
+{
+  const rg=new THREE.RingGeometry(0.94,1.0,40);
+  for(let i=0;i<RINGN;i++){
+    const m=new THREE.Mesh(rg,new THREE.MeshBasicMaterial({color:0x56b8e6,transparent:true,
+      opacity:0.4,side:THREE.DoubleSide,depthWrite:false}));
+    m.rotation.x=-Math.PI/2; m.visible=false; scene.add(m); rings.push(m);
+  }
+}
+function updatePercViz(){
+  const st=MSTATE();
+  const on=UI.fov && st==='TRANSIT';
+  fovMesh.visible=on;
+  psiArrow.visible=on;
+  tgtLine.visible=on;
+  offLine.visible=false;
+  if(on){
+    fovMesh.position.set(sim.s[1],-sim.s[2]+0.02,sim.s[0]); fovMesh.rotation.z=sim.s[4];
+    const m=DBG.mission, e=DBG.est;
+    const p=N2T(sim.s[0],sim.s[1],sim.s[2]);
+    psiArrow.position.copy(p);
+    psiArrow.setDirection(new THREE.Vector3(Math.sin(m.psi_d),0,Math.cos(m.psi_d)));
+    const wp=WPS[Math.min(m.wp_i,WPS.length-1)];
+    const tp=tgtGeo.attributes.position;
+    tp.setXYZ(0,p.x,p.y,p.z);
+    const wv=N2T(wp[0],wp[1],wp[2]); tp.setXYZ(1,wv.x,wv.y,wv.z);
+    tp.needsUpdate=true;
+    // 规避偏移线：e=eT 的平行线段（沿当前航段，从当前弧长-1m 到 +6m）
+    if(m.eT!==0){
+      const dx=wp[0]-m.leg_from[0], dy=wp[1]-m.leg_from[1], lp=Math.hypot(dx,dy)||1e-6;
+      const ux=dx/lp, uy=dy/lp;
+      const nx=-uy, ny=ux;                            // e 正方向的横向单位矢量
+      const sNow=(e.x-m.leg_from[0])*ux+(e.y-m.leg_from[1])*uy;
+      const a=[m.leg_from[0]+(sNow-1)*ux+m.eT*nx, m.leg_from[1]+(sNow-1)*uy+m.eT*ny];
+      const b=[m.leg_from[0]+(sNow+6)*ux+m.eT*nx, m.leg_from[1]+(sNow+6)*uy+m.eT*ny];
+      const op=offGeo.attributes.position;
+      const av=N2T(a[0],a[1],m.zref), bv=N2T(b[0],b[1],m.zref);
+      op.setXYZ(0,av.x,av.y,av.z); op.setXYZ(1,bv.x,bv.y,bv.z); op.needsUpdate=true;
+      offLine.visible=true;
+    }
+  }
+  // 跟踪线 + 预测线 + 安全圈（数据 = Python 跟踪器输出）
+  const pos=segGeo.attributes.position, col=segGeo.attributes.color;
+  let n=0, ri=0;
+  if(on){
+    const vp=N2T(DBG.est.x,DBG.est.y,DBG.est.z);
+    for(const tr of DBG.tracks){
+      if(n>=MAXSEG-1) break;
+      const c=tr.threat?[0.89,0.38,0.30]:[0.34,0.72,0.90];
+      const tpv=new THREE.Vector3(tr.y,-0.05,tr.x);
+      pos.setXYZ(n*2,vp.x,vp.y,vp.z); pos.setXYZ(n*2+1,tpv.x,tpv.y,tpv.z);
+      col.setXYZ(n*2,...c); col.setXYZ(n*2+1,...c); n++;
+      pos.setXYZ(n*2,tpv.x,tpv.y,tpv.z);
+      pos.setXYZ(n*2+1,tr.y+tr.vy*4,-0.05,tr.x+tr.vx*4);
+      col.setXYZ(n*2,c[0],c[1],c[2]); col.setXYZ(n*2+1,c[0]*0.5,c[1]*0.5,c[2]*0.5); n++;
+      if(ri<RINGN){
+        const ring=rings[ri++];
+        ring.visible=true;
+        ring.position.set(tr.y,0.03,tr.x);
+        const s=tr.r+MARGIN; ring.scale.set(s,s,1);
+        ring.material.color.setHex(tr.threat?0xe2604c:0x56b8e6);
+        ring.material.opacity=tr.threat?0.55:0.22;
+      }
+    }
+  }
+  for(;ri<RINGN;ri++) rings[ri].visible=false;
+  segGeo.setDrawRange(0,n*2); pos.needsUpdate=true; col.needsUpdate=true;
+}
+
+/* ---- 水面流迹粒子 ---- */
+const streaks=[];
+(function(){
+  const mat=new THREE.MeshBasicMaterial({color:0xd8ecf8,transparent:true,opacity:0.35,depthWrite:false});
+  for(let i=0;i<70;i++){
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(0.04,0.5),mat);
+    m.rotation.x=-Math.PI/2;
+    m.position.set(Math.random()*RIVER.wid,0.015,Math.random()*RIVER.len);
+    scene.add(m); streaks.push(m);
+  }
+})();
+function updateStreaks(dt,t){
+  for(const m of streaks){
+    const c=currentAt(m.position.z,m.position.x,t);
+    m.position.z += c[0]*dt*2.2; m.position.x += c[1]*dt*2.2;
+    m.material.opacity = 0.12+1.4*Math.hypot(c[0],c[1]);
+    if(m.position.z>RIVER.len||m.position.x<0||m.position.x>RIVER.wid){
+      m.position.set(Math.random()*RIVER.wid,0.015,Math.random()*2);
+    }
+  }
+}
+
+/* ---------- 机载相机画中画（艏部单目 + 检测叠加） ---------- */
+const obCam=new THREE.PerspectiveCamera(70,4/3,0.02,60);
+const PIPW=300, PIPH=225;
+const pipOv=$('pipOv'), pipCtx=pipOv.getContext('2d');
+function poseObCam(){
+  const g=rob.group; g.updateMatrixWorld();
+  obCam.position.copy(g.localToWorld(new THREE.Vector3(0,0,P.L*0.39+P.D/2+0.01)));
+  obCam.quaternion.copy(g.quaternion); obCam.rotateY(Math.PI);
+}
+function renderPIP(){
+  if(!UI.pip) return;
+  poseObCam();
+  const fd=scene.fog.density;
+  scene.fog.density = obCam.position.y<0 ? 0.10 : 0.014;
+  renderer.setScissorTest(true);
+  renderer.setViewport(12,12,PIPW,PIPH);
+  renderer.setScissor(12,12,PIPW,PIPH);
+  renderer.render(scene,obCam);
+  renderer.setScissorTest(false);
+  renderer.setViewport(0,0,innerWidth,innerHeight);
+  scene.fog.density=fd;
+  // 检测/跟踪叠加（数据 = Python 跟踪器；投影到机载相机像面）
+  const W=pipOv.width, H=pipOv.height;
+  pipCtx.clearRect(0,0,W,H);
+  pipCtx.strokeStyle='rgba(140,200,240,.5)'; pipCtx.lineWidth=1;
+  pipCtx.beginPath(); pipCtx.moveTo(W/2-18,H/2); pipCtx.lineTo(W/2+18,H/2);
+  pipCtx.moveTo(W/2,H/2-18); pipCtx.lineTo(W/2,H/2+18); pipCtx.stroke();
+  if(DBG && MSTATE()==='TRANSIT'){
+    const fpx=(H/2)/Math.tan(35*D2R);              // 垂直 FOV 70° 的焦距（像素）
+    pipCtx.font='13px "Microsoft YaHei"'; pipCtx.textBaseline='bottom';
+    for(const tr of DBG.tracks){
+      const h = tr.full ? -0.5 : -0.08;
+      const wpos=new THREE.Vector3(tr.y,h,tr.x);
+      const dist=wpos.distanceTo(obCam.position);
+      const ndc=wpos.clone().project(obCam);
+      if(ndc.z<-1||ndc.z>1||Math.abs(ndc.x)>1.15||Math.abs(ndc.y)>1.15) continue;
+      const px=(ndc.x*0.5+0.5)*W, py=(1-(ndc.y*0.5+0.5))*H;
+      const s=clamp(tr.r/Math.max(0.3,dist)*fpx,10,150);
+      pipCtx.strokeStyle=tr.threat?'#ff5040':'#4fd8ff';
+      pipCtx.lineWidth=tr.threat?2.5:1.5;
+      pipCtx.strokeRect(px-s,py-s*0.7,2*s,1.4*s);
+      pipCtx.fillStyle=tr.threat?'#ff8070':'#9fdcff';
+      pipCtx.fillText('#'+tr.id+' '+(OB_NAME[tr.type]||tr.type)+' '+dist.toFixed(1)+'m',px-s,py-s*0.7-2);
+      if(tr.threat && tr.cpa_d!=null){
+        pipCtx.fillStyle='#ffb0a0'; pipCtx.textBaseline='top';
+        pipCtx.fillText('CPA '+tr.cpa_d.toFixed(1)+'m / '+tr.cpa_t.toFixed(1)+'s',px-s,py+s*0.7+2);
+        pipCtx.textBaseline='bottom';
+      }
+    }
+  }
+}
+
+/* ---------- 相机 ---------- */
+const UI={ running:false, cam:'cine', speed:1, fov:true, pip:true };
+let cineAz=2.2;
+let orbit={az:2.4, el:0.42, dist:5, target:new THREE.Vector3(5,0,2), drag:false, px:0, py:0};
+renderer.domElement.addEventListener('mousedown',e=>{orbit.drag=true;orbit.px=e.clientX;orbit.py=e.clientY;});
+addEventListener('mouseup',()=>orbit.drag=false);
+addEventListener('mousemove',e=>{
+  if(!orbit.drag)return;
+  orbit.az-=(e.clientX-orbit.px)*0.006; orbit.el=clamp(orbit.el+(e.clientY-orbit.py)*0.004,0.06,1.5);
+  orbit.px=e.clientX; orbit.py=e.clientY;
+  if(UI.cam==='cine'){ UI.cam='follow'; syncCamBtns(); }
+});
+renderer.domElement.addEventListener('wheel',e=>{ orbit.dist=clamp(orbit.dist*(1+e.deltaY*0.001),1.2,60); });
+function updateCamera(dt){
+  const p=N2T(sim.s[0],sim.s[1],sim.s[2]);
+  if(UI.cam==='cine'){
+    cineAz+=0.06*dt;
+    orbit.target.lerp(p,0.05);
+    const t=orbit.target, d=4.6, el=0.34;
+    camera.position.lerp(new THREE.Vector3(
+      t.x+d*Math.cos(el)*Math.cos(cineAz), t.y+d*Math.sin(el)+0.3, t.z+d*Math.cos(el)*Math.sin(cineAz)),0.04);
+    camera.lookAt(t);
+  } else if(UI.cam==='top'){
+    orbit.target.lerp(new THREE.Vector3(RIVER.wid/2,0,sim.s[0]*0.6+RIVER.len*0.2),0.04);
+    camera.position.lerp(new THREE.Vector3(orbit.target.x,26,orbit.target.z+0.01),0.05);
+    camera.lookAt(orbit.target);
+  } else {
+    orbit.target.lerp(p,0.08);
+    const t=orbit.target, d=orbit.dist;
+    camera.position.set(t.x+d*Math.cos(orbit.el)*Math.cos(orbit.az),
+      t.y+d*Math.sin(orbit.el), t.z+d*Math.cos(orbit.el)*Math.sin(orbit.az));
+    camera.lookAt(t);
+  }
+  scene.fog.density = camera.position.y<0 ? 0.09 : 0.014;
+}
+
+/* ---------- HUD / 判定逻辑面板 ---------- */
+function stateBadge(){
+  const st=MSTATE(), am=DBG&&DBG.mission?DBG.mission.avoid_mode:null;
+  if(st==='DONE') return ['上浮回收/完成','#2c6fd6'];
+  if(st==='IDLE') return ['待命','#3a4a5a'];
+  if(am==='DIVE') return ['规避·下潜穿越','#a8752c'];
+  if(am==='STEER') return ['规避·绕行','#a8752c'];
+  if(am==='BOTH') return ['规避·复合','#a8752c'];
+  return ['ILOS 巡航','#2c7a5b'];
+}
+function logicLines(){
+  if(!DBG || MSTATE()==='IDLE') return ['等待任务开始…'];
+  if(MSTATE()==='DONE') return ['任务完成 → 排水上浮（压载 15%）'];
+  const m=DBG.mission, L=[];
+  L.push('ILOS：横偏 e=<b>'+m.e.toFixed(2)+'m</b>'+(m.eT!==0
+    ? '，跟踪<b class="warn">偏移线 '+(m.eT>0?'+':'')+m.eT.toFixed(1)+'m</b>（冻结积分）'
+    : ' → ψd='+((m.psi_d*R2D%360+360)%360).toFixed(0)+'°'));
+  const threats=DBG.tracks.filter(t=>t.threat);
+  if(!threats.length){
+    L.push('威胁扫描：<b>无冲突</b>（跟踪 '+DBG.tracks.length+' 个目标）');
+  }else{
+    for(const tr of threats.slice(0,2)){
+      const rs=(tr.r+MARGIN).toFixed(1);
+      if(tr.full)
+        L.push('<b class="warn">#'+tr.id+' '+OB_NAME[tr.type]+'</b>：挡在航段上，间隔 '
+          +(tr.cpa_d==null?'–':tr.cpa_d.toFixed(1))+'m &lt; 安全'+rs+'m → <b>绕行</b>');
+      else
+        L.push('<b class="warn">#'+tr.id+' '+OB_NAME[tr.type]+'</b>：CPA '
+          +(tr.cpa_d==null?'–':tr.cpa_d.toFixed(1))+'m@'+(tr.cpa_t==null?'–':tr.cpa_t.toFixed(1))
+          +'s &lt; '+rs+'m → <b>下潜穿越</b>');
+    }
+    if(m.lo!=null||m.hi!=null)
+      L.push('偏移约束：e ∈ ['+(m.lo==null?'−∞':m.lo.toFixed(1))+', '
+        +(m.hi==null?'+∞':m.hi.toFixed(1))+'] → 取 '+(m.eT>0?'+':'')+m.eT.toFixed(1)+'m');
+    if(m.slow<1) L.push('动态会遇 → <b class="warn">减速让行 ×'+m.slow.toFixed(2)+'</b>');
+  }
+  L.push('经济巡航：油门基值 '+(m.base*100).toFixed(0)+'%（地速伺服 0.42 m/s）');
+  return L;
+}
+function refreshHUD(){
+  const e=DBG?DBG.est:null, m=DBG?DBG.mission:null;
+  $('p_slam').textContent=e?e.x.toFixed(1)+', '+e.y.toFixed(1)+' m':'–';
+  $('p_drift').textContent=(SENSIM.drift()*100).toFixed(0)+' cm';
+  $('p_z').textContent=e?e.z.toFixed(2)+' m':'–';
+  $('p_att').textContent=e?(((e.psi*R2D)%360+360)%360).toFixed(0)+'° / '+(e.theta*R2D).toFixed(0)+'°':'–';
+  const trs=DBG?DBG.tracks:[];
+  const near=trs.length&&e?Math.min(...trs.map(t=>Math.hypot(t.x-e.x,t.y-e.y))):null;
+  $('p_vis').textContent=trs.length+' 个'+(near!=null?'（最近 '+near.toFixed(1)+' m）':'');
+  const [bt,bc]=stateBadge();
+  const bd=$('d_state'); bd.textContent=bt; bd.style.background=bc;
+  $('d_wp').textContent=m&&m.state!=='IDLE'?Math.min(m.wp_i+1,m.n_wp)+' / '+m.n_wp:'–';
+  $('d_psid').textContent=m&&m.state==='TRANSIT'?(((m.psi_d*R2D)%360+360)%360).toFixed(0)+'°':'–';
+  $('d_zref').textContent=m?m.zref.toFixed(2)+' m':'–';
+  $('d_base').textContent=m?(m.base*100).toFixed(0)+' %'+(m.slow<1?' (减速)':''):'–';
+  $('d_logic').innerHTML=logicLines().map(s=>'<div>'+s+'</div>').join('');
+  $('c_l').style.width=(50+clamp(lastCmd[0],-1,1)*50)+'%';
+  $('c_r').style.width=(50+clamp(lastCmd[1],-1,1)*50)+'%';
+  $('c_rud').textContent=(sim.s[11]*R2D).toFixed(0)+'° / '+(DBG?(DBG.ctrl.th_ref*R2D).toFixed(0):'0')+'°';
+  $('c_bal').textContent=(sim.s[10]*100).toFixed(0)+' %';
+  $('c_pw').textContent=METRICS.power.toFixed(1)+' W';
+  $('k_time').innerHTML=sim.t.toFixed(1)+'<em> s</em>';
+  $('k_wp').textContent=(m?Math.min(m.wp_i+(m.state==='DONE'?m.n_wp:0),m.n_wp):0)+' / '+WPS.length;
+  $('k_xte').textContent=METRICS.n?(METRICS.xteSum/METRICS.n).toFixed(2)+' m':'–';
+  $('k_zerr').textContent=METRICS.n?(METRICS.zerrSum/METRICS.n).toFixed(2)+' m':'–';
+  $('k_e').innerHTML=METRICS.energy.toFixed(0)+'<em> J</em>';
+  $('k_epm').textContent=METRICS.dist>1?(METRICS.energy/METRICS.dist).toFixed(1)+' J/m':'–';
+  $('k_avoid').innerHTML=(m?m.avoid_count:0)+'<em> 次</em>';
+  $('k_clear').textContent=isFinite(METRICS.minClear)?METRICS.minClear.toFixed(2)+' m':'–';
+  $('k_clear').style.color=METRICS.collisions>0?'#e2604c':(isFinite(METRICS.minClear)&&METRICS.minClear<0.3?'#e8b64c':'#ffd479');
+  wpBalls.forEach((mb,i)=>{
+    const wi=m?m.wp_i:0, tr=m&&m.state==='TRANSIT';
+    mb.material.color.setHex(i<wi||MSTATE()==='DONE'?0x3fbf8f:(i===wi&&tr?0xff4040:0xffd045));
+  });
+}
+
+/* ---------- 结算 ---------- */
+let doneShown=false;
+function showDone(){
+  doneShown=true;
+  const m=DBG.mission;
+  $('f_time').textContent=sim.t.toFixed(1)+' s';
+  $('f_dist').textContent=METRICS.dist.toFixed(1)+' m';
+  $('f_xte').textContent=METRICS.n?(METRICS.xteSum/METRICS.n).toFixed(2)+' m':'–';
+  $('f_zerr').textContent=METRICS.n?(METRICS.zerrSum/METRICS.n).toFixed(2)+' m':'–';
+  $('f_e').textContent=METRICS.energy.toFixed(0)+' J';
+  $('f_epm').textContent=(METRICS.energy/Math.max(1,METRICS.dist)).toFixed(1)+' J/m';
+  $('f_avoid').textContent=m.avoid_count+' 次'+(METRICS.collisions?'（碰撞 '+METRICS.collisions+'）':'（零碰撞）');
+  $('f_clear').textContent=isFinite(METRICS.minClear)?METRICS.minClear.toFixed(2)+' m':'–';
+  $('doneOverlay').style.display='flex';
+}
+
+/* ---------- UI 绑定 ---------- */
+function startDemo(){
+  if(!PY.ready) return;
+  $('startOverlay').style.display='none';
+  if(MSTATE()==='IDLE'){ PY.mod.engine_start(); logEvent('🌊 动态河流：中泓流速 '+U0.toFixed(2)+' m/s'); }
+  UI.running=true; $('btnGo').textContent='⏸ 暂停'; $('btnGo').classList.add('on');
+}
+$('btnStart').onclick=startDemo;
+$('btnAgain').onclick=()=>{ resetWorld(); trailN=0; trailGeo.setDrawRange(0,0); startDemo(); };
+$('btnGo').onclick=()=>{
+  if($('startOverlay').style.display!=='none'){ startDemo(); return; }
+  UI.running=!UI.running;
+  if(UI.running&&MSTATE()==='IDLE'&&PY.ready) PY.mod.engine_start();
+  $('btnGo').textContent=UI.running?'⏸ 暂停':'▶ 开始';
+  $('btnGo').classList.toggle('on',UI.running);
+};
+$('btnReset').onclick=()=>{ resetWorld(); trailN=0; trailGeo.setDrawRange(0,0);
+  UI.running=false; $('btnGo').textContent='▶ 开始'; $('btnGo').classList.remove('on');
+  $('startOverlay').style.display='flex'; refreshHUD(); };
+$('btnSpd').onclick=e=>{ UI.speed=UI.speed>=4?1:UI.speed*2; e.target.textContent=UI.speed+'×'; };
+function syncCamBtns(){
+  [['camCine','cine'],['camFollow','follow'],['camTop','top']].forEach(([id,k])=>
+    $(id).classList.toggle('on',UI.cam===k));
+}
+[['camCine','cine'],['camFollow','follow'],['camTop','top']].forEach(([id,k])=>{
+  $(id).onclick=()=>{ UI.cam=k; syncCamBtns(); };
+});
+$('btnFov').onclick=e=>{ UI.fov=!UI.fov; e.target.classList.toggle('on');
+  e.target.textContent=UI.fov?'👁 判定图形与航路：显示':'👁 判定图形与航路：隐藏'; };
+$('pipBtn').onclick=e=>{ UI.pip=!UI.pip; e.target.classList.toggle('on');
+  e.target.textContent=UI.pip?'📷 机载相机：开':'📷 机载相机：关';
+  $('pipFrame').style.display=UI.pip?'block':'none'; };
+$('curSl').oninput=e=>{ U0=+e.target.value; $('curV').textContent=U0.toFixed(2)+' m/s'; };
+
+/* ---------- 主循环 ---------- */
+let lastT=performance.now(), simAcc=0, frameN=0;
+function frame(now){
+  requestAnimationFrame(frame);
+  frameN++;
+  const dtReal=Math.min(0.05,(now-lastT)/1000); lastT=now;
+  if(UI.running && PY.ready){
+    simAcc+=dtReal*UI.speed;
+    let guard=0;
+    while(simAcc>0.01 && guard<120){ stepWorld(0.01); simAcc-=0.01; guard++; }
+    if(frameN%4===0) pushTrail();
+  }
+  rob.group.position.copy(N2T(sim.s[0],sim.s[1],sim.s[2]));
+  rob.group.rotation.set(0,0,0);
+  rob.group.rotateY(sim.s[4]); rob.group.rotateX(-sim.s[3]);
+  rob.props[0].rotation.z+=sim.TL*0.5; rob.props[1].rotation.z-=sim.TR*0.5;
+  rob.rudder.rotation.x=sim.s[11];
+  updateObstacleMeshes(sim.t);
+  updatePercViz();
+  updateStreaks(dtReal*(UI.running?UI.speed:0.3), sim.t);
+  if(waterGeo){
+    const pos=waterGeo.attributes.position;
+    for(let i=0;i<pos.count;i++)
+      pos.setZ(i,0.02*Math.sin(pos.getX(i)*2+sim.t*1.6)*Math.cos(pos.getY(i)*0.8+sim.t*0.9));
+    pos.needsUpdate=true;
+  }
+  if(frameN%6===0) refreshHUD();
+  updateCamera(dtReal);
+  renderer.render(scene,camera);
+  renderPIP();
+}
+addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+
+/* ---------- 初始化 + 测试钩子 ---------- */
+makeObstacles(); buildObstacleMeshes();
+resetWorld();
+refreshHUD();
+PY.autoLoad();
+window.__E = {
+  sim, METRICS, EVENTS, obstacles:()=>obstacles, WPS,
+  get DBG(){ return DBG; },
+  get pyReady(){ return PY.ready; },
+  ff(maxSec){                                  // 无渲染快进（探针测试用）
+    if(!PY.ready) throw new Error('Python core not ready');
+    if(MSTATE()==='IDLE') PY.mod.engine_start();
+    const n=Math.round(maxSec/0.01);
+    for(let i=0;i<n;i++){ stepWorld(0.01); if(MSTATE()==='DONE'&&sim.s[2]<0.12) break; }
+    refreshHUD();
+    const m=DBG.mission;
+    return { t:+sim.t.toFixed(1), state:m.state, wp:m.wp_i,
+      xte:METRICS.n?+(METRICS.xteSum/METRICS.n).toFixed(3):null,
+      zerr:METRICS.n?+(METRICS.zerrSum/METRICS.n).toFixed(3):null,
+      energy:+METRICS.energy.toFixed(0), dist:+METRICS.dist.toFixed(1),
+      epm:+(METRICS.energy/Math.max(1,METRICS.dist)).toFixed(2),
+      avoid:m.avoid_count, minClear:+METRICS.minClear.toFixed(2),
+      clearInfo:METRICS.clearInfo||null,
+      collisions:METRICS.collisions, drift:+SENSIM.drift().toFixed(3) };
+  }
+};
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

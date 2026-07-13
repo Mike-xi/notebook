@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>蛟人半潜器 · 数字水池可视化</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden;
+    font-family:"Microsoft YaHei","PingFang SC",sans-serif; background:#061420; color:#dceaf5; }
+  #c3d { position:absolute; inset:0; }
+  .panel { position:absolute; background:rgba(8,20,34,.82); border:1px solid rgba(110,180,255,.25);
+    border-radius:10px; padding:10px 12px; font-size:12.5px; backdrop-filter:blur(4px); }
+  #hud { left:12px; top:12px; width:210px; }
+  #hud h3 { font-size:13px; color:#7fd0ff; margin-bottom:6px; }
+  #hud .row { display:flex; justify-content:space-between; margin:3px 0; }
+  #hud .row b { color:#ffd479; font-weight:600; font-variant-numeric:tabular-nums; }
+  .bar { height:8px; background:#0c2030; border-radius:4px; overflow:hidden; margin:2px 0 6px; }
+  .bar i { display:block; height:100%; background:linear-gradient(90deg,#2c6fd6,#6fd3ff); width:50%; }
+  #ctrl { right:12px; top:12px; width:250px; max-height:calc(100% - 24px); overflow-y:auto; }
+  #ctrl h3 { font-size:13px; color:#7fd0ff; margin:8px 0 5px; }
+  #ctrl h3:first-child { margin-top:0; }
+  select,button,input[type=file] { width:100%; background:#0c2438; color:#dceaf5;
+    border:1px solid rgba(110,180,255,.3); border-radius:6px; padding:6px 8px; font-size:12.5px; margin:2px 0; cursor:pointer; }
+  button:hover { background:#14324c; }
+  button.on { background:#2c6fd6; border-color:#6fd3ff; }
+  .btnrow { display:flex; gap:5px; } .btnrow button { flex:1; }
+  label.sl { display:block; margin:4px 0 2px; color:#9fc3e0; }
+  label.sl span { color:#ffd479; float:right; }
+  input[type=range] { width:100%; accent-color:#4a9eff; }
+  #pipBox { position:absolute; left:12px; bottom:12px; width:240px; height:180px;
+    border:1px solid rgba(110,180,255,.45); border-radius:6px; pointer-events:none; display:none; }
+  #pipBox span { position:absolute; left:6px; top:4px; font-size:11px; color:#bfe3ff; text-shadow:0 0 4px #000; }
+  #helpBtn { position:absolute; right:274px; top:12px; width:auto; padding:6px 14px;
+    background:rgba(8,20,34,.82); border:1px solid rgba(110,180,255,.25); border-radius:10px; }
+  #helpPanel { right:274px; top:52px; width:370px; max-height:calc(100% - 70px); overflow-y:auto;
+    color:#9fc3e0; line-height:1.7; display:none; }
+  #helpPanel h3 { font-size:13px; color:#7fd0ff; margin:8px 0 4px; }
+  #helpPanel h3:first-child { margin-top:0; }
+  #helpPanel b { color:#cfe3f5; }
+  #helpPanel code { color:#ffd479; background:#0c2030; padding:0 4px; border-radius:4px; }
+  #loadfail { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+    background:#061420; z-index:99; text-align:center; line-height:2; }
+</style>
+</head>
+<body>
+<div id="c3d"></div>
+<div id="loadfail"><div><h2>Three.js 加载失败</h2>请检查网络后刷新（首次打开需联网加载 3D 引擎）</div></div>
+
+<div class="panel" id="hud">
+  <h3>🤿 状态仪表</h3>
+  <div class="row"><span>深度 z</span><b id="h_z">0.00 m</b></div>
+  <div class="row"><span>垂荡速度 ż</span><b id="h_w">0.00 m/s</b></div>
+  <div class="row"><span>航向 ψ</span><b id="h_psi">0°</b></div>
+  <div class="row"><span>俯仰 θ</span><b id="h_th">0°</b></div>
+  <div class="row"><span>航速 u</span><b id="h_u">0.00 m/s</b></div>
+  <div class="row"><span>注水量</span><b id="h_s">50%</b></div>
+  <div class="bar"><i id="b_s" style="background:linear-gradient(90deg,#3fbf9f,#6fd3ff)"></i></div>
+  <div class="row"><span>净浮力(＋下潜)</span><b id="h_fb">0.00 N</b></div>
+  <div class="row"><span>左桨</span></div><div class="bar"><i id="b_tl"></i></div>
+  <div class="row"><span>右桨</span></div><div class="bar"><i id="b_tr"></i></div>
+  <div class="row"><span>任务</span><b id="h_task">手动</b></div>
+  <div class="row" id="row_wp_r"><span>航点</span><b id="h_wp">–</b></div>
+  <div class="row" id="row_xte_r"><span>平均横偏</span><b id="h_xte">–</b></div>
+  <div class="row" id="row_zerr_r"><span>平均深度误差</span><b id="h_zerr">–</b></div>
+  <div class="row"><span>时间</span><b id="h_t">0.0 s</b></div>
+  <div class="row" id="row_gp"><span>手柄</span><b id="h_gp">未连接</b></div>
+</div>
+
+<div class="panel" id="ctrl">
+  <h3>环境（对应阶段任务）</h3>
+  <select id="envSel">
+    <option value="pool">① 标准水池 6×4×1.5（阶段一·控制调试）</option>
+    <option value="channel">② 长直水道 30×4（阶段一·直航/参数辨识）</option>
+    <option value="crossflow">③ 横流抗扰场 20×8（制导·ILOS抗流对比）</option>
+    <option value="patrol">④ 巡逻航点场 12×12（阶段三·LOS巡航）</option>
+    <option value="obstacle">⑤ 立柱地标场 12×12（视觉地标/纹理自适应）</option>
+    <option value="formation">⑥ 编队开阔场 20×20（阶段三·多机协同）</option>
+  </select>
+  <label class="sl">横流强度 <span id="curV">0.00 m/s</span></label>
+  <input type="range" id="curSl" min="0" max="0.15" step="0.01" value="0">
+
+  <button id="btnEngine" style="background:#1d4b33;border-color:#3fbf8f">🚀 综合场景演示：动态河流自主巡航</button>
+
+  <h3>模式</h3>
+  <div class="btnrow">
+    <button id="mLive" class="on">实时仿真</button>
+    <button id="mReplay">算法分析</button>
+  </div>
+  <div id="liveBox">
+    <h3>巡航算法（可载入对比）</h3>
+    <select id="algSel"></select>
+    <input type="file" id="pyfile" accept=".py" multiple style="display:none">
+    <button id="btnPy">🐍 载入 Python 算法（可多选）</button>
+    <input type="file" id="coreDir" webkitdirectory multiple style="display:none">
+    <button id="btnCore">🤖 载入蛟人核心（本项目算法包）</button>
+    <div id="pyStatus" style="font-size:11px;color:#8fb0cc;line-height:1.5"></div>
+    <h3>自动驾驶</h3>
+    <div class="btnrow">
+      <button id="apHead">定航向</button>
+      <button id="apDepth">定深</button>
+    </div>
+    <button id="apMission">▶ 执行本环境任务（LOS/编队）</button>
+    <label class="sl">目标航向 <span id="spPsiV">90°</span></label>
+    <input type="range" id="spPsi" min="0" max="360" step="5" value="90">
+    <label class="sl">目标深度 <span id="spZV">0.8 m</span></label>
+    <input type="range" id="spZ" min="0.05" max="1.4" step="0.05" value="0.8">
+    <button id="btnReset">↺ 复位机器人</button>
+  </div>
+  <div id="replayBox" style="display:none">
+    <h3>回放分析 Python 输出（输出\*.json）</h3>
+    <input type="file" id="jfile" accept=".json">
+    <div class="btnrow">
+      <button id="rpPlay">▶ 播放</button><button id="rpX">1×</button>
+    </div>
+  </div>
+
+  <h3>视角</h3>
+  <div class="btnrow">
+    <button id="camFollow" class="on">跟随</button>
+    <button id="camTop">俯视</button>
+    <button id="camFree">自由</button>
+  </div>
+  <h3>传感器</h3>
+  <button id="pipBtn">📷 机载相机画面</button>
+  <div class="btnrow">
+    <button id="sImu">IMU</button><button id="sDep">深度计</button>
+  </div>
+  <div id="sensOut" style="font-size:11px;color:#9fc3e0;white-space:pre-wrap;font-variant-numeric:tabular-nums;line-height:1.5"></div>
+  <button id="mkBtn" class="on">🏁 特征标志板：显示中</button>
+</div>
+<div id="pipBox"><span>📷 机载相机（艏部单目）</span></div>
+
+<button id="helpBtn">❓ 说明</button>
+<div class="panel" id="helpPanel">
+  <h3>操作说明</h3>
+  <b>键盘</b>（虚拟摇杆：按住渐进推杆，松开自动回中）：W/S 油门 · A/D 差速转向 · R/F 尾舵 · Q/E 注水/排水（保持） · 空格 急停<br>
+  <b>手柄</b>（即插即用，映射沿用学森营 XBoxClient）：左摇杆 推进+差速 · 右摇杆↕ 尾舵 · RT/LT 注水/排水 · A 急停 · LB 定深 · RB 定航向 · Y 任务<br>
+  <b>鼠标</b>：拖拽旋转视角 · 滚轮缩放（自由视角）
+  <h3>环境说明</h3><span id="envDesc"></span>
+  <h3>算法接入（两种方式）</h3>
+  ① <b>实时仿真</b>：点「载入 Python 算法」选 <code>.py</code> 文件（可多选），文件里按约定写
+  <code>update(state, env, dt)</code> 返回 <code>(左桨,右桨,舵角,注水)</code>，即出现在算法下拉框可切换对比，
+  模板见 <code>仿真\算法示例_LOS.py</code>；也可在控制台用 <code>JIAOREN.registerController()</code> 注册 JS 版。
+  点「🤖 载入蛟人核心」可直接载入本项目的正式算法包（<code>蛟人核心\</code>，JiaoRen 结构，装机同款）。<br>
+  ② <b>算法分析</b>：回放 Python 正式仿真（<code>jiaoren_sim</code>）导出的 <code>输出\*.json</code>，
+  用于严谨的定量分析与报告出图。
+  <h3>虚拟传感器（与实物外设对应）</h3>
+  SLAM/感知传感器套件 = <b>相机 + IMU + 深度计</b>（含噪声与采样率）。算法应只用传感器数据、不偷看真值，移植实物才无缝：<br>
+  · <code>read_imu()</code> — JY901：欧拉角°、角速度°/s、比力m/s²，100Hz<br>
+  · <code>read_depth()</code> — MS5837：深度m（σ3mm）、水压kPa，25Hz<br>
+  · <code>read_camera()</code> — 艏部单目：160×120 灰度帧，≤20Hz（SLAM/视觉接入点；池壁设有特征标志板，可用 🏁 开关模拟纹理丰富/贫乏）<br>
+  JS 侧对应 <code>JIAOREN.sensors.*</code>；点「📷 机载相机画面」可实时查看相机视角；
+  传感器版算法模板见 <code>仿真\算法示例_视惯压融合.py</code>。
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<script>
+if (typeof THREE === 'undefined') document.write('<scr'+'ipt src="https://unpkg.com/three@0.149.0/build/three.min.js"><\/scr'+'ipt>');
+</script>
+<script>
+if (typeof THREE === 'undefined') {
+  document.getElementById('loadfail').style.display = 'flex';
+  throw new Error('THREE not loaded');
+}
+/* =====================================================================
+   蛟人半潜器数字水池可视化
+   物理模型 = jiaoren_sim/vehicle.py 的 JS 移植（参数一致，params.py）
+   ===================================================================== */
+const D2R = Math.PI/180, R2D = 180/Math.PI;
+
+/* ---------- 物理参数（与 params.py 同步） ---------- */
+const P = {
+  m:3.0, maX:0.15, maYZ:3.5, Iy:0.0756, maQ:0.0885, Iz:0.0756, maR:0.0885,
+  dqX:2.86, dlX:0.3, dqYZ:27.2, dlYZ:1.5, dqRot:0.15, dlRot:0.04,
+  tMax:1.5, thrY:0.06, thrTau:0.15,
+  rudK:0.5*1000*0.004*(2*Math.PI*0.7), rudX:-0.28, rudStall:25*D2R, rudMax:90*D2R, rudRate:180*D2R,
+  balF:1000*9.81*60e-6,  // 每单位(s-0.5) 的净浮力 N
+  balRate:0.25, kPitch:0.294,
+  zFloat:0.05, zSurf:0.09, kWp:55,   // 78.5→55：原值水面吸附力(峰值0.35N)大于满注水下沉力(0.29N)，浮上水面后按Q无法下潜
+  L:0.55, D:0.09
+};
+
+/* ---------- 环境预设（为后续阶段准备的测试场） ---------- */
+const ENVS = {
+  pool: { len:6, wid:4, dep:1.5, desc:'阶段一基础场：小水池调 PID、测阶跃响应。对应云镜实验室量级的水池。',
+          start:[1.5,2,0.3,0], waypoints:null, obstacles:[], nRobots:1 },
+  channel: { len:30, wid:4, dep:2, desc:'阶段一直航场：长水道测末速度、加速时间、直线保持（可加横流）。',
+          start:[1,2,0.3,0], waypoints:null, obstacles:[], nRobots:1 },
+  crossflow: { len:20, wid:8, dep:1.5, desc:'抗流制导对比场：沿 x 轴往返的长直线航路，横流沿 y 轴推移（把「横流强度」拉到 0.1+）。基准 LOS 会被横流压出稳态横偏，积分视线法(ILOS)可把横偏拉回零 —— 用 HUD「平均横偏」直接对比。首个近航点(2.6)秒过，随即进入约 15 m 的固定直线段供积分收敛。',
+          start:[2,4,0.4,0], waypoints:[[2.6,4,0.6],[18,4,0.6]], obstacles:[], nRobots:1 },
+  patrol: { len:12, wid:12, dep:2, desc:'阶段三制导场：4 航点矩形巡逻（大落差变深 0.3↔1.6 m，考察变深通路带宽）。「执行任务」= LOS 视线法跟踪 + 航点状态机。',
+          start:[2,2,0.3,0],
+          waypoints:[[10,2,0.3],[10,10,1.6],[2,10,0.3],[2,2,1.6]], obstacles:[], nRobots:1 },
+  obstacle: { len:12, wid:12, dep:2, desc:'立柱地标场：立柱既是视觉地标（供 SLAM/视觉里程计提特征），也是穿行航路上的参照物。可结合相机纹理健康度自适应调速演示。',
+          start:[1.5,6,0.5,0],
+          waypoints:[[10.5,6,0.8]],
+          obstacles:[[4,4,0.5],[6.5,8,0.6],[8.5,4.5,0.45]], nRobots:1 },
+  formation: { len:20, wid:20, dep:3, desc:'阶段三协同场：3 机编队（演示为领航-跟随三角队形，一致性协议开发后替换控制律即可）。',
+          start:[3,10,0.5,0],
+          waypoints:[[17,10,0.8]], obstacles:[], nRobots:3 }
+};
+
+/* ---------- 半潜器物理 ---------- */
+class SubSim {
+  constructor(x,y,z,psi){ this.reset(x,y,z,psi); }
+  reset(x,y,z,psi){
+    this.s=[x,y,z,0,psi,0,0,0,0,0,0.5,0]; // x y z th psi u v w q r sbal delta
+    this.TL=0; this.TR=0; this.t=0; this.trail=[];
+  }
+  deriv(s,cmd,cur){
+    const [x,y,z,th,ps,u,v,w,q,r,sb,de] = s;
+    const [nL,nR,dCmd,sCmd] = cmd;
+    const TLc = Math.max(-1,Math.min(1,nL))*P.tMax, TRc = Math.max(-1,Math.min(1,nR))*P.tMax;
+    this.dTL=(TLc-this.TL)/P.thrTau; this.dTR=(TRc-this.TR)/P.thrTau;
+    const dc = Math.max(-P.rudMax,Math.min(P.rudMax,dCmd));
+    const dde = Math.max(-P.rudRate,Math.min(P.rudRate,(dc-de)/0.05));
+    const sc = Math.max(0,Math.min(1,sCmd));
+    const dsb = Math.max(-P.balRate,Math.min(P.balRate,(sc-sb)/0.2));
+    const cth=Math.cos(th), sth=Math.sin(th), cps=Math.cos(ps), sps=Math.sin(ps);
+    // 相对流速（机体系）
+    const ucb = cth*(cps*cur[0]+sps*cur[1]), vcb = -sps*cur[0]+cps*cur[1], wcb = sth*(cps*cur[0]+sps*cur[1]);
+    const ur=u-ucb, vr=v-vcb, wr=w-wcb;
+    const dragX=P.dqX*ur*Math.abs(ur)+P.dlX*ur, dragY=P.dqYZ*vr*Math.abs(vr)+P.dlYZ*vr;
+    const dragZ=P.dqYZ*wr*Math.abs(wr)+P.dlYZ*wr;
+    const dragQ=P.dqRot*q*Math.abs(q)+P.dlRot*q, dragR=P.dqRot*r*Math.abs(r)+P.dlRot*r;
+    const deEff=Math.max(-P.rudStall,Math.min(P.rudStall,de));
+    const fRud=P.rudK*deEff*ur*Math.abs(ur), mRud=fRud*(-P.rudX);
+    let fz=P.balF*(sb-0.5);
+    if (z<P.zSurf) fz += P.kWp*(P.zFloat-z)*(1-z/P.zSurf);
+    const mx=P.m+P.maX, myz=P.m+P.maYZ;
+    const du=(this.TL+this.TR-dragX-fz*(-sth))/mx + vr*r - wr*q;
+    const dv=(-dragY)/myz - ur*r;
+    const dw=(fz*cth-dragZ+fRud)/myz + ur*q;
+    const dq=(mRud-P.kPitch*sth-dragQ)/(P.Iy+P.maQ);
+    const dr=(P.thrY*(this.TL-this.TR)-dragR)/(P.Iz+P.maR);
+    return [cps*cth*u-sps*v+cps*sth*w, sps*cth*u+cps*v+sps*sth*w, -sth*u+cth*w,
+            q, r/Math.max(0.2,cth), du,dv,dw,dq,dr, dsb, dde];
+  }
+  step(cmd,cur,env,dt){
+    // RK2（中点法），dt=0.01 足够稳定
+    const s=this.s, k1=this.deriv(s,cmd,cur);
+    const s2=s.map((v,i)=>v+dt/2*k1[i]), k2=this.deriv(s2,cmd,cur);
+    for(let i=0;i<12;i++) s[i]+=dt*k2[i];
+    this.acc=[k2[5],k2[6],k2[7]];   // 机体系加速度（虚拟IMU用）
+    this.TL+=this.dTL*dt; this.TR+=this.dTR*dt;
+    // 边界
+    if(s[0]<0){s[0]=0;s[5]=Math.max(0,s[5]);} if(s[0]>env.len){s[0]=env.len;s[5]=Math.min(0,s[5]);}
+    if(s[1]<0){s[1]=0;s[6]=Math.max(0,s[6]);} if(s[1]>env.wid){s[1]=env.wid;s[6]=Math.min(0,s[6]);}
+    if(s[2]<0){s[2]=0;s[7]=Math.max(0,s[7]);} if(s[2]>env.dep){s[2]=env.dep;s[7]=Math.min(0,s[7]);}
+    this.t+=dt;
+  }
+}
+
+/* ---------- PID（移植 pid.py：环形误差 + 滑动积分窗） ---------- */
+class PID {
+  constructor(kp,ki,kd,sp,angular=false,lim=1){ Object.assign(this,{kp,ki,kd,sp,angular,lim});
+    this.buf=[]; this.acc=0; this.pe=null; this.df=0; }
+  reset(){ this.buf=[]; this.acc=0; this.pe=null; this.df=0; }
+  update(meas,dt){
+    let e=this.sp-meas;
+    if(this.angular) e=(e+Math.PI)%(2*Math.PI)-Math.PI, e=e<-Math.PI?e+2*Math.PI:e;
+    this.buf.push([dt,e*dt]); this.acc+=dt;
+    while(this.acc>5&&this.buf.length){ this.acc-=this.buf.shift()[0]; }
+    const integ=this.buf.reduce((a,b)=>a+b[1],0);
+    const de=this.pe===null?0:(e-this.pe)/dt; this.df+=0.5*(de-this.df); this.pe=e;
+    const o=this.kp*e+this.ki*integ+this.kd*this.df;
+    return Math.max(-this.lim,Math.min(this.lim,o));
+  }
+}
+
+/* ---------- 三维场景 ---------- */
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight); renderer.setPixelRatio(devicePixelRatio);
+renderer.shadowMap.enabled=true;
+document.getElementById('c3d').appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x0a1e30);
+scene.fog=new THREE.FogExp2(0x0a2438,0.035);
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.05,500);
+scene.add(new THREE.AmbientLight(0x88aacc,0.7));
+const sun=new THREE.DirectionalLight(0xffffff,1.0);
+sun.position.set(8,12,4); sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+scene.add(sun);
+
+/* NED(x前 y右 z下) → three.js(X=y, Y=-z, Z=x)，即 three 的 Y 向上 */
+const N2T=(x,y,z)=>new THREE.Vector3(y,-z,x);
+
+let envGroup=new THREE.Group(); scene.add(envGroup);
+let env=null, envKey='pool';
+
+function buildEnv(key){
+  envKey=key; env=ENVS[key];
+  scene.remove(envGroup); envGroup=new THREE.Group(); scene.add(envGroup);
+  const {len,wid,dep}=env;
+  // 池底
+  const bot=new THREE.Mesh(new THREE.PlaneGeometry(wid,len),
+    new THREE.MeshStandardMaterial({color:0x1c4a66,roughness:0.9}));
+  bot.rotation.x=-Math.PI/2; bot.position.set(wid/2,-dep,len/2); bot.receiveShadow=true;
+  envGroup.add(bot);
+  const grid=new THREE.GridHelper(Math.max(len,wid),Math.max(len,wid),0x2f6f94,0x235876);
+  grid.position.set(wid/2,-dep+0.01,len/2); envGroup.add(grid);
+  // 池壁（半透明）
+  const wallMat=new THREE.MeshStandardMaterial({color:0x2a6a8f,transparent:true,opacity:0.25,side:THREE.DoubleSide});
+  [[wid/2,len,0,0],[wid/2,len,wid,0],[0,wid,len/2,Math.PI/2],[len,wid,len/2,Math.PI/2]].forEach((w,i)=>{
+    const g=new THREE.PlaneGeometry(i<2?wid:wid===w[1]?wid:len, dep);
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(i<2?wid:len,dep),wallMat);
+    if(i<2){ m.position.set(wid/2,-dep/2,i===0?0:len); }
+    else { m.rotation.y=Math.PI/2; m.position.set(i===2?0:wid,-dep/2,len/2); }
+    envGroup.add(m);
+  });
+  // 视觉特征标志板（棋盘式随机图案，为阶段二 SLAM/视觉里程计提供纹理特征）
+  markerMeshes=[];
+  const addMk=mk=>{ mk.visible=UI.markers; envGroup.add(mk); markerMeshes.push(mk); };
+  const mkMat=s=>new THREE.MeshBasicMaterial({map:markerTexture(s),side:THREE.DoubleSide});
+  const nM=Math.max(2,Math.round(len/4));
+  for(let k=0;k<nM;k++){
+    [0,wid].forEach((xw,si)=>{
+      const mk=new THREE.Mesh(new THREE.PlaneGeometry(0.35,0.35),mkMat(k*37+si*101+len*7));
+      mk.rotation.y=Math.PI/2;
+      const dz=Math.min(dep-0.15, 0.25+((k+si)%3)*0.25);
+      mk.position.set(xw===0?0.02:wid-0.02, -dz, (k+0.5)*len/nM);
+      addMk(mk);
+    });
+  }
+  [0,len].forEach((zw,si)=>{
+    for(let k=0;k<2;k++){
+      const mk=new THREE.Mesh(new THREE.PlaneGeometry(0.35,0.35),mkMat(si*211+k*53+7));
+      mk.position.set((k+1)*wid/3, -Math.min(dep-0.15,0.3+k*0.3), zw===0?0.02:len-0.02);
+      addMk(mk);
+    }
+  });
+  // 水面
+  waterGeo=new THREE.PlaneGeometry(wid,len,32,32);
+  const water=new THREE.Mesh(waterGeo,new THREE.MeshStandardMaterial({
+    color:0x2e7fb8,transparent:true,opacity:0.45,metalness:0.3,roughness:0.15,side:THREE.DoubleSide}));
+  water.rotation.x=-Math.PI/2; water.position.set(wid/2,0,len/2); envGroup.add(water);
+  // 航点浮标
+  wpMarkers=[];
+  (env.waypoints||[]).forEach((wp,i)=>{
+    const buoy=new THREE.Group();
+    const ball=new THREE.Mesh(new THREE.SphereGeometry(0.12,16,12),
+      new THREE.MeshStandardMaterial({color:0xffd045,emissive:0x664400}));
+    buoy.add(ball);
+    const line=new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,wp[2]),
+      new THREE.MeshStandardMaterial({color:0xffe9a0,transparent:true,opacity:0.5}));
+    line.position.y=-wp[2]/2; buoy.add(line);
+    const tgt=new THREE.Mesh(new THREE.SphereGeometry(0.07,12,8),
+      new THREE.MeshStandardMaterial({color:0xff7043,emissive:0x552200}));
+    tgt.position.y=-wp[2]; buoy.add(tgt);
+    buoy.position.copy(N2T(wp[0],wp[1],0));
+    envGroup.add(buoy); wpMarkers.push(ball);
+  });
+  // 障碍立柱
+  (env.obstacles||[]).forEach(ob=>{
+    const cyl=new THREE.Mesh(new THREE.CylinderGeometry(ob[2],ob[2],dep,20),
+      new THREE.MeshStandardMaterial({color:0x8f5f3f,roughness:0.9}));
+    cyl.position.set(ob[1],-dep/2,ob[0]); cyl.castShadow=true; envGroup.add(cyl);
+  });
+  document.getElementById('envDesc').textContent=env.desc;
+}
+let waterGeo=null, wpMarkers=[], markerMeshes=[];
+function markerTexture(seed){
+  let a=(seed|0)+1; const rnd=()=>{ a=(a*1664525+1013904223)|0; return ((a>>>8)&0xffff)/65536; };
+  const cv=document.createElement('canvas'); cv.width=cv.height=64;
+  const c2=cv.getContext('2d');
+  c2.fillStyle='#f2f2f2'; c2.fillRect(0,0,64,64);
+  c2.fillStyle='#101418';
+  c2.fillRect(0,0,64,6); c2.fillRect(0,58,64,6); c2.fillRect(0,0,6,64); c2.fillRect(58,0,6,64);
+  for(let i=0;i<6;i++)for(let j=0;j<6;j++) if(rnd()>0.5) c2.fillRect(8+i*8,8+j*8,8,8);
+  return new THREE.CanvasTexture(cv);
+}
+
+/* ---------- 机器人模型 ---------- */
+function buildSubMesh(color=0xff8c42,finColor=0x16385c){
+  const g=new THREE.Group();
+  const hullMat=new THREE.MeshStandardMaterial({color,roughness:0.45,metalness:0.35});
+  const finMat=new THREE.MeshStandardMaterial({color:finColor,roughness:0.5,metalness:0.3});
+  const darkMat=new THREE.MeshStandardMaterial({color:0x2b3640,roughness:0.5,metalness:0.4});
+  const hull=new THREE.Mesh(new THREE.CylinderGeometry(P.D/2,P.D/2,P.L*0.78,24),hullMat);
+  hull.rotation.x=Math.PI/2; hull.castShadow=true; g.add(hull);
+  // 首部弹头（实体+双面渲染，任何视角不消失；透明罩改为浅色玻璃质感）
+  const nose=new THREE.Mesh(new THREE.SphereGeometry(P.D/2,20,14,0,Math.PI*2,0,Math.PI/2),
+    new THREE.MeshStandardMaterial({color:0x9fd4f0,roughness:0.15,metalness:0.1,side:THREE.DoubleSide}));
+  nose.rotation.x=Math.PI/2; nose.position.z=P.L*0.39; nose.castShadow=true; g.add(nose);
+  // 相机镜头窗
+  const lens=new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.015,0.006,14),
+    new THREE.MeshStandardMaterial({color:0x0d1c28,roughness:0.2,metalness:0.6}));
+  lens.rotation.x=Math.PI/2; lens.position.z=P.L*0.39+P.D/2-0.004; g.add(lens);
+  // 艉锥
+  const tail=new THREE.Mesh(new THREE.ConeGeometry(P.D/2,P.L*0.18,20),hullMat);
+  tail.rotation.x=-Math.PI/2; tail.position.z=-P.L*0.48; tail.castShadow=true; g.add(tail);
+  // 通气管（旗杆缩短为原 2/3）
+  const mast=new THREE.Mesh(new THREE.CylinderGeometry(0.008,0.008,0.147),
+    new THREE.MeshStandardMaterial({color:0xd0dae2}));
+  mast.position.set(0,0.093,P.L*0.1); g.add(mast);
+  const flag=new THREE.Mesh(new THREE.BoxGeometry(0.005,0.03,0.05),
+    new THREE.MeshStandardMaterial({color:0xff5544,emissive:0x441111,side:THREE.DoubleSide}));
+  flag.position.set(0,0.152,P.L*0.1-0.025); g.add(flag);  // 旗面拖在杆后（向艉飘）
+  // 双桨（导管螺旋桨：电机吊舱+支架+导管+桨毂锥+3片曲面桨叶）
+  const props=[];
+  const bladeMat=new THREE.MeshStandardMaterial({color:0xb8ccd8,roughness:0.35,metalness:0.55,side:THREE.DoubleSide});
+  const bladeShape=new THREE.Shape();       // 桨叶平面轮廓（根窄-中宽-圆头梢）
+  bladeShape.moveTo(0,0.004);
+  bladeShape.quadraticCurveTo(0.014,0.012,0.011,0.030);
+  bladeShape.quadraticCurveTo(0.004,0.035,-0.004,0.028);
+  bladeShape.quadraticCurveTo(-0.008,0.014,0,0.004);
+  const bladeGeo=new THREE.ExtrudeGeometry(bladeShape,{depth:0.0016,bevelEnabled:false});
+  [-1,1].forEach(side=>{
+    const pg=new THREE.Group();
+    // 电机吊舱
+    const pod=new THREE.Mesh(new THREE.CylinderGeometry(0.011,0.011,0.05,12),darkMat);
+    pod.rotation.x=Math.PI/2; pod.position.z=0.02; pod.castShadow=true; pg.add(pod);
+    // 横向支架连接艇体
+    const strut=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.006,0.02),darkMat);
+    strut.position.set(-side*0.03,0,0.02); pg.add(strut);
+    // 导管（环形护罩）
+    const duct=new THREE.Mesh(new THREE.CylinderGeometry(0.037,0.039,0.032,24,1,true),
+      new THREE.MeshStandardMaterial({color:0x24455e,roughness:0.6,metalness:0.3,side:THREE.DoubleSide}));
+    duct.rotation.x=Math.PI/2; duct.position.z=-0.012; pg.add(duct);
+    // 旋转部分：桨毂整流锥 + 3 桨叶（CW/CCW 对转 → 螺距反向）
+    const spin=new THREE.Group(); spin.position.z=-0.012;
+    const spinner=new THREE.Mesh(new THREE.ConeGeometry(0.008,0.02,12),darkMat);
+    spinner.rotation.x=-Math.PI/2; spinner.position.z=-0.008; spin.add(spinner);
+    const hub=new THREE.Mesh(new THREE.CylinderGeometry(0.009,0.009,0.014,12),darkMat);
+    hub.rotation.x=Math.PI/2; spin.add(hub);
+    for(let i=0;i<3;i++){
+      const holder=new THREE.Group(); holder.rotation.z=i*2*Math.PI/3;
+      const bl=new THREE.Mesh(bladeGeo,bladeMat);
+      bl.rotation.y=0.55*side;            // 桨叶螺距，左右对转
+      bl.position.y=0.006; holder.add(bl); spin.add(holder);
+    }
+    pg.add(spin);
+    pg.position.set(side*P.thrY,-0.01,-P.L*0.42); g.add(pg); props.push(spin);
+  });
+  // 尾舵（水平舵板）+ 固定垂直稳定鳍（深蓝尾翼）
+  const rud=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.006,0.055),finMat);
+  rud.position.set(0,0,-P.L*0.52); rud.castShadow=true; g.add(rud);
+  const fin=new THREE.Mesh(new THREE.BoxGeometry(0.005,0.05,0.05),finMat);
+  fin.position.set(0,0.045,-P.L*0.46); g.add(fin);
+  return {group:g, props, rudder:rud};
+}
+
+/* ---------- 机器人实例（支持多机） ---------- */
+let robots=[];   // {sim, mesh, trailLine, trailPts, color}
+const TRAIL_MAX=3000, TRAIL_SKIP=4;
+let frameCount=0;
+function spawnRobots(){
+  robots.forEach(r=>{ scene.remove(r.mesh.group); scene.remove(r.trailLine); });
+  robots=[];
+  const cols=[0xff8c42,0x4fbf7f,0x3f7fbf];   // 主机橙色外壳（尾翼统一深蓝），编队跟随机绿/蓝
+  for(let i=0;i<env.nRobots;i++){
+    const [sx,sy,sz,sp]=env.start;
+    // 跟随机直接生成在三角队形位（领航机后方 1m、两侧 ±1m）
+    const sim=new SubSim(i===0?sx:Math.max(0.3,sx-1.0),
+                         sy+(i===0?0:(i===1?-1.0:1.0)), sz, sp);
+    const mesh=buildSubMesh(cols[i%3]);
+    scene.add(mesh.group);
+    const tg=new THREE.BufferGeometry();
+    tg.setAttribute('position',new THREE.BufferAttribute(new Float32Array(TRAIL_MAX*3),3));
+    tg.setDrawRange(0,0);
+    const tl=new THREE.Line(tg,new THREE.LineBasicMaterial({color:cols[i%3],transparent:true,opacity:0.7}));
+    scene.add(tl);
+    robots.push({sim,mesh,trailLine:tl,trailN:0});
+  }
+}
+
+/* ---------- 控制状态 ---------- */
+const UI={ mode:'live', apHead:false, apDepth:false, mission:false,
+  camMode:'follow', spPsi:90*D2R, spZ:0.8, replaySpeed:1, pip:false,
+  markers:true, sens:{imu:false,dep:false} };
+const keys={};
+addEventListener('keydown',e=>{ keys[e.key.toLowerCase()]=true; if(e.key===' ')e.preventDefault(); });
+addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; });
+
+const pidPsi=new PID(2.0,0.1,0.8,UI.spPsi,true,0.8);
+const pidZ=new PID(3.0,0.15,4.0,UI.spZ,false,0.5);
+let manual={s:0.5};
+let wpIndex=0;
+
+/* ---------- 手动输入：虚拟摇杆 ----------
+   键盘按住时目标值渐进推满、松开自动回中（模拟摇杆行程与回弹）；
+   手柄接入时直读模拟量。差速混控与按键映射参照 学森挑战营
+   2025Summer/PadControl.py 与 XBoxClient.py */
+const DZ=0.18;                            // 摇杆死区（学森营用 0.2/0.25）
+const vstick={surge:0,turn:0,rud:0};      // 虚拟摇杆当前值 -1..1
+let inputT={surge:0,turn:0,rud:0,ball:0,analog:false};
+let gpConnected=false, gpPrev=[];
+function ramp(v,tgt,rate,dt){ const d=tgt-v,m=rate*dt; return v+Math.max(-m,Math.min(m,d)); }
+function fullStop(){
+  vstick.surge=vstick.turn=vstick.rud=0; manual.s=0.5;
+  if(UI.apHead)$('apHead').click(); if(UI.apDepth)$('apDepth').click();
+}
+function readInputTargets(){
+  const gps=navigator.getGamepads?navigator.getGamepads():[];
+  let gp=null; for(const g of gps){ if(g&&g.connected){gp=g;break;} }
+  gpConnected=!!gp;
+  if(gp){
+    const ax=i=>Math.abs(gp.axes[i]||0)>DZ?gp.axes[i]:0;
+    const bv=i=>gp.buttons[i]?gp.buttons[i].value:0;
+    const pr=i=>!!(gp.buttons[i]&&gp.buttons[i].pressed);
+    if(pr(0)&&!gpPrev[0]) fullStop();                 // A 急停
+    if(pr(4)&&!gpPrev[4]) $('apDepth').click();       // LB 定深
+    if(pr(5)&&!gpPrev[5]) $('apHead').click();        // RB 定航向
+    if(pr(3)&&!gpPrev[3]) $('apMission').click();     // Y 任务
+    gpPrev=gp.buttons.map(b=>b.pressed);
+    return {surge:-ax(1),turn:ax(0),rud:-ax(3),ball:bv(7)-bv(6),analog:true};
+  }
+  let f=0,t=0,rd=0,ball=0;
+  if(keys['w'])f+=1; if(keys['s'])f-=1;
+  if(keys['d'])t+=1; if(keys['a'])t-=1;
+  if(keys['r'])rd+=1; if(keys['f'])rd-=1;
+  if(keys['q'])ball+=1; if(keys['e'])ball-=1;
+  if(keys[' ']) fullStop();
+  return {surge:f,turn:t,rud:rd,ball,analog:false};
+}
+
+/* ---------- 巡航算法接口（对比择优） ----------
+   registerController({id, name,
+     reset(env),                                    // 任务启动/复位时调用
+     update(r, idx, env, dt) -> [nL,nR,delta,sCmd]  // 每仿真步调用；idx=0 领航/单机
+   })
+   注册后自动出现在「巡航算法」下拉框。页面暴露 window.JIAOREN =
+   {registerController, reportXTE, P, ENVS}，外部算法脚本可直接挂载对比。
+   横向偏差经 reportXTE(e) 上报后 HUD 显示均值，用作择优指标 */
+const Controllers={list:{},active:null};
+function registerController(c){
+  Controllers.list[c.id]=c;
+  const sel=document.getElementById('algSel'), op=document.createElement('option');
+  op.value=c.id; op.textContent=c.name; sel.appendChild(op);
+  if(!Controllers.active){ Controllers.active=c.id; sel.value=c.id; }
+}
+let mStats=null;
+function statReset(){ mStats={sum:0,n:0,zsum:0,zn:0}; }
+function reportXTE(e){ if(mStats){ mStats.sum+=Math.abs(e); mStats.n++; } }
+window.JIAOREN={registerController,reportXTE,P,ENVS};
+
+/* LOS 视线法制导：返回期望航向与横向偏差 */
+function losHeading(sim,wpA,wpB){
+  const [x,y]=sim.s;
+  const dx=wpB[0]-wpA[0], dy=wpB[1]-wpA[1];
+  const pathAng=Math.atan2(dy,dx), Lp=Math.hypot(dx,dy)||1e-6;
+  // 横向偏差 e = -(x-xA)·sin(ψp) + (y-yA)·cos(ψp)（Fossen 标准定义）
+  const ex=x-wpA[0], ey=y-wpA[1];
+  const e=(ey*dx-ex*dy)/Lp;
+  const lookahead=1.2;                   // 前视距离（约2倍艇长）
+  return {psi:pathAng+Math.atan2(-e,lookahead), e};
+}
+
+/* 内置基准算法：LOS + PID（后续新算法与它同台对比） */
+registerController({
+  id:'los_pid', name:'LOS 视线法 + PID（基准）',
+  reset(){ wpIndex=0; pidPsi.reset(); pidZ.reset(); },
+  update(r,idx,env,dt){
+    const sim=r.sim, wps=env.waypoints;
+    if(!wps||!wps.length) return [0,0,0,0.5];
+    if(idx===0){ // 领航机 / 单机
+      const wp=wps[wpIndex%wps.length];
+      const d=Math.hypot(wp[0]-sim.s[0],wp[1]-sim.s[1]);
+      if(d<0.45){ wpIndex++; pidZ.reset(); }
+      const wpn=wps[wpIndex%wps.length];
+      const prv=wpIndex===0?[sim.s[0],sim.s[1]]:wps[(wpIndex-1)%wps.length];
+      const los=losHeading(sim,prv,wpn);
+      reportXTE(los.e);
+      pidPsi.sp=los.psi;
+      pidZ.sp=wpn[2];
+      const turn=pidPsi.update(sim.s[4],dt);
+      const sCmd=0.5+pidZ.update(sim.s[2],dt);
+      const base=env.nRobots>1?0.45:0.55;   // 编队时领航机减速，便于跟随机就位
+      return [base+turn,base-turn,0,sCmd];
+    }
+    // 跟随机：领航-跟随三角队形（阶段三将替换为一致性协议）
+    const ld=robots[0].sim, off=idx===1?[-1.0,-1.0]:[-1.0,1.0]; // 机体系偏置(后,侧)
+    const c=Math.cos(ld.s[4]), s=Math.sin(ld.s[4]);
+    const tx=ld.s[0]+off[0]*c-off[1]*s, ty=ld.s[1]+off[0]*s+off[1]*c;
+    const dx=tx-r.sim.s[0], dy=ty-r.sim.s[1], dist=Math.hypot(dx,dy);
+    const hd=Math.atan2(dy,dx);
+    let e=(hd-r.sim.s[4]+Math.PI)%(2*Math.PI)-Math.PI; if(e<-Math.PI)e+=2*Math.PI;
+    const base=Math.min(0.9,0.55+0.5*(dist-0.0));
+    const turn=Math.max(-0.7,Math.min(0.7,1.8*e));
+    if(!r.pidZ){ r.pidZ=new PID(3.0,0.15,4.0,ld.s[2],false,0.5); }
+    r.pidZ.sp=ld.s[2];
+    const sCmd=0.5+r.pidZ.update(r.sim.s[2],dt);
+    return [Math.max(0,base*(dist>0.3?1:0)+turn), Math.max(0,base*(dist>0.3?1:0)-turn), 0, sCmd];
+  }
+});
+
+/* ---------- 虚拟传感器（SLAM/感知套件：JY901 IMU / MS5837 深度计 / 艏部单目相机） ----------
+   算法应尽量只调传感器（含噪声+采样率限制），不偷看真值 → 移植实物无缝。
+   JS: JIAOREN.sensors.imu/depth/camera(robotIdx)
+   Python: read_imu()/read_depth()/read_camera() */
+function gauss(sg){ return sg*Math.sqrt(-2*Math.log(Math.random()+1e-12))*Math.cos(6.2832*Math.random()); }
+const obCam=new THREE.PerspectiveCamera(70,4/3,0.02,60);
+const camRT=new THREE.WebGLRenderTarget(160,120);
+function poseOnboardCam(i){
+  const r=robots[i]||robots[0]; if(!r) return null;
+  const g=r.mesh.group; g.updateMatrixWorld();
+  obCam.position.copy(g.localToWorld(new THREE.Vector3(0,0,P.L*0.39+P.D/2+0.01)));  // 镜头窗外侧，避免看到自身
+  obCam.quaternion.copy(g.quaternion); obCam.rotateY(Math.PI);   // three 相机朝 -Z，翻转对准艇艏
+  return r;
+}
+function sensCache(i,key,hz,fn){
+  const r=robots[i]||robots[0]; if(!r) return null;
+  r.sens=r.sens||{};
+  const c=r.sens[key];
+  if(c&&r.sim.t>=c.t&&(r.sim.t-c.t)<1/hz) return c.v;
+  const v=fn(r); r.sens[key]={t:r.sim.t,v}; return v;
+}
+const SENS={
+  /* JY901：欧拉角[°] 角速度[°/s] 比力[m/s²]（静止时约 [9.81sinθ, 0, -9.81cosθ]），100Hz */
+  imu(i=0){ return sensCache(i,'imu',100,r=>{
+    const s=r.sim.s, a=r.sim.acc||[0,0,0], g0=9.81;
+    return { roll:gauss(0.2), pitch:s[3]*R2D+gauss(0.2),
+      yaw:(((s[4]*R2D)%360+360)%360)+gauss(0.5),
+      gyro:[gauss(0.3), s[8]*R2D+gauss(0.3), s[9]*R2D+gauss(0.3)],
+      acc:[a[0]+g0*Math.sin(s[3])+gauss(0.02), a[1]+gauss(0.02), a[2]-g0*Math.cos(s[3])+gauss(0.02)],
+      t:r.sim.t }; }); },
+  /* MS5837：深度[m]（σ≈3mm）+ 绝对压力[kPa]，25Hz */
+  depth(i=0){ return sensCache(i,'dep',25,r=>{
+    const z=Math.max(0,r.sim.s[2])+gauss(0.003);
+    return {depth:z, pressure:101.325+9.81*z, t:r.sim.t}; }); },
+  /* 艏部单目相机：160×120 灰度帧（Uint8Array，已翻正），≤20Hz（SLAM/视觉算法接入点） */
+  camera(i=0){ return sensCache(i,'cam',20,r=>{
+    if(!poseOnboardCam(i)) return null;
+    const fd=scene.fog.density;
+    scene.fog.density=obCam.position.y<0?0.12:0.035;
+    renderer.setRenderTarget(camRT); renderer.render(scene,obCam); renderer.setRenderTarget(null);
+    scene.fog.density=fd;
+    const buf=new Uint8Array(160*120*4);
+    renderer.readRenderTargetPixels(camRT,0,0,160,120,buf);
+    const g=new Uint8Array(160*120);
+    for(let yy=0;yy<120;yy++)for(let xx=0;xx<160;xx++){
+      const si=((119-yy)*160+xx)*4;
+      g[yy*160+xx]=(buf[si]*0.299+buf[si+1]*0.587+buf[si+2]*0.114)|0;
+    }
+    return {w:160,h:120,gray:g,t:r.sim.t}; }); }
+};
+JIAOREN.sensors=SENS;
+
+/* ---------- Python 算法直载（Pyodide） ----------
+   队友无需改网页：写一个 .py（约定见 仿真\算法示例_LOS.py），点「载入 Python 算法」
+   选中即注册进下拉框，可多选、可切换。Python 约定：
+     NAME = "显示名"                        （可选）
+     def reset(env): ...                    （可选）
+     def update(state, env, dt): return (nL, nR, delta_rad, s_cmd)   （必须）
+   state/env 为 dict；可调用 report_xte(e) 上报横向偏差 */
+let pyodide=null, pyLoading=null;
+function ensurePyodide(){
+  if(pyodide) return Promise.resolve(pyodide);
+  if(!pyLoading){
+    document.getElementById('pyStatus').textContent='⏳ 正在加载 Python 引擎（Pyodide，首次需联网下载约20MB）…';
+    pyLoading=new Promise((res,rej)=>{
+      const sc=document.createElement('script');
+      sc.src='https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js';
+      sc.onload=async()=>{ try{ pyodide=await loadPyodide(); res(pyodide); }catch(e){ rej(e); } };
+      sc.onerror=()=>rej(new Error('Pyodide 下载失败，请检查网络'));
+      document.head.appendChild(sc);
+    });
+  }
+  return pyLoading;
+}
+function pyStateDict(r){
+  const s=r.sim.s;
+  return {x:s[0],y:s[1],z:s[2],theta:s[3],psi:s[4],u:s[5],v:s[6],w:s[7],
+          q:s[8],r:s[9],s_bal:s[10],delta:s[11],t:r.sim.t,TL:r.sim.TL,TR:r.sim.TR};
+}
+function pyEnvDict(envR,idx){
+  const ld=(idx>0&&robots[0])?robots[0].sim.s:null;
+  return {waypoints:envR.waypoints||[], length:envR.len, width:envR.wid, depth:envR.dep,
+          n_robots:envR.nRobots, idx,
+          leader:ld?{x:ld[0],y:ld[1],z:ld[2],psi:ld[4]}:null};
+}
+async function registerPyController(fname,code){
+  await ensurePyodide();
+  const ns=pyodide.toPy({});
+  ns.set('report_xte',e=>reportXTE(e));
+  ns.set('set_wp',i=>{ wpIndex=i; });   // 同步 HUD 航点进度显示
+  // 虚拟传感器（默认读本机 idx 0；编队跟随机传入自己的 idx）
+  ns.set('read_imu',i=>pyodide.toPy(SENS.imu(i??0)));
+  ns.set('read_depth',i=>pyodide.toPy(SENS.depth(i??0)));
+  ns.set('read_camera',i=>{ const c=SENS.camera(i??0);
+    return c?pyodide.toPy({w:c.w,h:c.h,pixels:Array.from(c.gray)}):null; });
+  pyodide.runPython(code,{globals:ns});
+  const upd=ns.get('update');
+  if(!upd) throw new Error(fname+' 中缺少 update(state, env, dt) 函数');
+  const rst=ns.get('reset');
+  const dispName='🐍 '+(ns.get('NAME')||fname.replace(/\.py$/i,''));
+  registerController({
+    id:'py_'+fname+'_'+Date.now(), name:dispName,
+    reset(envR){
+      if(!rst) return;
+      const ev=pyodide.toPy(pyEnvDict(envR,0));
+      try{ rst(ev); } finally{ ev.destroy(); }
+    },
+    update(r,idx,envR,dt){
+      const st=pyodide.toPy(pyStateDict(r)), ev=pyodide.toPy(pyEnvDict(envR,idx));
+      let res;
+      try{ res=upd(st,ev,dt); } finally{ st.destroy(); ev.destroy(); }
+      const out=res.toJs(); if(res.destroy)res.destroy();
+      return [out[0]||0,out[1]||0,out[2]||0,out[3]??0.5];
+    }
+  });
+  return dispName;
+}
+document.getElementById('btnPy').onclick=()=>document.getElementById('pyfile').click();
+document.getElementById('pyfile').addEventListener('change',async ev=>{
+  const files=[...ev.target.files]; if(!files.length) return;
+  const stat=document.getElementById('pyStatus');
+  for(const f of files){
+    try{
+      const name=await registerPyController(f.name,await f.text());
+      stat.textContent='✅ 已载入 '+name+'（在下拉框切换）';
+      document.getElementById('algSel').value=Object.keys(Controllers.list).pop();
+      Controllers.active=document.getElementById('algSel').value;
+    }catch(err){
+      stat.textContent='❌ '+f.name+' 载入失败：'+err.message;
+      console.error(err);
+    }
+  }
+  ev.target.value='';
+});
+
+/* ---------- 蛟人核心（JiaoRen 结构算法包）直载 ----------
+   包 = 蛟人核心\sim_entry.py + Lib\*.py（与装机 JiaoRen.py 共用同一 Lib）。
+   http 打开（启动演示.bat）→ 自动 fetch；file:// 双击打开 → 选文件夹。 */
+document.getElementById('btnEngine').onclick=()=>{
+  if(window.parent!==window){ window.parent.postMessage({dcNav:'cruise'},'*'); }
+  else window.open('cruise.html'+(location.search||''));
+};
+const CORE_FILES=['sim_entry.py','Lib/__init__.py','Lib/Params.py','Lib/StateEstimation.py',
+  'Lib/Vision.py','Lib/Guidance.py','Lib/Control.py','Lib/Sensors.py','Lib/Actuators.py'];
+async function bootCore(files){                     // files: Map(相对路径→源码)
+  const stat=document.getElementById('pyStatus');
+  await ensurePyodide();
+  try{ pyodide.FS.mkdirTree('/jrcore/Lib'); }catch(e){}
+  for(const [rel,src] of files) pyodide.FS.writeFile('/jrcore/'+rel, src);
+  pyodide.runPython("import sys\nif '/jrcore' not in sys.path: sys.path.insert(0,'/jrcore')\n"+
+    "for m in [k for k in list(sys.modules) if k=='sim_entry' or k.startswith('Lib')]:\n    del sys.modules[m]");
+  const name=await registerPyController('蛟人核心', files.get('sim_entry.py'));
+  stat.textContent='✅ 已载入 '+name+'（'+files.size+' 个 .py，装机同款）';
+  document.getElementById('algSel').value=Object.keys(Controllers.list).pop();
+  Controllers.active=document.getElementById('algSel').value;
+}
+document.getElementById('btnCore').onclick=async()=>{
+  const stat=document.getElementById('pyStatus');
+  if(location.protocol.startsWith('http')){
+    try{
+      stat.textContent='⏳ 正在从 蛟人核心\\ 读取算法包…';
+      const files=new Map();
+      for(const f of CORE_FILES){
+        const r=await fetch('core/'+f,{cache:'no-store'});
+        if(!r.ok) throw new Error(f+' HTTP '+r.status);
+        files.set(f, await r.text());
+      }
+      await bootCore(files);
+    }catch(err){ stat.textContent='❌ 蛟人核心载入失败：'+err.message; console.error(err); }
+  }else{
+    stat.textContent='请在弹窗中选择「蛟人核心」文件夹（或改用 启动演示.bat 打开可自动加载）';
+    document.getElementById('coreDir').click();
+  }
+};
+document.getElementById('coreDir').addEventListener('change',async ev=>{
+  const stat=document.getElementById('pyStatus');
+  const all=[...ev.target.files].filter(f=>f.name.endsWith('.py'));
+  const entry=all.find(f=>f.name==='sim_entry.py');
+  if(!entry){ stat.textContent='❌ 所选文件夹里没有 sim_entry.py —— 请选择"蛟人核心"文件夹'; return; }
+  const prefix=(entry.webkitRelativePath||entry.name).replace(/sim_entry\.py$/,'');
+  const files=new Map();
+  for(const f of all){
+    const rel=(f.webkitRelativePath||f.name).slice(prefix.length);
+    if(rel==='sim_entry.py'||rel.startsWith('Lib/')) files.set(rel, await f.text());
+  }
+  try{ await bootCore(files); }
+  catch(err){ stat.textContent='❌ 蛟人核心载入失败：'+err.message; console.error(err); }
+  ev.target.value='';
+});
+
+function liveCommand(r,idx){
+  if(UI.mission){
+    const c=Controllers.list[Controllers.active];
+    return c?c.update(r,idx,env,0.01):[0,0,0,0.5];
+  }
+  if(idx>0) return [0,0,0,0.5];
+  const dt=0.01, it=inputT;
+  if(it.analog){ vstick.surge=it.surge; vstick.turn=it.turn; vstick.rud=it.rud; }
+  else {
+    vstick.surge=ramp(vstick.surge,it.surge, it.surge!==0?2.2:3.0, dt);
+    vstick.turn =ramp(vstick.turn, it.turn,  it.turn !==0?2.8:4.0, dt);
+    vstick.rud  =ramp(vstick.rud,  it.rud,   it.rud  !==0?1.6:2.4, dt);
+  }
+  manual.s=Math.max(0,Math.min(1,manual.s+it.ball*0.8*dt));   // 注射器：保持型
+  // 差速混控（参照 PadControl：转向时外桨满油、内桨按比例，合成超限则归一）
+  let nL=vstick.surge+0.55*vstick.turn, nR=vstick.surge-0.55*vstick.turn;
+  const mx=Math.max(1,Math.abs(nL),Math.abs(nR)); nL=nL/mx*0.85; nR=nR/mx*0.85;
+  let dC=vstick.rud*P.rudMax, sC=manual.s;
+  if(UI.apHead){ const turn=pidPsi.update(r.sim.s[4],dt); nL=0.55+turn; nR=0.55-turn; }
+  if(UI.apDepth){ sC=0.5+pidZ.update(r.sim.s[2],dt); }
+  return [nL,nR,dC,sC];
+}
+
+/* ---------- 回放 ---------- */
+let replay={data:null,idx:0,playing:false};
+document.getElementById('jfile').addEventListener('change',ev=>{
+  const f=ev.target.files[0]; if(!f)return;
+  f.text().then(txt=>{
+    replay.data=JSON.parse(txt); replay.idx=0; replay.playing=false;
+    const pl=replay.data.pool;
+    // 用回放文件里的水池尺寸重建环境
+    ENVS._replay={len:pl.length,wid:pl.width,dep:pl.depth,desc:'回放：'+(f.name),start:[1,1,0.3,0],waypoints:null,obstacles:[],nRobots:1};
+    buildEnv('_replay'); spawnRobots();
+  });
+});
+document.getElementById('rpPlay').onclick=()=>{ if(replay.data){replay.playing=!replay.playing;
+  document.getElementById('rpPlay').textContent=replay.playing?'⏸ 暂停':'▶ 播放';} };
+document.getElementById('rpX').onclick=e=>{
+  UI.replaySpeed=UI.replaySpeed>=8?1:UI.replaySpeed*2; e.target.textContent=UI.replaySpeed+'×'; };
+
+/* ---------- 相机 ---------- */
+let orbit={az:2.4, el:0.45, dist:5, target:new THREE.Vector3(2,0,3), drag:false, px:0, py:0};
+renderer.domElement.addEventListener('mousedown',e=>{orbit.drag=true;orbit.px=e.clientX;orbit.py=e.clientY;});
+addEventListener('mouseup',()=>orbit.drag=false);
+addEventListener('mousemove',e=>{
+  if(!orbit.drag)return;
+  orbit.az-=(e.clientX-orbit.px)*0.006; orbit.el=Math.max(0.05,Math.min(1.5,orbit.el+(e.clientY-orbit.py)*0.004));
+  orbit.px=e.clientX; orbit.py=e.clientY;
+});
+renderer.domElement.addEventListener('wheel',e=>{
+  orbit.dist=Math.max(1,Math.min(60,orbit.dist*(1+e.deltaY*0.001)));
+});
+function updateCamera(){
+  const r0=robots[0];
+  const p=r0?N2T(r0.sim.s[0],r0.sim.s[1],r0.sim.s[2]):new THREE.Vector3(2,0,3);
+  if(UI.camMode==='follow'){ orbit.target.lerp(p,0.08); }
+  else if(UI.camMode==='top'){ orbit.target.lerp(new THREE.Vector3(env.wid/2,0,env.len/2),0.05); }
+  const t=orbit.target;
+  if(UI.camMode==='top'){
+    camera.position.lerp(new THREE.Vector3(t.x,Math.max(env.len,env.wid)*0.9,t.z+0.01),0.06);
+    camera.lookAt(t);
+  } else {
+    const d=orbit.dist;
+    camera.position.set(t.x+d*Math.cos(orbit.el)*Math.cos(orbit.az),
+                        t.y+d*Math.sin(orbit.el),
+                        t.z+d*Math.cos(orbit.el)*Math.sin(orbit.az));
+    camera.lookAt(t);
+  }
+  // 水下时加蓝雾
+  scene.fog.density=camera.position.y<0?0.12:0.035;
+}
+
+/* ---------- UI 绑定 ---------- */
+const $=id=>document.getElementById(id);
+$('envSel').onchange=e=>{ buildEnv(e.target.value); spawnRobots(); wpIndex=0; UI.mission=false;
+  $('apMission').classList.remove('on'); $('apMission').textContent='▶ 执行本环境任务（LOS/编队）'; };
+$('curSl').oninput=e=>{ $('curV').textContent=(+e.target.value).toFixed(2)+' m/s'; };
+$('mLive').onclick=()=>{ UI.mode='live'; $('mLive').classList.add('on'); $('mReplay').classList.remove('on');
+  $('liveBox').style.display=''; $('replayBox').style.display='none'; buildEnv(envKey==='_replay'?'pool':envKey); spawnRobots(); };
+$('mReplay').onclick=()=>{ UI.mode='replay'; $('mReplay').classList.add('on'); $('mLive').classList.remove('on');
+  $('liveBox').style.display='none'; $('replayBox').style.display=''; };
+$('apHead').onclick=e=>{ UI.apHead=!UI.apHead; e.target.classList.toggle('on'); pidPsi.reset(); pidPsi.sp=UI.spPsi; };
+$('apDepth').onclick=e=>{ UI.apDepth=!UI.apDepth; e.target.classList.toggle('on'); pidZ.reset(); pidZ.sp=UI.spZ; };
+$('apMission').onclick=e=>{ UI.mission=!UI.mission; e.target.classList.toggle('on');
+  e.target.textContent=UI.mission?'⏹ 停止任务':'▶ 执行本环境任务（LOS/编队）';
+  wpIndex=0; statReset();
+  const c=Controllers.list[Controllers.active]; if(c&&c.reset)c.reset(env); };
+$('algSel').onchange=e=>{ Controllers.active=e.target.value; wpIndex=0; statReset();
+  const c=Controllers.list[Controllers.active]; if(c&&c.reset)c.reset(env); };
+$('spPsi').oninput=e=>{ UI.spPsi=e.target.value*D2R; pidPsi.sp=UI.spPsi; $('spPsiV').textContent=e.target.value+'°'; };
+$('spZ').oninput=e=>{ UI.spZ=+e.target.value; pidZ.sp=UI.spZ; $('spZV').textContent=(+e.target.value).toFixed(2)+' m'; };
+$('btnReset').onclick=()=>{ spawnRobots(); wpIndex=0; manual={s:0.5};
+  vstick.surge=vstick.turn=vstick.rud=0; };
+$('pipBtn').onclick=e=>{ UI.pip=!UI.pip; e.target.classList.toggle('on');
+  $('pipBox').style.display=UI.pip?'block':'none'; };
+[['sImu','imu'],['sDep','dep']].forEach(([id,k])=>{
+  $(id).onclick=e=>{ UI.sens[k]=!UI.sens[k]; e.target.classList.toggle('on'); }; });
+$('mkBtn').onclick=e=>{ UI.markers=!UI.markers; e.target.classList.toggle('on');
+  e.target.textContent=UI.markers?'🏁 特征标志板：显示中':'🏁 特征标志板：已隐藏';
+  markerMeshes.forEach(m=>m.visible=UI.markers); };
+$('helpBtn').onclick=()=>{ const p=$('helpPanel');
+  p.style.display=p.style.display==='block'?'none':'block';
+  $('helpBtn').classList.toggle('on'); };
+['camFollow','camTop','camFree'].forEach(id=>{
+  $(id).onclick=()=>{ UI.camMode=id.replace('cam','').toLowerCase();
+    ['camFollow','camTop','camFree'].forEach(j=>$(j).classList.toggle('on',j===id)); };
+});
+
+/* ---------- 主循环 ---------- */
+let lastT=performance.now(), simAcc=0, wave=0;
+function frame(now){
+  requestAnimationFrame(frame);
+  frameCount++;
+  const dtReal=Math.min(0.05,(now-lastT)/1000); lastT=now;
+  const cur=[0,+$('curSl').value];
+
+  if(UI.mode==='live'){
+    inputT=readInputTargets();
+    simAcc+=dtReal;
+    while(simAcc>0.01){
+      robots.forEach((r,i)=>r.sim.step(liveCommand(r,i),cur,env,0.01));
+      simAcc-=0.01;
+    }
+  } else if(replay.data&&replay.playing){
+    replay.idx=Math.min(replay.data.log.t.length-1, replay.idx+UI.replaySpeed);
+    const L=replay.data.log, i=Math.floor(replay.idx), r0=robots[0];
+    if(r0){ r0.sim.s[0]=L.x[i]; r0.sim.s[1]=L.y[i]; r0.sim.s[2]=L.z[i];
+      r0.sim.s[3]=L.theta[i]; r0.sim.s[4]=L.psi[i]; r0.sim.s[10]=L.s_bal[i]; r0.sim.s[11]=L.delta[i];
+      r0.sim.s[5]=L.u[i]; r0.sim.TL=L.TL[i]; r0.sim.TR=L.TR[i]; r0.sim.t=L.t[i]; }
+  }
+
+  // 更新机器人姿态与尾迹
+  robots.forEach(r=>{
+    const s=r.sim.s, g=r.mesh.group;
+    g.position.copy(N2T(s[0],s[1],s[2]));
+    g.rotation.set(0,0,0);
+    g.rotateY(s[4]); g.rotateX(-s[3]);    // 航向 + 俯仰（NED→three：ψ 正向对应绕 Y 正转）
+    r.mesh.props[0].rotation.z+=r.sim.TL*0.5; r.mesh.props[1].rotation.z-=r.sim.TR*0.5;
+    r.mesh.rudder.rotation.x=s[11];
+    if((UI.mode==='live'||replay.playing)&&frameCount%TRAIL_SKIP===0){
+      const attr=r.trailLine.geometry.attributes.position;
+      if(r.trailN>=TRAIL_MAX){    // 满了就丢弃前一半，保留近段轨迹
+        for(let i=0;i<TRAIL_MAX/2;i++)
+          attr.setXYZ(i,attr.getX(i+TRAIL_MAX/2),attr.getY(i+TRAIL_MAX/2),attr.getZ(i+TRAIL_MAX/2));
+        r.trailN=TRAIL_MAX/2;
+      }
+      const p=N2T(s[0],s[1],s[2]);
+      attr.setXYZ(r.trailN,p.x,p.y,p.z); r.trailN++;
+      r.trailLine.geometry.setDrawRange(0,r.trailN); attr.needsUpdate=true;
+    }
+  });
+
+  // 水面微波
+  wave+=dtReal;
+  if(waterGeo){
+    const pos=waterGeo.attributes.position;
+    for(let i=0;i<pos.count;i++){
+      pos.setZ(i,0.015*Math.sin(pos.getX(i)*2+wave*1.5)*Math.cos(pos.getY(i)*1.5+wave));
+    }
+    pos.needsUpdate=true;
+  }
+  // 航点高亮
+  if(env.waypoints){ wpMarkers.forEach((m,i)=>{
+    m.material.color.setHex(i===wpIndex%env.waypoints.length&&UI.mission?0xff4040:0xffd045); }); }
+
+  // 深度跟踪误差统计（对当前航点目标深度，与平均横偏并列的择优指标）
+  if(UI.mission&&env.waypoints&&mStats&&robots[0]){
+    const wz=env.waypoints[wpIndex%env.waypoints.length][2];
+    mStats.zsum+=Math.abs(robots[0].sim.s[2]-wz); mStats.zn++;
+  }
+
+  // HUD
+  const r0=robots[0];
+  if(r0){ const s=r0.sim.s;
+    $('h_z').textContent=s[2].toFixed(2)+' m';
+    $('h_w').textContent=(-Math.sin(s[3])*s[5]+Math.cos(s[3])*s[7]).toFixed(2)+' m/s';
+    let deg=((s[4]*R2D)%360+360)%360;
+    $('h_psi').textContent=deg.toFixed(0)+'°';
+    $('h_th').textContent=(s[3]*R2D).toFixed(1)+'°';
+    $('h_u').textContent=s[5].toFixed(2)+' m/s';
+    $('h_s').textContent=(s[10]*100).toFixed(0)+'%';
+    $('b_s').style.width=(s[10]*100)+'%';
+    const fb=P.balF*(s[10]-0.5);                       // 注射器净浮力（NED，+向下=下潜）
+    $('h_fb').textContent=(fb>=0?'+':'')+fb.toFixed(2)+' N';
+    $('h_t').textContent=r0.sim.t.toFixed(1)+' s';
+    $('b_tl').style.width=(50+r0.sim.TL/P.tMax*50)+'%';
+    $('b_tr').style.width=(50+r0.sim.TR/P.tMax*50)+'%';
+    $('h_task').textContent=UI.mode==='replay'?'算法分析':(UI.mission?'自主任务':(UI.apHead||UI.apDepth?'自动驾驶':'手动'));
+    $('h_wp').textContent=(UI.mission&&env.waypoints)?((wpIndex%env.waypoints.length)+1)+' / '+env.waypoints.length:'–';
+    $('h_xte').textContent=(UI.mission&&mStats&&mStats.n)?(mStats.sum/mStats.n).toFixed(2)+' m':'–';
+    $('h_zerr').textContent=(UI.mission&&mStats&&mStats.zn)?(mStats.zsum/mStats.zn).toFixed(2)+' m':'–';
+    $('h_gp').textContent=gpConnected?'🎮 已连接':'未连接';
+    // 自主航行时精简 HUD：只显示状态 + 航线（隐藏手动相关行）；航线行仅任务时显示
+    const autoNav=UI.mission||UI.apHead||UI.apDepth||UI.mode==='replay';
+    $('row_gp').style.display=(gpConnected||!autoNav)?'':'none';
+    ['row_wp_r','row_xte_r','row_zerr_r'].forEach(id=>$(id).style.display=UI.mission?'':'none');
+  }
+  // 传感器读数面板
+  if(r0&&(UI.sens.imu||UI.sens.dep)){
+    let tx='';
+    if(UI.sens.imu){ const m=SENS.imu(0);
+      if(m) tx+='IMU  俯仰 '+m.pitch.toFixed(1)+'°  航向 '+m.yaw.toFixed(1)+'°\n'
+        +'  角速度 q '+m.gyro[1].toFixed(1)+'  r '+m.gyro[2].toFixed(1)+' °/s\n'
+        +'  比力 ['+m.acc.map(v=>v.toFixed(2)).join(', ')+'] m/s²\n'; }
+    if(UI.sens.dep){ const d=SENS.depth(0);
+      if(d) tx+='深度计  '+d.depth.toFixed(3)+' m   '+d.pressure.toFixed(1)+' kPa\n'; }
+    $('sensOut').textContent=tx;
+  } else $('sensOut').textContent='';
+  updateCamera();
+  renderer.render(scene,camera);
+  // 机载相机画中画
+  if(UI.pip&&robots[0]&&poseOnboardCam(0)){
+    const fd=scene.fog.density;
+    scene.fog.density=obCam.position.y<0?0.12:0.035;
+    const w=240,h=180,px=12,py=12;
+    renderer.setScissorTest(true);
+    renderer.setViewport(px,py,w,h); renderer.setScissor(px,py,w,h);
+    renderer.render(scene,obCam);
+    renderer.setScissorTest(false);
+    renderer.setViewport(0,0,innerWidth,innerHeight);
+    scene.fog.density=fd;
+  }
+}
+addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+
+buildEnv('pool'); spawnRobots(); requestAnimationFrame(frame);
+</script>
+</body>
+</html>

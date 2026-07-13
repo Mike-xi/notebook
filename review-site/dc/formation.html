@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,">
+<title>蛟人多机编队 · 图论一致性协同演示（Python 核心）</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden;
+    font-family:"Microsoft YaHei","PingFang SC",sans-serif; background:#04101c; color:#dceaf5; }
+  #c3d { position:absolute; inset:0; }
+  .panel { position:absolute; background:rgba(8,20,34,.86); border:1px solid rgba(110,180,255,.25);
+    border-radius:12px; padding:10px 12px; font-size:12.5px; backdrop-filter:blur(5px); }
+
+  #titlebar { left:50%; top:10px; transform:translateX(-50%); text-align:center; padding:8px 26px; }
+  #titlebar h1 { font-size:17px; color:#7fd0ff; letter-spacing:1px; }
+  #titlebar p { font-size:11.5px; color:#9fc3e0; margin-top:2px; }
+
+  /* 左：一致性协同管线 */
+  #pipe { left:12px; top:74px; width:270px; max-height:calc(100% - 92px); overflow-y:auto; }
+  #pipe h3 { font-size:13px; color:#7fd0ff; margin-bottom:6px; }
+  .layer { border:1px solid rgba(110,180,255,.22); border-left:3px solid #56b8e6;
+    border-radius:8px; padding:7px 9px; margin:6px 0; background:rgba(12,32,50,.55); }
+  .layer h4 { font-size:12.5px; color:#bfe3ff; margin-bottom:4px; }
+  .layer .row { display:flex; justify-content:space-between; margin:2px 0; color:#9fc3e0; }
+  .layer .row b { color:#ffd479; font-weight:600; font-variant-numeric:tabular-nums; text-align:right; }
+  .layer.guide { border-left-color:#e8b64c; }
+  .layer.cons  { border-left-color:#c07fe0; }
+  .layer.ctrl  { border-left-color:#3fbf8f; }
+  .flow { text-align:center; color:#56b8e6; font-size:12px; line-height:0.9; opacity:.8; }
+  .agentrow { display:flex; gap:5px; margin:3px 0; }
+  .achip { flex:1; border-radius:7px; padding:4px 5px; font-size:11px; text-align:center;
+    border:1px solid rgba(110,180,255,.25); background:rgba(12,32,50,.5); }
+  .achip.dead { opacity:.4; text-decoration:line-through; }
+  .achip b { display:block; font-size:12.5px; font-variant-numeric:tabular-nums; }
+  #d_log div { color:#cfe0ee; margin:3px 0; line-height:1.5; font-size:11.6px; }
+  #d_log b { color:#ffd479; }
+
+  /* 右：指标 + 操控 */
+  #dash { right:12px; top:74px; width:262px; max-height:calc(100% - 92px); overflow-y:auto; }
+  #dash h3 { font-size:13px; color:#7fd0ff; margin:9px 0 5px; }
+  #dash h3:first-child { margin-top:0; }
+  .kgrid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .kpi { background:rgba(12,32,50,.55); border:1px solid rgba(110,180,255,.18);
+    border-radius:8px; padding:5px 8px; }
+  .kpi span { display:block; font-size:10.5px; color:#8fb0cc; }
+  .kpi b { font-size:14.5px; color:#ffd479; font-variant-numeric:tabular-nums; font-weight:600; }
+  .kpi b em { font-style:normal; font-size:10px; color:#9fc3e0; }
+  .kpi.good b { color:#6ee6a0; } .kpi.bad b { color:#ff8a72; }
+  select,button { width:100%; background:#0c2438; color:#dceaf5; border:1px solid rgba(110,180,255,.3);
+    border-radius:6px; padding:6px 8px; font-size:12.5px; margin:2px 0; cursor:pointer; }
+  button:hover { background:#14324c; }
+  button.on { background:#2c6fd6; border-color:#6fd3ff; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .btnrow { display:flex; gap:5px; } .btnrow button { flex:1; }
+  .seg { display:flex; gap:0; margin:3px 0; }
+  .seg button { border-radius:0; margin:0; } .seg button:first-child{border-radius:6px 0 0 6px;}
+  .seg button:last-child{border-radius:0 6px 6px 0;}
+  label.sl { display:block; margin:5px 0 2px; color:#9fc3e0; font-size:12px; }
+  label.sl span { color:#ffd479; float:right; }
+  input[type=range] { width:100%; accent-color:#4a9eff; }
+  .hint { font-size:10.8px; color:#7f9bb5; line-height:1.45; margin-top:3px; }
+
+  /* 一致性误差曲线 */
+  #chartWrap { margin-top:6px; }
+  #chart { width:100%; height:70px; background:rgba(6,16,28,.7); border-radius:7px;
+    border:1px solid rgba(110,180,255,.18); display:block; }
+  .lgd { display:flex; gap:12px; font-size:10.5px; margin-top:3px; color:#9fc3e0; }
+  .lgd i { display:inline-block; width:10px; height:3px; vertical-align:middle; margin-right:3px; }
+
+  /* 顶部对照徽标 */
+  #modeflag { left:50%; top:52px; transform:translateX(-50%); padding:3px 16px; border-radius:0 0 10px 10px;
+    font-size:12px; font-weight:600; letter-spacing:.5px; }
+  #modeflag.c { background:rgba(44,111,214,.85); color:#e8f4ff; }
+  #modeflag.b { background:rgba(200,80,60,.85); color:#ffe8e0; }
+
+  /* 起始卡片 */
+  #cover { position:absolute; inset:0; background:rgba(4,12,22,.94); z-index:30;
+    display:flex; align-items:center; justify-content:center; }
+  .card { width:min(560px,90vw); background:rgba(10,26,42,.96); border:1px solid rgba(110,180,255,.3);
+    border-radius:16px; padding:26px 30px; text-align:center; }
+  .card h2 { color:#7fd0ff; font-size:20px; margin-bottom:6px; }
+  .card p { color:#a8c6e0; font-size:13px; line-height:1.7; margin:6px 0; }
+  .card .go { margin-top:16px; font-size:15px; padding:11px; background:#2c6fd6; border-color:#6fd3ff; }
+  .card small { color:#6f93b0; display:block; margin-top:12px; line-height:1.6; }
+  #pyState { margin-top:12px; padding:9px 11px; border-radius:8px; background:rgba(12,32,50,.7);
+    font-size:12px; color:#bcd6ec; min-height:20px; }
+  #btnPickCore { display:none; margin-top:8px; }
+  #loadfail { display:none; position:absolute; inset:0; z-index:40; background:rgba(4,12,22,.96);
+    align-items:center; justify-content:center; text-align:center; color:#ff9a80; padding:40px; }
+</style>
+</head>
+<body>
+<div id="c3d"></div>
+
+<div id="titlebar" class="panel">
+  <h1>蛟人多机编队 · 图论一致性分布式协同</h1>
+  <p>阶段三成果：领航-跟随 / 无领航一致性 · 队形保持·变换·拓扑切换·个体失效鲁棒（算法＝装机同款 Python 核心）</p>
+</div>
+<div id="modeflag" class="panel c">图论一致性协同（本课题算法）</div>
+
+<!-- 左：协同管线 -->
+<div id="pipe" class="panel">
+  <h3>▎分布式协同管线（每机本地运行）</h3>
+  <div class="layer guide">
+    <h4>① 制导层 · 编队虚拟质心 LOS</h4>
+    <div class="row"><span>巡逻航点</span><b id="g_wp">–</b></div>
+    <div class="row"><span>LOS 横偏</span><b id="g_xte">–</b></div>
+    <div class="row"><span>巡逻圈数</span><b id="g_lap">0</b></div>
+  </div>
+  <div class="flow">▼ 参考 (质心位姿+速度)</div>
+  <div class="layer cons">
+    <h4>② 一致性层 · 图论分布式编队</h4>
+    <div class="row"><span>协同结构</span><b id="c_mode">无领航一致性</b></div>
+    <div class="row"><span>当前队形</span><b id="c_shape">三角</b></div>
+    <div class="row"><span>一致性误差 max‖ξi−ξj‖</span><b id="c_cons">–</b></div>
+    <div class="row"><span>队形误差 RMS</span><b id="c_form">–</b></div>
+    <div class="row"><span>活跃机 / 连通</span><b id="c_alive">3/3 ✓</b></div>
+    <div class="agentrow" id="c_agents"></div>
+  </div>
+  <div class="flow">▼ 各机 (ψd, z_ref, 油门)</div>
+  <div class="layer ctrl">
+    <h4>③ 控制层 · 各机 M1 双闭环＋浮潜协同</h4>
+    <div class="row"><span>航向/深度/压载</span><b>装机同款 Controller ×3</b></div>
+  </div>
+  <h3 style="margin-top:9px">▎协同事件</h3>
+  <div id="d_log"></div>
+</div>
+
+<!-- 右：指标与操控 -->
+<div id="dash" class="panel">
+  <h3>▎编队性能指标</h3>
+  <div class="kgrid">
+    <div class="kpi" id="k_form"><span>队形误差 RMS</span><b>–<em> m</em></b></div>
+    <div class="kpi" id="k_cons"><span>一致性误差</span><b>–<em> m</em></b></div>
+    <div class="kpi" id="k_xte"><span>质心 LOS 横偏</span><b>–<em> m</em></b></div>
+    <div class="kpi" id="k_spread"><span>队形展开度</span><b>–<em> m</em></b></div>
+  </div>
+
+  <h3>▎一致性误差收敛</h3>
+  <div id="chartWrap">
+    <canvas id="chart" width="260" height="70"></canvas>
+    <div class="lgd"><span><i style="background:#c07fe0"></i>一致性误差</span>
+      <span><i style="background:#6ee6a0"></i>队形误差</span>
+      <span><i style="background:#ffd479"></i>LOS横偏</span></div>
+  </div>
+
+  <h3>▎协同结构</h3>
+  <div class="seg">
+    <button id="mLeaderless" class="on">无领航一致性</button>
+    <button id="mLeader">领航-跟随</button>
+  </div>
+  <div class="hint">无领航：全体经邻居达成一致，无单点；领航-跟随：领队引导、僚机一致跟随，领队失效自动递补。</div>
+
+  <h3>▎队形变换（图论偏移平滑过渡）</h3>
+  <select id="selShape">
+    <option value="三角">三角队（领队在前）</option>
+    <option value="横排">横排（扫测阵）</option>
+    <option value="纵列">纵列（窄水道）</option>
+    <option value="梯队">斜梯队</option>
+    <option value="楔形分层">楔形分层（含深度差·立体队形）</option>
+  </select>
+
+  <h3>▎通信拓扑</h3>
+  <div class="seg">
+    <button id="topRing" class="on">全连通环</button>
+    <button id="topLine">链式 0-1-2</button>
+  </div>
+
+  <h3>▎个体失效 / 恢复（鲁棒性）</h3>
+  <div class="btnrow" id="failRow"></div>
+  <div class="hint">失效后：邻居把它从一致性求和剔除，剩余机在残余连通图上重构一致；领航模式下若领队失效，pinning 自动递补。</div>
+
+  <h3>▎算法对照（体现优越性）</h3>
+  <div class="seg">
+    <button id="algCons" class="on">图论一致性</button>
+    <button id="algBase">无协同基线</button>
+  </div>
+  <div class="hint" id="algHint">基线＝经典纯领航-跟随（僚机只锚领队、机间不通信、无递补）。切到基线后再让领队失效，可见编队停摆——对比一致性协议的续航与重构。</div>
+
+  <h3>▎视角 / 播放</h3>
+  <div class="seg">
+    <button id="camCine" class="on">巡航</button>
+    <button id="camFollow">跟随</button>
+    <button id="camTop">俯视</button>
+  </div>
+  <label class="sl">水流强度 U₀ <span id="curV">0.10 m/s</span></label>
+  <input id="curSl" type="range" min="0" max="0.28" step="0.01" value="0.10">
+  <label class="sl">仿真速度 <span id="spdV">1.0×</span></label>
+  <input id="spdSl" type="range" min="0.5" max="4" step="0.5" value="1">
+  <div class="btnrow">
+    <button id="btnGo" disabled>▶ 开始</button>
+    <button id="btnReset">↺ 重置</button>
+  </div>
+</div>
+
+<!-- 起始卡片 -->
+<div id="cover">
+  <div class="card">
+    <h2>🐟 蛟人多机编队 · 图论一致性协同演示</h2>
+    <p>3 台半潜机器人以<b>分布式一致性协议</b>编队巡航：制导层给出编队虚拟质心的 LOS 变深矩形航线，
+       一致性层用<b>图论拉普拉斯 + pinning</b> 让各机仅凭<b>邻居通信</b>达成队形一致，
+       控制层调用<b>装机同款</b> Controller 逐机执行。</p>
+    <p>可实时切换<b>协同结构 / 队形 / 通信拓扑</b>，制造<b>个体失效</b>，
+       并与<b>无协同基线</b>对照，直观展示一致性协同的鲁棒优越性。</p>
+    <button class="go" id="btnBoot">▶ 加载 Python 核心并进入演示</button>
+    <div id="pyState">点击上方按钮：将加载 蛟人核心\（swarm_entry.py + Lib\，装机同款算法）</div>
+    <button id="btnPickCore">📁 选择「蛟人核心」文件夹</button>
+    <input id="coreDir" type="file" webkitdirectory directory multiple style="display:none">
+    <small>在线部署版：点击上方按钮即自动从本站加载 Python 核心（首次约十余秒）。</small>
+  </div>
+</div>
+<div id="loadfail"><div><h2>⚠ Three.js 未能加载</h2><p>请连网后刷新，或改用本地 three.min.js。</p></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<script>
+if (typeof THREE === 'undefined') document.write('<scr'+'ipt src="https://unpkg.com/three@0.149.0/build/three.min.js"><\/scr'+'ipt>');
+</script>
+<script>
+if (typeof THREE === 'undefined') {
+  document.getElementById('loadfail').style.display = 'flex';
+  throw new Error('THREE not loaded');
+}
+/* =====================================================================
+   蛟人多机编队 · 图论一致性协同演示（Python 核心版）
+   网页只负责：水池物理（每机一套 RK2，与阶段一二 SubSim 同参数）、
+   传感器仿真（含噪）、三维渲染与指标评估。
+   感知融合 / 图论一致性编队 / 运动控制 全部调用 蛟人核心\（swarm_entry.py + Lib\）。
+   ===================================================================== */
+const D2R = Math.PI/180, R2D = 180/Math.PI;
+const $ = id => document.getElementById(id);
+const clamp = (v,lo,hi) => Math.max(lo, Math.min(hi, v));
+const wrap = a => { a=(a+Math.PI)%(2*Math.PI)-Math.PI; return a<-Math.PI?a+2*Math.PI:a; };
+function gauss(sg){ return sg*Math.sqrt(-2*Math.log(Math.random()+1e-12))*Math.cos(6.2832*Math.random()); }
+
+/* ---------- 物理参数（与 jiaoren_sim/params.py 同步；阶段一二同款） ---------- */
+const P = {
+  m:3.0, maX:0.15, maYZ:3.5, Iy:0.0756, maQ:0.0885, Iz:0.0756, maR:0.0885,
+  dqX:2.86, dlX:0.3, dqYZ:27.2, dlYZ:1.5, dqRot:0.15, dlRot:0.04,
+  tMax:1.5, thrY:0.06, thrTau:0.15,
+  rudK:0.5*1000*0.004*(2*Math.PI*0.7), rudX:-0.28, rudStall:25*D2R, rudMax:90*D2R, rudRate:180*D2R,
+  balF:1000*9.81*60e-6, balRate:0.25, kPitch:0.294,
+  zFloat:0.05, zSurf:0.09, kWp:55,
+  L:0.55, D:0.09
+};
+
+/* ---------- 水池（编队演示用开阔矩形水域） ---------- */
+const POOL = { len:26, wid:16, dep:2.4 };
+// 编队虚拟质心的矩形巡逻航点（含变深 0.5↔1.5m）
+const WPS = [ [5,4,0.5], [21,4,1.4], [21,12,0.6], [5,12,1.3] ];
+// 3 机初始位姿（NED: x y z psi），错开起步
+const STARTS = [ [4.0,8.0,0.4,0], [3.0,7.0,0.4,0], [3.0,9.0,0.4,0] ];
+const AGN = STARTS.length;
+const COLORS = [0xff8c42, 0x42c8ff, 0x8cff6a];   // 三机识别色（橙/蓝/绿）
+let U0 = 0.10;
+function currentAt(x, y, t){
+  const f = 4*(y/POOL.wid)*(1 - y/POOL.wid);
+  const pul = 1 + 0.18*Math.sin(0.35*t + 0.2*x);
+  return [ U0*Math.max(0,f)*pul, 0.16*U0*Math.sin(0.4*x + 0.15*t)*f ];
+}
+
+/* ---------- 半潜器动力学（RK2，dt=0.01；与阶段一二 SubSim 完全一致） ---------- */
+class SubSim {
+  constructor(x,y,z,psi){ this.reset(x,y,z,psi); }
+  reset(x,y,z,psi){
+    this.s=[x,y,z,0,psi,0,0,0,0,0,0.5,0]; // x y z th psi u v w q r sbal delta
+    this.TL=0; this.TR=0; this.t=0;
+  }
+  deriv(s,cmd,cur){
+    const [x,y,z,th,ps,u,v,w,q,r,sb,de] = s;
+    const [nL,nR,dCmd,sCmd] = cmd;
+    const TLc = clamp(nL,-1,1)*P.tMax, TRc = clamp(nR,-1,1)*P.tMax;
+    this.dTL=(TLc-this.TL)/P.thrTau; this.dTR=(TRc-this.TR)/P.thrTau;
+    const dc = clamp(dCmd,-P.rudMax,P.rudMax);
+    const dde = clamp((dc-de)/0.05,-P.rudRate,P.rudRate);
+    const sc = clamp(sCmd,0,1);
+    const dsb = clamp((sc-sb)/0.2,-P.balRate,P.balRate);
+    const cth=Math.cos(th), sth=Math.sin(th), cps=Math.cos(ps), sps=Math.sin(ps);
+    const ucb = cth*(cps*cur[0]+sps*cur[1]), vcb = -sps*cur[0]+cps*cur[1];
+    const ur=u-ucb, vr=v-vcb, wr=w-sth*(cps*cur[0]+sps*cur[1]);
+    const dragX=P.dqX*ur*Math.abs(ur)+P.dlX*ur, dragY=P.dqYZ*vr*Math.abs(vr)+P.dlYZ*vr;
+    const dragZ=P.dqYZ*wr*Math.abs(wr)+P.dlYZ*wr;
+    const dragQ=P.dqRot*q*Math.abs(q)+P.dlRot*q, dragR=P.dqRot*r*Math.abs(r)+P.dlRot*r;
+    const deEff=clamp(de,-P.rudStall,P.rudStall);
+    const fRud=P.rudK*deEff*ur*Math.abs(ur), mRud=fRud*(-P.rudX);
+    let fz=P.balF*(sb-0.5);
+    if (z<P.zSurf) fz += P.kWp*(P.zFloat-z)*(1-z/P.zSurf);
+    const mx=P.m+P.maX, myz=P.m+P.maYZ;
+    const du=(this.TL+this.TR-dragX-fz*(-sth))/mx + vr*r - wr*q;
+    const dv=(-dragY)/myz - ur*r;
+    const dw=(fz*cth-dragZ+fRud)/myz + ur*q;
+    const dq=(mRud-P.kPitch*sth-dragQ)/(P.Iy+P.maQ);
+    const dr=(P.thrY*(this.TL-this.TR)-dragR)/(P.Iz+P.maR);
+    return [cps*cth*u-sps*v+cps*sth*w, sps*cth*u+cps*v+sps*sth*w, -sth*u+cth*w,
+            q, r/Math.max(0.2,cth), du,dv,dw,dq,dr, dsb, dde];
+  }
+  step(cmd,cur,dt){
+    const s=this.s, k1=this.deriv(s,cmd,cur);
+    const s2=s.map((v,i)=>v+dt/2*k1[i]), k2=this.deriv(s2,cmd,cur);
+    for(let i=0;i<12;i++) s[i]+=dt*k2[i];
+    this.TL+=this.dTL*dt; this.TR+=this.dTR*dt;
+    if(s[0]<0.3){s[0]=0.3;s[5]=Math.max(0,s[5]);} if(s[0]>POOL.len-0.3){s[0]=POOL.len-0.3;s[5]=Math.min(0,s[5]);}
+    if(s[1]<0.3){s[1]=0.3;s[6]=Math.max(0,s[6]);} if(s[1]>POOL.wid-0.3){s[1]=POOL.wid-0.3;s[6]=Math.min(0,s[6]);}
+    if(s[2]<0){s[2]=0;s[7]=Math.max(0,s[7]);} if(s[2]>POOL.dep){s[2]=POOL.dep;s[7]=Math.min(0,s[7]);}
+    this.t+=dt;
+  }
+}
+// 3 台机器人的水池实体
+const fleet = STARTS.map(s=>new SubSim(s[0],s[1],s[2],s[3]));
+
+/* ---------- 每机传感器仿真（网页造带噪测量，融合在 Python） ---------- */
+function makeSensor(idx){
+  return {
+    bx:0, by:0, _dep:null, _depT:-9,
+    reset(){ this.bx=0; this.by=0; this._dep=null; this._depT=-9; },
+    stepDrift(dt){
+      this.bx += gauss(0.02*Math.sqrt(dt)) - this.bx*dt/40;
+      this.by += gauss(0.02*Math.sqrt(dt)) - this.by*dt/40;
+      this.bx = clamp(this.bx,-0.25,0.25); this.by = clamp(this.by,-0.25,0.25);
+    },
+    imu(){ const s=fleet[idx].s;
+      return { yaw:s[4]+gauss(0.5*D2R), pitch:s[3]+gauss(0.2*D2R),
+               q:s[8]+gauss(0.3*D2R), r:s[9]+gauss(0.3*D2R) }; },
+    depth(t){ if(t-this._depT>=0.04||this._dep===null){
+        this._dep={depth:Math.max(0,fleet[idx].s[2])+gauss(0.003)}; this._depT=t; } return this._dep; },
+    vo(){ const s=fleet[idx].s, cps=Math.cos(s[4]), sps=Math.sin(s[4]), cth=Math.cos(s[3]);
+      return { x:s[0]+this.bx, y:s[1]+this.by,
+               vx:cps*cth*s[5]-sps*s[6]+gauss(0.015), vy:sps*cth*s[5]+cps*s[6]+gauss(0.015) }; },
+    drift(){ return Math.hypot(this.bx,this.by); }
+  };
+}
+const SENS = STARTS.map((_,i)=>makeSensor(i));
+
+/* =====================================================================
+   蛟人核心加载（Pyodide）：http 自动 fetch；file:// 选文件夹
+   ===================================================================== */
+const CORE_DIR='core';
+const CORE_FILES=['swarm_entry.py','Lib/__init__.py','Lib/Params.py','Lib/StateEstimation.py',
+  'Lib/Vision.py','Lib/Guidance.py','Lib/Control.py','Lib/Formation.py','Lib/Sensors.py','Lib/Actuators.py'];
+const PY={ ready:false, mod:null, pyodide:null,
+  status(html){ $('pyState').innerHTML=html; },
+  async ensurePyodide(){
+    if(this.pyodide) return this.pyodide;
+    this.status('⏳ 正在加载 Python 运行环境（Pyodide，首次联网约 20MB）…');
+    await new Promise((res,rej)=>{
+      const sc=document.createElement('script');
+      sc.src='https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js';
+      sc.onload=res; sc.onerror=()=>rej(new Error('Pyodide 下载失败，请检查网络'));
+      document.head.appendChild(sc);
+    });
+    this.pyodide=await loadPyodide();
+    return this.pyodide;
+  },
+  async boot(files){
+    const py=await this.ensurePyodide();
+    try{ py.FS.mkdirTree('/jrcore/Lib'); }catch(e){}
+    for(const [rel,src] of files) py.FS.writeFile('/jrcore/'+rel, src);
+    py.runPython(
+`import sys
+if '/jrcore' not in sys.path: sys.path.insert(0,'/jrcore')
+for m in [k for k in list(sys.modules) if k=='swarm_entry' or k.startswith('Lib')]:
+    del sys.modules[m]
+import swarm_entry`);
+    this.mod=py.pyimport('swarm_entry');
+    this.mod.swarm_init(JSON.stringify({ n:AGN, mode:CFG.mode, shape:CFG.shape,
+      waypoints:WPS, width:POOL.wid, starts:STARTS, u_des:0.30, loop:true }));
+    this.ready=true;
+    this.status('✅ 蛟人核心已加载：<b>'+files.size+' 个 .py</b>（swarm_entry + Lib，图论一致性编队 装机同款）');
+    startDemo();
+  },
+  async autoLoad(){
+    if(location.protocol.startsWith('http')){
+      try{
+        const files=new Map();
+        for(const f of CORE_FILES){
+          const r=await fetch(CORE_DIR+'/'+f, {cache:'no-store'});
+          if(!r.ok) throw new Error(f+' HTTP '+r.status);
+          files.set(f, await r.text());
+        }
+        await this.boot(files); return;
+      }catch(err){
+        this.status('❌ 自动加载失败：'+err.message+'<br>请确认本页与 蛟人核心\\ 在同一文件夹');
+        $('btnPickCore').style.display='block';
+      }
+    }else{
+      this.status('本页以 <b>file://</b> 打开，浏览器不允许自动读取文件夹。<br>'+
+        '推荐：双击同文件夹的 <b>启动编队演示.bat</b>；或点下方选择 <b>蛟人核心</b> 文件夹。');
+      $('btnPickCore').style.display='block';
+      await this.ensurePyodide().catch(e=>this.status('❌ '+e.message));
+    }
+  },
+  async fromPicker(fileList){
+    const all=[...fileList].filter(f=>f.name.endsWith('.py'));
+    const entry=all.find(f=>f.name==='swarm_entry.py');
+    if(!entry){ this.status('❌ 所选文件夹里没有 swarm_entry.py —— 请选择「蛟人核心」文件夹'); return; }
+    const prefix=(entry.webkitRelativePath||entry.name).replace(/swarm_entry\.py$/,'');
+    const files=new Map();
+    for(const f of all){
+      const rel=(f.webkitRelativePath||f.name).slice(prefix.length);
+      if(rel==='swarm_entry.py'||rel.startsWith('Lib/')) files.set(rel, await f.text());
+    }
+    this.status('⏳ 正在启动 Python 核心…');
+    try{ await this.boot(files); }catch(err){ this.status('❌ 核心启动失败：'+err.message); }
+  },
+  step(inp){ return JSON.parse(this.mod.swarm_step(JSON.stringify(inp))); },
+  set(cmd){ return JSON.parse(this.mod.swarm_set(JSON.stringify(cmd))); }
+};
+
+/* =====================================================================
+   世界推进：各机传感器仿真 → Python 编队核心 → 各机执行器 → 水池物理
+   ===================================================================== */
+const CFG = { mode:'leaderless', shape:'三角', started:false };
+let DBG=null, lastCmd=fleet.map(()=>[0,0,0,0.5]), nextVis=0, simT=0;
+function stepWorld(dt){
+  for(const sn of SENS) sn.stepDrift(dt);
+  const imu=SENS.map(s=>s.imu()), depth=SENS.map(s=>s.depth(simT)), vo=SENS.map(s=>s.vo());
+  const out=PY.step({ t:simT, dt, imu, depth, vo });
+  lastCmd = out.cmds; DBG = out.debug;
+  if(out.events && out.events.length) out.events.forEach(logEvent);
+  for(let i=0;i<AGN;i++)
+    fleet[i].step(lastCmd[i], currentAt(fleet[i].s[0],fleet[i].s[1],simT), dt);
+  METRICS.step(dt);
+  simT+=dt;
+}
+
+/* ---------- 指标评估 ---------- */
+const METRICS={ formSum:0, consSum:0, xteSum:0, n:0, formMax:0,
+  reset(){ this.formSum=this.consSum=this.xteSum=0; this.n=0; this.formMax=0; },
+  step(dt){ if(!DBG) return; const f=DBG.form;
+    this.formSum+=f.form_err; this.consSum+=f.cons_err; this.xteSum+=Math.abs(f.los_e); this.n++;
+    this.formMax=Math.max(this.formMax,f.form_err); },
+  formAvg(){ return this.n?this.formSum/this.n:0; },
+};
+
+/* =====================================================================
+   三维场景
+   ===================================================================== */
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight); renderer.setPixelRatio(devicePixelRatio);
+renderer.shadowMap.enabled=true; $('c3d').appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x8fbdd8); scene.fog=new THREE.FogExp2(0x8fbdd8,0.016);
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.05,600);
+scene.add(new THREE.AmbientLight(0xbfd4e6,0.78));
+const sun=new THREE.DirectionalLight(0xfff2dd,1.05);
+sun.position.set(10,20,6); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=-24; sun.shadow.camera.right=24; sun.shadow.camera.top=24; sun.shadow.camera.bottom=-24;
+scene.add(sun);
+const N2T=(x,y,z)=>new THREE.Vector3(y,-z,x);   // NED → Three（阶段一二同款）
+
+/* ---- 水池 ---- */
+let waterGeo=null;
+(function buildPool(){
+  const {len,wid,dep}=POOL;
+  const bed=new THREE.Mesh(new THREE.PlaneGeometry(wid,len),
+    new THREE.MeshStandardMaterial({color:0x2f4f5a,roughness:0.95}));
+  bed.rotation.x=-Math.PI/2; bed.position.set(wid/2,-dep,len/2); bed.receiveShadow=true; scene.add(bed);
+  const grid=new THREE.GridHelper(Math.max(len,wid),Math.max(len,wid),0x3f6f7c,0x365f6a);
+  grid.position.set(wid/2,-dep+0.01,len/2); scene.add(grid);
+  // 池壁
+  const wallMat=new THREE.MeshStandardMaterial({color:0x516b76,roughness:0.9,side:THREE.DoubleSide});
+  const walls=[[wid/2,-dep/2,0,wid,dep,0],[wid/2,-dep/2,len,wid,dep,0],
+               [0,-dep/2,len/2,dep,len,1],[wid,-dep/2,len/2,dep,len,1]];
+  walls.forEach(([px,py,pz,a,b,rot])=>{
+    const w=new THREE.Mesh(new THREE.PlaneGeometry(a,b),wallMat);
+    if(rot){ w.rotation.y=Math.PI/2; } w.position.set(px,py,pz); scene.add(w);
+  });
+  // 池边台
+  const rimMat=new THREE.MeshStandardMaterial({color:0x8794a0,roughness:0.8});
+  const rim=new THREE.Mesh(new THREE.BoxGeometry(wid+1.2,0.2,len+1.2),rimMat);
+  rim.position.set(wid/2,0.02,len/2); scene.add(rim);
+  const inner=new THREE.Mesh(new THREE.BoxGeometry(wid,0.25,len),
+    new THREE.MeshStandardMaterial({color:0x11313f}));
+  inner.position.set(wid/2,0.0,len/2); scene.add(inner);
+  waterGeo=new THREE.PlaneGeometry(wid,len,20,32);
+  const water=new THREE.Mesh(waterGeo,new THREE.MeshStandardMaterial({
+    color:0x2e88bf,transparent:true,opacity:0.5,metalness:0.35,roughness:0.2,side:THREE.DoubleSide}));
+  water.rotation.x=-Math.PI/2; water.position.set(wid/2,0,len/2); scene.add(water);
+})();
+
+/* ---- 航点浮标（编队质心巡逻航线） ---- */
+WPS.forEach(wp=>{
+  const buoy=new THREE.Group();
+  const ball=new THREE.Mesh(new THREE.SphereGeometry(0.15,16,12),
+    new THREE.MeshStandardMaterial({color:0xffd045,emissive:0x664400}));
+  buoy.add(ball);
+  const line=new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,wp[2]),
+    new THREE.MeshStandardMaterial({color:0xffe9a0,transparent:true,opacity:0.5}));
+  line.position.y=-wp[2]/2; buoy.add(line);
+  const tgt=new THREE.Mesh(new THREE.SphereGeometry(0.08,12,8),
+    new THREE.MeshStandardMaterial({color:0xff7043,emissive:0x552200}));
+  tgt.position.y=-wp[2]; buoy.add(tgt);
+  buoy.position.copy(N2T(wp[0],wp[1],0)); scene.add(buoy);
+});
+// 计划航线（俯视辅助）
+(function(){
+  const pts=[...WPS, WPS[0]].map(w=>N2T(w[0],w[1],0.02));
+  const g=new THREE.BufferGeometry().setFromPoints(pts);
+  scene.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:0xffd045,transparent:true,opacity:0.35})));
+})();
+
+/* ---- 机器人模型（阶段一二 buildSubMesh 同款外观，可指定机身色） ---- */
+function buildSubMesh(color=0xff8c42,finColor=0x16385c){
+  const g=new THREE.Group();
+  const hullMat=new THREE.MeshStandardMaterial({color,roughness:0.45,metalness:0.35});
+  const finMat=new THREE.MeshStandardMaterial({color:finColor,roughness:0.5,metalness:0.3});
+  const darkMat=new THREE.MeshStandardMaterial({color:0x2b3640,roughness:0.5,metalness:0.4});
+  const hull=new THREE.Mesh(new THREE.CylinderGeometry(P.D/2,P.D/2,P.L*0.78,24),hullMat);
+  hull.rotation.x=Math.PI/2; hull.castShadow=true; g.add(hull);
+  const nose=new THREE.Mesh(new THREE.SphereGeometry(P.D/2,20,14,0,Math.PI*2,0,Math.PI/2),
+    new THREE.MeshStandardMaterial({color:0x9fd4f0,roughness:0.15,metalness:0.1,side:THREE.DoubleSide}));
+  nose.rotation.x=Math.PI/2; nose.position.z=P.L*0.39; nose.castShadow=true; g.add(nose);
+  const tail=new THREE.Mesh(new THREE.ConeGeometry(P.D/2,P.L*0.18,20),hullMat);
+  tail.rotation.x=-Math.PI/2; tail.position.z=-P.L*0.48; tail.castShadow=true; g.add(tail);
+  const mast=new THREE.Mesh(new THREE.CylinderGeometry(0.008,0.008,0.147),
+    new THREE.MeshStandardMaterial({color:0xd0dae2}));
+  mast.position.set(0,0.093,P.L*0.1); g.add(mast);
+  const props=[];
+  [-1,1].forEach(side=>{
+    const pg=new THREE.Group();
+    const duct=new THREE.Mesh(new THREE.CylinderGeometry(0.037,0.039,0.032,20,1,true),
+      new THREE.MeshStandardMaterial({color:0x24455e,roughness:0.6,metalness:0.3,side:THREE.DoubleSide}));
+    duct.rotation.x=Math.PI/2; duct.position.z=-0.012; pg.add(duct);
+    const spin=new THREE.Group(); spin.position.z=-0.012;
+    const hub=new THREE.Mesh(new THREE.CylinderGeometry(0.009,0.009,0.014,12),darkMat);
+    hub.rotation.x=Math.PI/2; spin.add(hub);
+    for(let i=0;i<3;i++){
+      const bl=new THREE.Mesh(new THREE.BoxGeometry(0.006,0.03,0.004),
+        new THREE.MeshStandardMaterial({color:0xb8ccd8,metalness:0.55,roughness:0.35}));
+      bl.rotation.z=i*2*Math.PI/3; bl.position.y=0.014; spin.add(bl);
+    }
+    pg.add(spin);
+    pg.position.set(side*P.thrY,-0.01,-P.L*0.42); g.add(pg); props.push(spin);
+  });
+  const rud=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.006,0.055),finMat);
+  rud.position.set(0,0,-P.L*0.52); g.add(rud);
+  const fin=new THREE.Mesh(new THREE.BoxGeometry(0.005,0.05,0.05),finMat);
+  fin.position.set(0,0.045,-P.L*0.46); g.add(fin);
+  // 头顶识别环（与机身同色，俯视好区分）
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(0.05,0.008,8,20),
+    new THREE.MeshStandardMaterial({color,emissive:color,emissiveIntensity:0.5}));
+  ring.rotation.x=Math.PI/2; ring.position.y=0.06; g.add(ring);
+  return {group:g, props, rudder:rud};
+}
+const robs = COLORS.map(c=>{ const r=buildSubMesh(c); scene.add(r.group); return r; });
+
+/* ---- 队形槽位标记（半透明幽灵，示意期望位置） ---- */
+const slots = COLORS.map(c=>{
+  const m=new THREE.Mesh(new THREE.RingGeometry(0.12,0.17,20),
+    new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:0.5,side:THREE.DoubleSide}));
+  m.rotation.x=-Math.PI/2; scene.add(m); return m;
+});
+
+/* ---- 通信链路（机间连线，表达拓扑与一致性通信） ---- */
+let commLines=[];
+function rebuildCommLines(edges){
+  commLines.forEach(l=>scene.remove(l)); commLines=[];
+  (edges||[]).forEach(()=>{
+    const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]);
+    const l=new THREE.Line(g,new THREE.LineBasicMaterial({color:0x7fe0ff,transparent:true,opacity:0.7}));
+    scene.add(l); commLines.push(l);
+  });
+}
+/* ---- 各机尾迹 ---- */
+const trails = COLORS.map(c=>{
+  const geo=new THREE.BufferGeometry(); const MAX=400;
+  geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(MAX*3),3));
+  geo.setDrawRange(0,0);
+  const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color:c,transparent:true,opacity:0.55}));
+  scene.add(line); return {line, pts:[], MAX};
+});
+function pushTrail(){
+  for(let i=0;i<AGN;i++){
+    if(DBG && !DBG.agents[i].alive) continue;
+    const t=trails[i], p=N2T(fleet[i].s[0],fleet[i].s[1],fleet[i].s[2]);
+    t.pts.push(p); if(t.pts.length>t.MAX) t.pts.shift();
+    const arr=t.line.geometry.attributes.position.array;
+    t.pts.forEach((q,k)=>{ arr[k*3]=q.x; arr[k*3+1]=q.y; arr[k*3+2]=q.z; });
+    t.line.geometry.attributes.position.needsUpdate=true;
+    t.line.geometry.setDrawRange(0,t.pts.length);
+  }
+}
+
+/* =====================================================================
+   相机
+   ===================================================================== */
+const UI={ running:false, cam:'cine', speed:1 };
+let cineAz=2.2;
+let orbit={az:2.4, el:0.5, dist:11, target:new THREE.Vector3(8,0,10), drag:false, px:0, py:0};
+renderer.domElement.addEventListener('mousedown',e=>{orbit.drag=true;orbit.px=e.clientX;orbit.py=e.clientY;});
+addEventListener('mouseup',()=>orbit.drag=false);
+addEventListener('mousemove',e=>{
+  if(!orbit.drag)return;
+  orbit.az-=(e.clientX-orbit.px)*0.006; orbit.el=clamp(orbit.el+(e.clientY-orbit.py)*0.004,0.08,1.5);
+  orbit.px=e.clientX; orbit.py=e.clientY;
+  if(UI.cam==='cine'){ UI.cam='follow'; syncCamBtns(); }
+});
+renderer.domElement.addEventListener('wheel',e=>{ orbit.dist=clamp(orbit.dist*(1+e.deltaY*0.001),3,40); });
+function fleetCentroid(){
+  let x=0,y=0,z=0,k=0;
+  for(let i=0;i<AGN;i++){ if(DBG&&!DBG.agents[i].alive) continue; x+=fleet[i].s[0];y+=fleet[i].s[1];z+=fleet[i].s[2];k++; }
+  k=k||1; return N2T(x/k,y/k,z/k);
+}
+function updateCamera(dt){
+  const c=fleetCentroid();
+  if(UI.cam==='cine'){
+    cineAz+=0.05*dt; orbit.target.lerp(c,0.05);
+    const t=orbit.target, d=9, el=0.42;
+    camera.position.lerp(new THREE.Vector3(
+      t.x+d*Math.cos(el)*Math.cos(cineAz), t.y+d*Math.sin(el)+0.5, t.z+d*Math.cos(el)*Math.sin(cineAz)),0.04);
+    camera.lookAt(t);
+  } else if(UI.cam==='top'){
+    orbit.target.lerp(new THREE.Vector3(POOL.wid/2,0,POOL.len/2),0.04);
+    camera.position.lerp(new THREE.Vector3(POOL.wid/2,24,POOL.len/2+0.01),0.05);
+    camera.lookAt(orbit.target);
+  } else {
+    orbit.target.lerp(c,0.08);
+    const t=orbit.target, d=orbit.dist;
+    camera.position.set(t.x+d*Math.cos(orbit.el)*Math.cos(orbit.az),
+      t.y+d*Math.sin(orbit.el), t.z+d*Math.cos(orbit.el)*Math.sin(orbit.az));
+    camera.lookAt(t);
+  }
+  scene.fog.density = camera.position.y<0 ? 0.09 : 0.016;
+}
+
+/* =====================================================================
+   HUD
+   ===================================================================== */
+const EVENTS=[];
+function logEvent(html){ EVENTS.unshift(html); if(EVENTS.length>7) EVENTS.pop();
+  $('d_log').innerHTML=EVENTS.map(e=>'<div>'+e+'</div>').join(''); }
+
+function refreshHUD(){
+  if(!DBG){ return; }
+  const f=DBG.form;
+  $('g_wp').textContent=(f.wp_i+1)+' / '+f.n_wp;
+  $('g_xte').textContent=Math.abs(f.los_e).toFixed(3)+' m';
+  $('g_lap').textContent=f.laps;
+  $('c_mode').textContent=(f.mode==='leader'?'领航-跟随':'无领航一致性');
+  $('c_shape').textContent=f.shape+(f.morphing?' …变换中':'');
+  $('c_cons').textContent=f.cons_err.toFixed(3)+' m';
+  $('c_form').textContent=f.form_err.toFixed(3)+' m';
+  $('c_alive').textContent=f.n_alive+'/'+AGN+(f.connected?' ✓连通':' ✗断连');
+  // 三机小卡
+  $('c_agents').innerHTML=DBG.agents.map(a=>{
+    const col=['#ff8c42','#42c8ff','#8cff6a'][a.id];
+    return '<div class="achip'+(a.alive?'':' dead')+'" style="border-color:'+col+'55">'+
+      '<span style="color:'+col+'">'+(a.id+1)+'号</span>'+
+      '<b>'+(a.alive?('油门 '+a.base.toFixed(2)):'失效')+'</b></div>';
+  }).join('');
+  // KPI
+  const setk=(id,v,unit,cls)=>{ const e=$(id); e.className='kpi'+(cls?' '+cls:'');
+    e.querySelector('b').innerHTML=v+'<em> '+unit+'</em>'; };
+  const boat=0.55;
+  setk('k_form', f.form_err.toFixed(3), 'm', f.form_err<0.3?'good':(f.form_err>0.6?'bad':''));
+  setk('k_cons', f.cons_err.toFixed(3), 'm', f.cons_err<0.1?'good':'');
+  setk('k_xte', Math.abs(f.los_e).toFixed(3), 'm', Math.abs(f.los_e)<0.275?'good':'bad');
+  // 队形展开度：活跃机两两最大间距
+  let spread=0;
+  for(let i=0;i<AGN;i++)for(let j=i+1;j<AGN;j++){
+    if(DBG.agents[i].alive&&DBG.agents[j].alive)
+      spread=Math.max(spread,Math.hypot(fleet[i].s[0]-fleet[j].s[0],fleet[i].s[1]-fleet[j].s[1]));
+  }
+  setk('k_spread', spread.toFixed(2), 'm');
+  drawChart(f);
+}
+
+/* ---- 一致性/队形/横偏 收敛曲线 ---- */
+const HIST={cons:[],form:[],xte:[]}, HMAX=260;
+function drawChart(f){
+  HIST.cons.push(f.cons_err); HIST.form.push(f.form_err); HIST.xte.push(Math.abs(f.los_e));
+  for(const k in HIST) if(HIST[k].length>HMAX) HIST[k].shift();
+  const cv=$('chart'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle='rgba(255,255,255,0.08)';
+  for(let gy=0;gy<=2;gy++){ const y=H*gy/2; ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke(); }
+  const top=0.8;  // 纵轴上限 0.8m
+  const draw=(arr,col)=>{ ctx.strokeStyle=col; ctx.lineWidth=1.5; ctx.beginPath();
+    arr.forEach((v,i)=>{ const x=W*i/HMAX, y=H-clamp(v/top,0,1)*H;
+      i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.stroke(); };
+  // 0.5 艇长参考线
+  const boat=0.275; const yb=H-clamp(boat/top,0,1)*H;
+  ctx.strokeStyle='rgba(255,180,120,0.5)'; ctx.setLineDash([4,3]); ctx.beginPath();
+  ctx.moveTo(0,yb); ctx.lineTo(W,yb); ctx.stroke(); ctx.setLineDash([]);
+  draw(HIST.xte,'#ffd479'); draw(HIST.form,'#6ee6a0'); draw(HIST.cons,'#c07fe0');
+}
+
+/* =====================================================================
+   交互
+   ===================================================================== */
+function startDemo(){
+  $('cover').style.display='none';
+  $('btnGo').disabled=false;
+  UI.running=true; $('btnGo').textContent='⏸ 暂停'; $('btnGo').classList.add('on');
+  PY.mod.swarm_start(); CFG.started=true;
+  logEvent('🚀 编队启动：3 机以<b>'+(CFG.mode==='leader'?'领航-跟随':'无领航一致性')+'</b>结构巡航');
+}
+$('btnBoot').onclick=()=>{ $('btnBoot').disabled=true; PY.autoLoad(); };
+$('btnPickCore').onclick=()=>$('coreDir').click();
+$('coreDir').addEventListener('change',ev=>{ if(ev.target.files.length) PY.fromPicker(ev.target.files); });
+
+$('btnGo').onclick=()=>{ if(!PY.ready)return; UI.running=!UI.running;
+  $('btnGo').textContent=UI.running?'⏸ 暂停':'▶ 开始'; $('btnGo').classList.toggle('on',UI.running); };
+$('btnReset').onclick=()=>resetWorld();
+
+function resetWorld(){
+  fleet.forEach((s,i)=>s.reset(STARTS[i][0],STARTS[i][1],STARTS[i][2],STARTS[i][3]));
+  SENS.forEach(s=>s.reset()); METRICS.reset();
+  for(const k in HIST) HIST[k].length=0;
+  trails.forEach(t=>{ t.pts.length=0; t.line.geometry.setDrawRange(0,0); });
+  simT=0; DBG=null;
+  if(PY.ready){
+    PY.mod.swarm_reset();
+    // 重置后恢复当前 UI 选择的模式/队形/拓扑/算法
+    PY.set({op:'mode',value:CFG.mode}); PY.set({op:'shape',value:CFG.shape});
+    if(CFG.started) PY.mod.swarm_start();
+  }
+  EVENTS.length=0; $('d_log').innerHTML='';
+  logEvent('↺ 已重置到初始队形');
+}
+
+// 协同结构
+function setMode(m){ CFG.mode=m; $('mLeaderless').classList.toggle('on',m==='leaderless');
+  $('mLeader').classList.toggle('on',m==='leader');
+  if(PY.ready) PY.set({op:'mode',value:m}); }
+$('mLeaderless').onclick=()=>setMode('leaderless');
+$('mLeader').onclick=()=>setMode('leader');
+
+// 队形变换
+$('selShape').onchange=e=>{ CFG.shape=e.target.value;
+  if(PY.ready) PY.set({op:'shape',value:CFG.shape}); };
+
+// 拓扑
+$('topRing').onclick=()=>{ $('topRing').classList.add('on');$('topLine').classList.remove('on');
+  if(PY.ready) PY.set({op:'topology',value:'ring'}); };
+$('topLine').onclick=()=>{ $('topLine').classList.add('on');$('topRing').classList.remove('on');
+  if(PY.ready) PY.set({op:'topology',value:'line'}); };
+
+// 失效/恢复
+const failState=[false,false,false];
+(function buildFailBtns(){
+  const row=$('failRow'); row.innerHTML='';
+  for(let i=0;i<AGN;i++){
+    const b=document.createElement('button');
+    b.textContent=(i+1)+'号失效'; b.style.borderColor=['#ff8c42','#42c8ff','#8cff6a'][i]+'88';
+    b.onclick=()=>{ failState[i]=!failState[i];
+      PY.set({op:failState[i]?'fail':'revive',value:i});
+      b.textContent=(i+1)+(failState[i]?'号恢复':'号失效'); b.classList.toggle('on',failState[i]); };
+    row.appendChild(b);
+  }
+})();
+
+// 算法对照
+function setAlg(cons){ $('algCons').classList.toggle('on',cons); $('algBase').classList.toggle('on',!cons);
+  $('modeflag').className='panel '+(cons?'c':'b');
+  $('modeflag').textContent=cons?'图论一致性协同（本课题算法）':'无协同基线（对照组·经典纯领航-跟随）';
+  if(PY.ready) PY.set({op:'consensus',value:cons});
+  logEvent(cons?'🧠 切到<b>图论一致性</b>协同':'🧪 切到<b>无协同基线</b>：僚机只锚领队、机间不通信'); }
+$('algCons').onclick=()=>setAlg(true);
+$('algBase').onclick=()=>setAlg(false);
+
+function syncCamBtns(){ [['camCine','cine'],['camFollow','follow'],['camTop','top']].forEach(([id,k])=>
+  $(id).classList.toggle('on',UI.cam===k)); }
+[['camCine','cine'],['camFollow','follow'],['camTop','top']].forEach(([id,k])=>{
+  $(id).onclick=()=>{ UI.cam=k; syncCamBtns(); }; });
+$('curSl').oninput=e=>{ U0=+e.target.value; $('curV').textContent=U0.toFixed(2)+' m/s'; };
+$('spdSl').oninput=e=>{ UI.speed=+e.target.value; $('spdV').textContent=UI.speed.toFixed(1)+'×'; };
+
+/* =====================================================================
+   主循环
+   ===================================================================== */
+let lastT=performance.now(), simAcc=0, frameN=0;
+function frame(now){
+  requestAnimationFrame(frame);
+  frameN++;
+  const dtReal=Math.min(0.05,(now-lastT)/1000); lastT=now;
+  if(UI.running && PY.ready && CFG.started){
+    simAcc+=dtReal*UI.speed; let guard=0;
+    while(simAcc>0.01 && guard<200){ stepWorld(0.01); simAcc-=0.01; guard++; }
+    if(frameN%4===0) pushTrail();
+  }
+  // 更新各机模型
+  for(let i=0;i<AGN;i++){
+    const s=fleet[i].s, alive=!DBG||DBG.agents[i].alive;
+    robs[i].group.visible=true;
+    robs[i].group.position.copy(N2T(s[0],s[1],s[2]));
+    robs[i].group.rotation.set(0,0,0);
+    robs[i].group.rotateY(s[4]); robs[i].group.rotateX(-s[3]);
+    robs[i].props[0].rotation.z+=fleet[i].TL*0.5; robs[i].props[1].rotation.z-=fleet[i].TR*0.5;
+    robs[i].rudder.rotation.x=s[11];
+    // 失效机变暗
+    robs[i].group.traverse(o=>{ if(o.material&&o.material.emissive!==undefined){} });
+    robs[i].group.children.forEach(ch=>{ if(ch.material) ch.material.opacity=alive?1:0.35; });
+  }
+  // 队形槽位幽灵 + 通信链路
+  if(DBG){
+    updateSlots(); updateCommLines();
+  }
+  // 水面波动
+  if(waterGeo){ const pos=waterGeo.attributes.position;
+    for(let i=0;i<pos.count;i++)
+      pos.setZ(i,0.02*Math.sin(pos.getX(i)*2+simT*1.6)*Math.cos(pos.getY(i)*0.8+simT*0.9));
+    pos.needsUpdate=true; }
+  if(frameN%6===0) refreshHUD();
+  updateCamera(dtReal);
+  renderer.render(scene,camera);
+}
+
+function updateSlots(){
+  // 期望槽位 = 编队质心估计参考 + 旋转偏移；这里用 Python 回传的 xi + psi_f 近似示意
+  const psif=DBG.form.psi_f;
+  for(let i=0;i<AGN;i++){
+    const a=DBG.agents[i];
+    if(!a.alive){ slots[i].visible=false; continue; }
+    slots[i].visible=true;
+    // 用本机参考估计 xi 作为槽位锚（与 Formation 内一致）
+    const xi=a.xi;
+    slots[i].position.copy(N2T(xi[0],xi[1],0.03));
+  }
+}
+function updateCommLines(){
+  const edges=DBG.edges||[];
+  if(commLines.length!==edges.length) rebuildCommLines(edges);
+  edges.forEach((e,k)=>{
+    const [i,j,ok]=e;
+    const pi=N2T(fleet[i].s[0],fleet[i].s[1],fleet[i].s[2]);
+    const pj=N2T(fleet[j].s[0],fleet[j].s[1],fleet[j].s[2]);
+    const arr=commLines[k].geometry.attributes.position.array;
+    arr[0]=pi.x;arr[1]=pi.y;arr[2]=pi.z; arr[3]=pj.x;arr[4]=pj.y;arr[5]=pj.z;
+    commLines[k].geometry.attributes.position.needsUpdate=true;
+    commLines[k].material.opacity=ok?0.7:0.12;
+    commLines[k].material.color.setHex(ok?0x7fe0ff:0x556);
+  });
+}
+
+addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+
+/* ---------- 测试钩子（无渲染快进，探针用） ---------- */
+window.__S = {
+  fleet, get DBG(){ return DBG; }, get pyReady(){ return PY.ready; }, METRICS,
+  set:(c)=>PY.set(c),
+  reset(){ resetWorld(); },
+  ff(maxSec){
+    if(!PY.ready) throw new Error('Python core not ready');
+    if(!CFG.started){ PY.mod.swarm_start(); CFG.started=true; }
+    const n=Math.round(maxSec/0.01);
+    for(let i=0;i<n;i++) stepWorld(0.01);
+    refreshHUD();
+    const f=DBG.form;
+    return { t:+simT.toFixed(1), mode:f.mode, shape:f.shape, consensus:f.consensus,
+      form_err:+f.form_err.toFixed(3), cons_err:+f.cons_err.toFixed(3),
+      los_e:+Math.abs(f.los_e).toFixed(3), n_alive:f.n_alive, connected:f.connected,
+      laps:f.laps, formAvg:+METRICS.formAvg().toFixed(3),
+      centroid:DBG.ref, agents:DBG.agents.map(a=>({id:a.id,alive:a.alive,x:a.x,y:a.y,base:a.base})) };
+  }
+};
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
