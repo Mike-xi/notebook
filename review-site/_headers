@@ -8,6 +8,10 @@
 /viewer-md.html
   Cache-Control: public, max-age=0, must-revalidate
 
+# 大创演示 /dc：迭代频繁，改完必须立刻生效
+/dc/*
+  Cache-Control: public, max-age=0, must-revalidate
+
 # 英汉词典分片数据：内容稳定、体积大，浏览器本地长缓存一天，避免重复下载
 /dict/*
   Cache-Control: public, max-age=86400
