@@ -151,9 +151,9 @@ scene.fog=new THREE.FogExp2(0x7aa8c8,0.016);
 const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.05,600);
 scene.add(new THREE.AmbientLight(0xbfd4e6,0.75));
 const sun=new THREE.DirectionalLight(0xfff2dd,1.1);
-sun.position.set(14,20,8); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048);
+sun.position.set(9+14,20,23+8); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048);
 sun.shadow.camera.left=-32; sun.shadow.camera.right=32; sun.shadow.camera.top=32; sun.shadow.camera.bottom=-32;
-scene.add(sun);
+sun.target.position.set(9,0,23); scene.add(sun.target); scene.add(sun);   // 阴影相机对准湖心，远端也有影
 addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
 const N2T=(x,y,z)=>new THREE.Vector3(y,-z,x);
 
@@ -286,15 +286,15 @@ function subPose(s,dt){
   for(const o of OBST){ const d=Math.hypot(s.x-o.x,s.y-o.y), min=o.r+0.32;
     if(d<min){ const k=(min-d)/Math.max(d,0.01); s.x+=(s.x-o.x)*k; s.y+=(s.y-o.y)*k; s.u*=0.85; } }
 }
-function placeMesh(s,t){
+function placeMesh(s,t,dt){
   const g=s.mesh.group;
   g.position.copy(N2T(s.x,s.y,s.z));
   if(s.alive){ g.position.y+= 0.012*Math.sin(1.1*t+s.x); }
   g.rotation.set(0,0,0);
-  g.rotateY(Math.PI/2 - s.psi);
+  g.rotateY(s.psi);            // 与 /dc 演示一致：NED 航向 ψ 正向 = 绕 THREE Y 正转
   if(!s.alive){ g.rotateX(clamp(s.sinkT*0.5,0,0.9)); }
   for(const p of s.mesh.props) p.rotation.z += (s.alive? (0.3+Math.abs(s.u))*0.6 : 0.02);
-  if(s.flashT>0){ s.flashT-=1/60; const f=Math.sin(s.flashT*40)>0;
+  if(s.flashT>0){ s.flashT-=dt; const f=Math.sin(s.flashT*40)>0;
     s.mesh.group.traverse(m=>{ if(m.isMesh&&m.material.emissive) m.material.emissive.setHex(f?0x661111:0x000000); });
     if(s.flashT<=0) s.mesh.group.traverse(m=>{ if(m.isMesh&&m.material.emissive) m.material.emissive.setHex(0x000000); });
   }
@@ -323,7 +323,8 @@ const bubGeo=new THREE.SphereGeometry(0.02,6,5);
 const bubMat=new THREE.MeshBasicMaterial({color:0xcfeaff,transparent:true,opacity:0.55});
 function spawnBubble(x,y,z){
   let b=bubbles.find(b=>!b.on);
-  if(!b){ b={mesh:new THREE.Mesh(bubGeo,bubMat.clone()),on:false,t:0}; scene.add(b.mesh); bubbles.push(b); if(bubbles.length>240) return; }
+  if(!b){ if(bubbles.length>=240) return;
+    b={mesh:new THREE.Mesh(bubGeo,bubMat.clone()),on:false,t:0}; scene.add(b.mesh); bubbles.push(b); }
   b.on=true; b.t=0; b.mesh.visible=true; b.mesh.position.copy(N2T(x,y,z)); b.mesh.scale.setScalar(0.6+Math.random()*0.6);
 }
 function stepBubbles(dt){ for(const b of bubbles){ if(!b.on) continue; b.t+=dt; b.mesh.position.y+=0.25*dt; b.mesh.material.opacity=0.55*(1-b.t/1.1); b.mesh.scale.multiplyScalar(1+0.8*dt);
@@ -426,6 +427,7 @@ addEventListener('keydown',e=>{ if(e.code==='Space') e.preventDefault(); KEY[e.c
   if(e.code==='Space') tryFire();
   if(e.code==='Enter' && $('startOv').style.display!=='none') startGame(); });
 addEventListener('keyup',e=>KEY[e.code]=false);
+addEventListener('blur',()=>{ for(const k in KEY) KEY[k]=false; });   // 失焦清键，防按键卡死
 function tryFire(){
   if(!RUN.on||!player.alive) return;
   const i=tubes[0]<=0?0:(tubes[1]<=0?1:-1);
@@ -434,7 +436,7 @@ function tryFire(){
   fireTorp(player,false);
 }
 /* 相机轨道 */
-const cam={ yaw:-0.5, pitch:0.42, dist:3.4, drag:false, px:0, py:0 };
+const cam={ yaw:0, pitch:0.42, dist:3.4, drag:false, px:0, py:0 };
 addEventListener('mousedown',e=>{ if(e.target.closest('.panel,.overlay,#back'))return; cam.drag=true; cam.px=e.clientX; cam.py=e.clientY; });
 addEventListener('mousemove',e=>{ if(!cam.drag)return; cam.yaw-=(e.clientX-cam.px)*0.005; cam.pitch=clamp(cam.pitch+(e.clientY-cam.py)*0.004,0.08,1.25); cam.px=e.clientX; cam.py=e.clientY; });
 addEventListener('mouseup',()=>cam.drag=false);
@@ -522,7 +524,10 @@ function loop(now){
       const thr=(KEY.KeyW||KEY.ArrowUp?1:0)+(KEY.KeyS||KEY.ArrowDown?-1:0);
       const trn=(KEY.KeyA||KEY.ArrowLeft?-1:0)+(KEY.KeyD||KEY.ArrowRight?1:0);
       const dz =(KEY.KeyQ?1:0)+(KEY.KeyE?-1:0);
-      player.u += ((thr>0?U_MAX:(thr<0?U_REV:0))-player.u)*dt*1.6;
+      // 油门（学水池演示手感）：W 渐进推杆；松开滑行减速；S 在前进时先急制动，停稳后才倒车
+      if(thr>0)           player.u += (U_MAX-player.u)*dt*1.6;
+      else if(thr<0)      player.u += ((player.u>0.08? 0:U_REV)-player.u)*dt*(player.u>0.08?4.5:1.6);
+      else                player.u += (0-player.u)*dt*1.1;
       player.psi += trn*YAW_MAX*(0.45+0.55*Math.min(1,Math.abs(player.u)/0.5))*dt;
       player.z = clamp(player.z+dz*0.45*dt, Z_MIN, Z_MAX);
       subPose(player,dt);
@@ -540,7 +545,7 @@ function loop(now){
       tp.x+=Math.cos(tp.psi)*tp.v*dt; tp.y+=Math.sin(tp.psi)*tp.v*dt; tp.life-=dt;
       tp.trailAcc+=dt; if(tp.trailAcc>0.05){ tp.trailAcc=0; spawnBubble(tp.x,tp.y,tp.z); }
       tp.mesh.position.copy(N2T(tp.x,tp.y,tp.z));
-      tp.mesh.rotation.set(0,Math.PI/2-tp.psi,0);
+      tp.mesh.rotation.set(0,tp.psi,0);
       let dead=tp.life<=0 || tp.x<0.3||tp.x>LAKE.len-0.3||tp.y<0.3||tp.y>LAKE.wid-0.3;
       if(!dead) for(const o of OBST){ if(Math.hypot(tp.x-o.x,tp.y-o.y)<o.r+0.08){ dead=true; explode(tp.x,tp.y,tp.z,false); break; } }
       if(!dead){
@@ -554,8 +559,8 @@ function loop(now){
   }
 
   stepBubbles(dt); stepBooms(dt);
-  placeMesh(player,t);
-  for(const e of enemies) placeMesh(e,t);
+  placeMesh(player,t,dt);
+  for(const e of enemies) placeMesh(e,t,dt);
 
   // 水面微波
   if(waterGeo){ const pos=waterGeo.attributes.position;
@@ -563,9 +568,9 @@ function loop(now){
       pos.setZ(i, 0.02*Math.sin(0.8*x+1.4*t)+0.015*Math.cos(0.6*y+1.1*t)); }
     pos.needsUpdate=true; }
 
-  // 第三人称相机
+  // 第三人称相机（默认吊在艇艉后方）
   const anchor=N2T(player.x,player.y,Math.min(player.z,1.2));
-  const yaw=(Math.PI/2-player.psi)+cam.yaw;
+  const yaw=player.psi+Math.PI+cam.yaw;
   const cx=anchor.x+Math.sin(yaw)*Math.cos(cam.pitch)*cam.dist;
   const cz=anchor.z+Math.cos(yaw)*Math.cos(cam.pitch)*cam.dist;
   const cy=anchor.y+Math.sin(cam.pitch)*cam.dist;
