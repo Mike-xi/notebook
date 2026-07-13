@@ -80,6 +80,18 @@
     "tags": ["OSINT", "情报", "实时地图"]
   },
   {
+    "file": "subwar",
+    "title": "深海猎杀 · 潜艇鱼雷战",
+    "subject": "游戏",
+    "description": "自由操控半潜艇与 AI 敌艇鱼雷对战 · 波次进攻 / 声纳地图 / 变深机动 · 3D 场景与艇体沿用大创数字水池引擎",
+    "icon": "⚓",
+    "color": "#2C6FD6",
+    "kind": "html",
+    "category": "play",
+    "link": "/subwar.html",
+    "tags": ["游戏", "潜艇", "鱼雷", "3D", "大创"]
+  },
+  {
     "file": "basketball.html",
     "title": "3D 投篮物理模拟器",
     "subject": "大学物理",
