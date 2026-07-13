@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420">
+  <defs>
+    <linearGradient id="bg4" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0a1e30"/><stop offset="1" stop-color="#04101c"/>
+    </linearGradient>
+    <linearGradient id="slab" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0e2f4a"/><stop offset="1" stop-color="#0a2438"/>
+    </linearGradient>
+  </defs>
+  <rect width="720" height="420" fill="url(#bg4)"/>
+
+  <!-- 等轴测薄板 -->
+  <polygon points="120,230 480,150 700,220 340,310" fill="url(#slab)"/>
+  <polygon points="120,230 340,310 340,326 120,246" fill="#081c2e"/>
+  <polygon points="340,310 700,220 700,236 340,326" fill="#071828"/>
+  <polygon points="120,230 480,150 700,220 340,310" fill="none" stroke="#56b8e6" stroke-opacity=".28"/>
+  <!-- 板上网格 -->
+  <g stroke="#56b8e6" stroke-opacity=".10">
+    <line x1="210" y1="210" x2="430" y2="288"/>
+    <line x1="300" y1="190" x2="520" y2="268"/><line x1="390" y1="170" x2="610" y2="248"/>
+    <line x1="192" y1="246" x2="552" y2="166"/><line x1="264" y1="272" x2="624" y2="192"/>
+  </g>
+
+  <!-- 三条 3D 轨迹（蓝/琥珀/绿），从板面升起 -->
+  <g fill="none" stroke-width="2.2" stroke-linecap="round">
+    <path d="M180,242 C260,196 320,214 380,186 C440,158 500,180 560,158" stroke="#56b8e6"/>
+    <path d="M200,258 C280,214 340,232 400,204 C460,176 520,198 580,176" stroke="#e8b64c" stroke-opacity=".9"/>
+    <path d="M222,274 C300,232 360,250 420,222 C480,194 540,216 600,194" stroke="#3fbf8f" stroke-opacity=".9"/>
+  </g>
+  <!-- 轨迹端点航点 -->
+  <g>
+    <circle cx="560" cy="158" r="4" fill="#56b8e6"><animate attributeName="r" dur="2.4s" repeatCount="indefinite" values="3.4;5;3.4"/></circle>
+    <circle cx="580" cy="176" r="4" fill="#e8b64c"><animate attributeName="r" dur="2.4s" begin=".4s" repeatCount="indefinite" values="3.4;5;3.4"/></circle>
+    <circle cx="600" cy="194" r="4" fill="#3fbf8f"><animate attributeName="r" dur="2.4s" begin=".8s" repeatCount="indefinite" values="3.4;5;3.4"/></circle>
+  </g>
+
+  <!-- 悬浮面板一：RMS 折线图 -->
+  <g transform="translate(96,76)">
+    <rect width="180" height="104" rx="9" fill="#081826" stroke="#56b8e6" stroke-opacity=".3"/>
+    <text x="12" y="20" font-size="10" fill="#8fb0cc" letter-spacing="1.5" font-family="sans-serif">FORMATION RMS [m]</text>
+    <g stroke="#56b8e6" stroke-opacity=".12"><line x1="12" y1="46" x2="168" y2="46"/><line x1="12" y1="68" x2="168" y2="68"/></g>
+    <path d="M12,84 L36,70 L60,74 L84,56 L108,60 L132,44 L156,48 L168,40" fill="none" stroke="#e8b64c" stroke-width="1.8"/>
+    <path d="M12,88 L36,82 L60,84 L84,76 L108,78 L132,70 L156,72 L168,66" fill="none" stroke="#56b8e6" stroke-width="1.8"/>
+  </g>
+
+  <!-- 悬浮面板二：矩阵柱状 -->
+  <g transform="translate(508,60)">
+    <rect width="150" height="112" rx="9" fill="#081826" stroke="#56b8e6" stroke-opacity=".3"/>
+    <text x="12" y="20" font-size="10" fill="#8fb0cc" letter-spacing="1.5" font-family="sans-serif">96-RUN MATRIX</text>
+    <g>
+      <rect x="16" y="62" width="14" height="34" fill="#56b8e6" opacity=".9"/>
+      <rect x="38" y="50" width="14" height="46" fill="#56b8e6" opacity=".65"/>
+      <rect x="60" y="40" width="14" height="56" fill="#e8b64c" opacity=".8"/>
+      <rect x="82" y="56" width="14" height="40" fill="#e8b64c" opacity=".55"/>
+      <rect x="104" y="34" width="14" height="62" fill="#3fbf8f" opacity=".8"/>
+      <rect x="126" y="46" width="14" height="50" fill="#3fbf8f" opacity=".55"/>
+    </g>
+  </g>
+
+  <!-- 连接线：面板锚到板面 -->
+  <g stroke="#56b8e6" stroke-opacity=".3" stroke-dasharray="3 4">
+    <line x1="186" y1="180" x2="240" y2="228"/>
+    <line x1="583" y1="172" x2="560" y2="212"/>
+  </g>
+</svg>

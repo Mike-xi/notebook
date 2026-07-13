@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>蛟人半潜器 · 全系统集成展示（阶段四）</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0a1622;font-family:"Microsoft YaHei",sans-serif;color:#cfe4f2}
+  #c3d{position:absolute;inset:0}
+  .panel{position:absolute;background:rgba(8,20,34,.86);border:1px solid #1e4460;border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.55;backdrop-filter:blur(4px)}
+  h1{font-size:15px;margin:0;color:#8fd8ff;letter-spacing:1px}
+  #titlebar{top:10px;left:50%;transform:translateX(-50%);text-align:center;white-space:nowrap}
+  #titlebar small{color:#7a9ab0;font-size:11px}
+  #left{top:10px;left:10px;width:250px;max-height:calc(100% - 40px);overflow-y:auto}
+  #right{top:10px;right:10px;width:280px}
+  .sec{border-top:1px solid #1d3a52;margin-top:8px;padding-top:8px}
+  .sec:first-child{border-top:none;margin-top:0;padding-top:0}
+  .sechead{color:#8fd8ff;font-weight:bold;margin-bottom:4px}
+  select,button,input[type=range]{background:#10293e;color:#cfe4f2;border:1px solid #2a5578;border-radius:6px;font-size:12px;padding:3px 6px}
+  select{width:100%;margin:2px 0}
+  button{cursor:pointer;margin:2px 2px 2px 0}
+  button:hover{background:#1a3d5c}
+  button.primary{background:#1c5a8a;border-color:#3f88c0}
+  button.primary:hover{background:#2a6fa5}
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px}
+  .kpi{background:#0e2338;border:1px solid #1d3a52;border-radius:6px;padding:4px 7px}
+  .kpi .v{color:#ffd479;font-size:15px;font-weight:bold}
+  .kpi .l{color:#7a9ab0;font-size:10px}
+  .navbtns button{width:100%;text-align:left;margin:2px 0}
+  #chart{background:#0e2338;border:1px solid #1d3a52;border-radius:6px;width:100%}
+  #timeline{width:100%}
+  .lbl{color:#7a9ab0}
+  table{border-collapse:collapse;width:100%;font-size:11px;margin-top:3px}
+  td,th{border:1px solid #1d3a52;padding:2px 5px;text-align:center}
+  th{color:#8fd8ff;background:#0e2338}
+  #loadBox{top:50%;left:50%;transform:translate(-50%,-50%);width:400px;text-align:center;z-index:9}
+  #loadBox h1{margin-bottom:8px}
+  #err{color:#ff9a7a}
+</style>
+</head>
+<body>
+<div id="c3d"></div>
+
+<div class="panel" id="titlebar">
+  <h1>蛟人半潜器 · 全系统集成展示</h1>
+  <small>阶段四 ｜ 实验矩阵闭环数据回放（阶段一动力学 × 阶段三编队引擎）｜ SJTU 大创 IPP32027</small>
+</div>
+
+<div class="panel" id="left">
+  <div class="sec">
+    <div class="sechead">🧪 实验工况选择（96 组全真实闭环）</div>
+    <span class="lbl">横流强度 [m/s]</span><select id="selCur"></select>
+    <span class="lbl">编队增益 Kp</span><select id="selKp"></select>
+    <span class="lbl">链路丢包率</span><select id="selLoss"></select>
+    <span class="lbl">通信拓扑</span><select id="selTopo"></select>
+  </div>
+  <div class="sec">
+    <div class="sechead">📊 本组结果</div>
+    <div class="kpis">
+      <div class="kpi"><div class="v" id="kRms">–</div><div class="l">RMS 均值 [m]</div></div>
+      <div class="kpi"><div class="v" id="kPeak">–</div><div class="l">RMS 峰值 [m]</div></div>
+      <div class="kpi"><div class="v" id="kSep">–</div><div class="l">最小机间距 [m]</div></div>
+      <div class="kpi"><div class="v" id="kTime">–</div><div class="l">完成用时 [s]</div></div>
+    </div>
+  </div>
+  <div class="sec">
+    <div class="sechead">🗂 矩阵总览</div>
+    <div id="aggBox">加载中…</div>
+  </div>
+  <div class="sec">
+    <div class="sechead">🚀 各阶段演示入口</div>
+    <div class="navbtns">
+      <button onclick="parent.postMessage({dcNav:'cruise'},'*')">阶段一二 · 综合场景引擎（单机避障巡航）</button>
+      <button onclick="parent.postMessage({dcNav:'sim'},'*')">阶段一二 · 交互可视化平台</button>
+      <button onclick="parent.postMessage({dcNav:'formation'},'*')">阶段三 · 多机编队实时演示</button>
+    </div>
+    <div class="lbl" style="margin-top:4px">※ 点击可切换到对应演示场景</div>
+  </div>
+</div>
+
+<div class="panel" id="right">
+  <div class="sec">
+    <div class="sechead">▶ 回放控制</div>
+    <button class="primary" id="btnPlay">▶ 播放</button>
+    <button id="btnCam">📷 视角：环绕</button>
+    速度 <select id="selSpd" style="width:60px;display:inline-block">
+      <option>1</option><option selected>2</option><option>4</option><option>8</option><option>16</option>
+    </select>×
+    <input type="range" id="timeline" min="0" max="1000" value="0">
+    <div><span class="lbl">t = </span><span id="tNow">0.0</span>s ／ <span id="tEnd">–</span>s
+      ｜ <span class="lbl">RMS</span> <span id="rmsNow" style="color:#ffd479">–</span> m
+      ｜ <span class="lbl">WP</span> <span id="wpNow">–</span></div>
+  </div>
+  <div class="sec">
+    <div class="sechead">📈 编队 RMS 误差时序</div>
+    <canvas id="chart" width="256" height="110"></canvas>
+  </div>
+  <div class="sec">
+    <div class="sechead">❓ 数据说明</div>
+    <div class="lbl" style="font-size:11px">每组实验：3 机三角编队 4 航点巡逻，38×14m 河道。
+    物理=阶段一 5 自由度模型（RK4 100Hz），决策控制=阶段三蛟人核心 v2
+    （速度场一致性编队 + M1 控制），通信=拓扑约束 + Gilbert-Elliott 突发丢包。
+    仿真脚本 <b>仿真\run_experiment_matrix.py</b>，数据
+    <b>experiment_matrix.csv / fleet_log.json</b>（本页直读，无预设数据）。</div>
+  </div>
+</div>
+
+<div class="panel" id="loadBox">
+  <h1>加载实验数据</h1>
+  <div id="loadMsg">正在读取 仿真/输出/fleet_log.json …</div>
+  <div id="err"></div>
+  <input type="file" id="filePick" accept=".json" style="display:none;margin-top:8px">
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const WPS=[[7,7,.5],[14,10,.8],[23,10,.6],[32,7,.5]];
+const START=[2,7,.45,0];
+const RIVER={len:38,wid:14,dep:2.2};
+const P={L:0.55,D:0.09,thrY:0.06};
+const AGENT_COLORS=[0xff8c42,0x3fbf6f,0x3f8fd0];
+const AGENT_NAMES=['领航','跟随1','跟随2'];
+const N2T=(x,y,z)=>new THREE.Vector3(y,-z,x);
+const wrap=a=>{a=(a+Math.PI)%(2*Math.PI); if(a<0)a+=2*Math.PI; return a-Math.PI;};
+
+// ---------- three 场景 ----------
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight); renderer.setPixelRatio(devicePixelRatio);
+renderer.shadowMap.enabled=true; $('c3d').appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x87b8d8);
+scene.fog=new THREE.FogExp2(0x7aa8c8,0.016);
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.05,600);
+scene.add(new THREE.AmbientLight(0xbfd4e6,0.8));
+const sun=new THREE.DirectionalLight(0xfff2dd,1.1);
+sun.position.set(14,20,8); sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=-30;sun.shadow.camera.right=30;sun.shadow.camera.top=30;sun.shadow.camera.bottom=-30;
+scene.add(sun);
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+
+(function buildRiver(){
+  const {len,wid,dep}=RIVER;
+  const bed=new THREE.Mesh(new THREE.PlaneGeometry(wid,len),new THREE.MeshStandardMaterial({color:0x556052,roughness:1}));
+  bed.rotation.x=-Math.PI/2; bed.position.set(wid/2,-dep,len/2); bed.receiveShadow=true; scene.add(bed);
+  const pebMat=new THREE.MeshStandardMaterial({color:0x6e7a70,roughness:.95});
+  for(let i=0;i<40;i++){const p=new THREE.Mesh(new THREE.DodecahedronGeometry(0.05+Math.random()*0.09,0),pebMat);
+    p.position.set(Math.random()*wid,-dep+0.04,Math.random()*len); p.rotation.set(Math.random()*3,Math.random()*3,0); scene.add(p);}
+  function bank(edgeX,sgn){const prof=[[0,-dep],[0.55,-0.03],[1.15,0.2],[3.4,0.6],[9,1.25]];
+    const cols=[0x4f4433,0xc9b585,0x5b8a4a,0x4e7a42]; const L=len+24,z0=-12;
+    for(let i=0;i<prof.length-1;i++){const [x1,y1]=prof[i],[x2,y2]=prof[i+1];
+      const g=new THREE.BufferGeometry();
+      g.setAttribute('position',new THREE.BufferAttribute(new Float32Array([
+        edgeX+sgn*x1,y1,z0, edgeX+sgn*x2,y2,z0, edgeX+sgn*x2,y2,z0+L,
+        edgeX+sgn*x1,y1,z0, edgeX+sgn*x2,y2,z0+L, edgeX+sgn*x1,y1,z0+L]),3));
+      g.computeVertexNormals();
+      const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({color:cols[i],roughness:.95,side:THREE.DoubleSide}));
+      m.receiveShadow=true; scene.add(m);}}
+  bank(0,-1); bank(wid,1);
+  const trunkMat=new THREE.MeshStandardMaterial({color:0x6a4a30}),
+        leafMat=new THREE.MeshStandardMaterial({color:0x3c6b3a,roughness:.9}),
+        hillMat=new THREE.MeshStandardMaterial({color:0x486e42,roughness:1});
+  for(let i=0;i<12;i++){const sgn=i%2?-1:1,edge=i%2?0:wid;const off=2.8+Math.random()*3.6,zz=(i*3.2)%len+1;
+    const s=0.8+Math.random()*0.6,g=new THREE.Group();
+    const tr=new THREE.Mesh(new THREE.CylinderGeometry(0.06*s,0.09*s,0.8*s),trunkMat); tr.position.y=0.4*s; g.add(tr);
+    const l1=new THREE.Mesh(new THREE.ConeGeometry(0.55*s,1.0*s,8),leafMat); l1.position.y=1.1*s; l1.castShadow=true; g.add(l1);
+    g.position.set(edge+sgn*off,0.45+off*0.09,zz); scene.add(g);}
+  for(let i=0;i<6;i++){const sgn=i%2?-1:1,edge=i%2?0:wid;
+    const h=new THREE.Mesh(new THREE.SphereGeometry(6+Math.random()*5,12,8),hillMat);
+    h.position.set(edge+sgn*(14+Math.random()*6),-2.5,(i*8+4)%len); h.scale.y=0.55; scene.add(h);}
+  const water=new THREE.Mesh(new THREE.PlaneGeometry(wid,len,24,60),
+    new THREE.MeshStandardMaterial({color:0x2e7fb8,transparent:true,opacity:0.55,metalness:0.35,roughness:0.2,side:THREE.DoubleSide}));
+  water.rotation.x=-Math.PI/2; water.position.set(wid/2,0,len/2); scene.add(water);
+})();
+
+// 航点浮标 + 计划航线
+WPS.forEach(wp=>{const buoy=new THREE.Group();
+  buoy.add(new THREE.Mesh(new THREE.SphereGeometry(0.14,16,12),new THREE.MeshStandardMaterial({color:0xffd045,emissive:0x664400})));
+  const line=new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.012,wp[2]),new THREE.MeshStandardMaterial({color:0xffe9a0,transparent:true,opacity:.5}));
+  line.position.y=-wp[2]/2; buoy.add(line);
+  const tgt=new THREE.Mesh(new THREE.SphereGeometry(0.08,12,8),new THREE.MeshStandardMaterial({color:0xff7043,emissive:0x552200}));
+  tgt.position.y=-wp[2]; buoy.add(tgt);
+  buoy.position.copy(N2T(wp[0],wp[1],0)); scene.add(buoy);});
+scene.add(new THREE.Line(
+  new THREE.BufferGeometry().setFromPoints([[START[0],START[1],0],...WPS.map(w=>[w[0],w[1],0])].map(p=>N2T(p[0],p[1],p[2]))),
+  new THREE.LineBasicMaterial({color:0x4fd8ff,transparent:true,opacity:.35})));
+
+// ---------- 潜航器模型（与阶段一二/三同款） ----------
+function buildSubMesh(color=0xff8c42,finColor=0x16385c){
+  const g=new THREE.Group();
+  const hullMat=new THREE.MeshStandardMaterial({color,roughness:.45,metalness:.35});
+  const finMat=new THREE.MeshStandardMaterial({color:finColor,roughness:.5,metalness:.3});
+  const darkMat=new THREE.MeshStandardMaterial({color:0x2b3640,roughness:.5,metalness:.4});
+  const hull=new THREE.Mesh(new THREE.CylinderGeometry(P.D/2,P.D/2,P.L*0.78,24),hullMat);
+  hull.rotation.x=Math.PI/2; hull.castShadow=true; g.add(hull);
+  const nose=new THREE.Mesh(new THREE.SphereGeometry(P.D/2,20,14,0,Math.PI*2,0,Math.PI/2),
+    new THREE.MeshStandardMaterial({color:0x9fd4f0,roughness:.15,metalness:.1,side:THREE.DoubleSide}));
+  nose.rotation.x=Math.PI/2; nose.position.z=P.L*0.39; nose.castShadow=true; g.add(nose);
+  const lens=new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.015,0.006,14),
+    new THREE.MeshStandardMaterial({color:0x0d1c28,roughness:.2,metalness:.6}));
+  lens.rotation.x=Math.PI/2; lens.position.z=P.L*0.39+P.D/2-0.004; g.add(lens);
+  const tail=new THREE.Mesh(new THREE.ConeGeometry(P.D/2,P.L*0.18,20),hullMat);
+  tail.rotation.x=-Math.PI/2; tail.position.z=-P.L*0.48; tail.castShadow=true; g.add(tail);
+  const mast=new THREE.Mesh(new THREE.CylinderGeometry(0.008,0.008,0.147),new THREE.MeshStandardMaterial({color:0xd0dae2}));
+  mast.position.set(0,0.093,P.L*0.1); g.add(mast);
+  const flag=new THREE.Mesh(new THREE.BoxGeometry(0.005,0.03,0.05),
+    new THREE.MeshStandardMaterial({color:0xff5544,emissive:0x441111,side:THREE.DoubleSide}));
+  flag.position.set(0,0.152,P.L*0.1-0.025); g.add(flag);
+  const props=[];
+  const bladeMat=new THREE.MeshStandardMaterial({color:0xb8ccd8,roughness:.35,metalness:.55,side:THREE.DoubleSide});
+  const bladeShape=new THREE.Shape();
+  bladeShape.moveTo(0,0.004);
+  bladeShape.quadraticCurveTo(0.014,0.012,0.011,0.030);
+  bladeShape.quadraticCurveTo(0.004,0.035,-0.004,0.028);
+  bladeShape.quadraticCurveTo(-0.008,0.014,0,0.004);
+  const bladeGeo=new THREE.ExtrudeGeometry(bladeShape,{depth:0.0016,bevelEnabled:false});
+  [-1,1].forEach(side=>{
+    const pg=new THREE.Group();
+    const pod=new THREE.Mesh(new THREE.CylinderGeometry(0.011,0.011,0.05,12),darkMat);
+    pod.rotation.x=Math.PI/2; pod.position.z=0.02; pg.add(pod);
+    const strut=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.006,0.02),darkMat);
+    strut.position.set(-side*0.03,0,0.02); pg.add(strut);
+    const duct=new THREE.Mesh(new THREE.CylinderGeometry(0.037,0.039,0.032,24,1,true),
+      new THREE.MeshStandardMaterial({color:0x24455e,roughness:.6,metalness:.3,side:THREE.DoubleSide}));
+    duct.rotation.x=Math.PI/2; duct.position.z=-0.012; pg.add(duct);
+    const spin=new THREE.Group(); spin.position.z=-0.012;
+    const spinner=new THREE.Mesh(new THREE.ConeGeometry(0.008,0.02,12),darkMat);
+    spinner.rotation.x=-Math.PI/2; spinner.position.z=-0.008; spin.add(spinner);
+    const hub=new THREE.Mesh(new THREE.CylinderGeometry(0.009,0.009,0.014,12),darkMat);
+    hub.rotation.x=Math.PI/2; spin.add(hub);
+    for(let i=0;i<3;i++){const holder=new THREE.Group(); holder.rotation.z=i*2*Math.PI/3;
+      const bl=new THREE.Mesh(bladeGeo,bladeMat); bl.rotation.y=0.55*side; bl.position.y=0.006;
+      holder.add(bl); spin.add(holder);}
+    pg.add(spin); pg.position.set(side*P.thrY,-0.01,-P.L*0.42); g.add(pg); props.push(spin);});
+  const rud=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.006,0.055),finMat);
+  rud.position.set(0,0,-P.L*0.52); g.add(rud);
+  const fin=new THREE.Mesh(new THREE.BoxGeometry(0.005,0.05,0.05),finMat);
+  fin.position.set(0,0.045,-P.L*0.46); g.add(fin);
+  return {group:g,props};
+}
+
+const boats=[];
+for(let i=0;i<3;i++){
+  const m=buildSubMesh(AGENT_COLORS[i], i===0?0x223344:0x112233);
+  scene.add(m.group);
+  const canvas=document.createElement('canvas'); canvas.width=128; canvas.height=48;
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='rgba(8,20,34,0.7)'; ctx.fillRect(0,0,128,48);
+  ctx.strokeStyle='#7fd0ff'; ctx.strokeRect(2,2,124,44);
+  ctx.fillStyle='#ffd479'; ctx.font='bold 22px Microsoft YaHei'; ctx.fillText('#'+i+' '+AGENT_NAMES[i],10,32);
+  const label=new THREE.Mesh(new THREE.PlaneGeometry(0.7,0.26),
+    new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(canvas),transparent:true,side:THREE.DoubleSide}));
+  label.position.set(0,0.55,0); m.group.add(label);
+  const TRAIL_MAX=400;
+  const tg=new THREE.BufferGeometry();
+  tg.setAttribute('position',new THREE.BufferAttribute(new Float32Array(TRAIL_MAX*3),3));
+  const tl=new THREE.Line(tg,new THREE.LineBasicMaterial({color:AGENT_COLORS[i],transparent:true,opacity:.65}));
+  scene.add(tl);
+  boats.push({mesh:m,label,trailGeo:tg,trailN:0,TRAIL_MAX});
+}
+
+// ---------- 数据加载 ----------
+let DATA=null, RUN=null;
+async function loadData(){
+  try{
+    const r=await fetch('data/fleet_log.json');
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    DATA=await r.json(); onDataReady();
+  }catch(e){
+    $('loadMsg').textContent='自动读取失败（file:// 直开或数据未生成）。请手动选择 仿真\\输出\\fleet_log.json：';
+    $('err').textContent=String(e);
+    const fp=$('filePick'); fp.style.display='inline-block';
+    fp.onchange=()=>{const f=fp.files[0]; if(!f)return;
+      const rd=new FileReader();
+      rd.onload=()=>{try{DATA=JSON.parse(rd.result); onDataReady();}catch(err){$('err').textContent='解析失败：'+err;}};
+      rd.readAsText(f);};
+  }
+}
+function uniq(key){return [...new Set(DATA.runs.map(r=>r.factors[key]))].sort((a,b)=>a-b);}
+function onDataReady(){
+  $('loadBox').style.display='none';
+  const fill=(sel,vals,fmt)=>{$(sel).innerHTML=vals.map(v=>`<option value="${v}">${fmt(v)}</option>`).join('');};
+  fill('selCur',uniq('current'),v=>v.toFixed(2));
+  fill('selKp',uniq('kp'),v=>v.toFixed(1));
+  fill('selLoss',uniq('loss_rate'),v=>(v*100).toFixed(0)+'%');
+  $('selTopo').innerHTML=[...new Set(DATA.runs.map(r=>r.factors.topology))]
+    .map(v=>`<option value="${v}">${v==='full'?'全连通 full':'链式 chain'}</option>`).join('');
+  $('selCur').value='0.1'; $('selKp').value='0.8';
+  ['selCur','selKp','selLoss','selTopo'].forEach(id=>$(id).onchange=pickRun);
+  buildAggregate(); pickRun();
+}
+function buildAggregate(){
+  const rs=DATA.runs;
+  const mean=a=>a.reduce((s,x)=>s+x,0)/Math.max(1,a.length);
+  const byTopo=t=>mean(rs.filter(r=>r.factors.topology===t).map(r=>r.summary.rms_avg));
+  const byLoss=l=>mean(rs.filter(r=>Math.abs(r.factors.loss_rate-l)<1e-9).map(r=>r.summary.rms_avg));
+  const losses=uniq('loss_rate');
+  $('aggBox').innerHTML=
+    `共 <b>${rs.length}</b> 组 ｜ 完成 <b style="color:#7fe0a0">${rs.filter(r=>r.summary.completed).length}</b> 组
+    <table><tr><th>因子</th><th>RMS均值[m]</th></tr>
+    <tr><td>全连通</td><td>${byTopo('full').toFixed(2)}</td></tr>
+    <tr><td>链式中继</td><td>${byTopo('chain').toFixed(2)}</td></tr>
+    ${losses.map(l=>`<tr><td>丢包 ${(l*100).toFixed(0)}%</td><td>${byLoss(l).toFixed(2)}</td></tr>`).join('')}
+    </table>`;
+}
+
+// ---------- 回放 ----------
+const PB={t:0,playing:false,spd:2,cam:'orbit'};
+let orbit={az:2.35,el:0.45,dist:9,target:new THREE.Vector3(9,0,14),drag:false,px:0,py:0};
+function pickRun(){
+  const f={current:parseFloat($('selCur').value),kp:parseFloat($('selKp').value),
+           loss_rate:parseFloat($('selLoss').value),topology:$('selTopo').value};
+  RUN=DATA.runs.find(r=>Math.abs(r.factors.current-f.current)<1e-9&&Math.abs(r.factors.kp-f.kp)<1e-9&&
+      Math.abs(r.factors.loss_rate-f.loss_rate)<1e-9&&r.factors.topology===f.topology);
+  if(!RUN) return;
+  const s=RUN.summary;
+  $('kRms').textContent=s.rms_avg.toFixed(3);
+  $('kPeak').textContent=s.rms_peak.toFixed(2);
+  $('kSep').textContent=s.min_sep.toFixed(2);
+  $('kTime').textContent=s.completed?s.completion_time.toFixed(1):'未完成';
+  $('kSep').style.color=s.min_sep<0.3?'#ff9a7a':'#ffd479';
+  $('tEnd').textContent=RUN.log[RUN.log.length-1].t.toFixed(0);
+  PB.t=0; boats.forEach(b=>{b.trailN=0; b.trailGeo.setDrawRange(0,0);});
+  drawChart();
+}
+function frameAt(t){
+  const log=RUN.log;
+  if(t<=log[0].t) return log[0];
+  if(t>=log[log.length-1].t) return log[log.length-1];
+  let i=Math.min(log.length-2,Math.max(0,Math.floor(t-log[0].t)));
+  while(i<log.length-2&&log[i+1].t<=t)i++;
+  while(i>0&&log[i].t>t)i--;
+  const a=log[i],b=log[i+1],u=(t-a.t)/Math.max(1e-9,b.t-a.t);
+  return {t,rms:a.rms+(b.rms-a.rms)*u,wp_i:a.wp_i,
+    pos:a.pos.map((p,k)=>p.map((v,d)=>v+(b.pos[k][d]-v)*u)),
+    psi:a.psi.map((p,k)=>p+wrap(b.psi[k]-p)*u)};
+}
+function drawChart(){
+  const cv=$('chart'),ctx=cv.getContext('2d'),log=RUN.log;
+  ctx.fillStyle='#0e2338'; ctx.fillRect(0,0,cv.width,cv.height);
+  const tMax=log[log.length-1].t, rMax=Math.max(0.5,...log.map(p=>p.rms))*1.1;
+  ctx.strokeStyle='#1d3a52';
+  for(let r=0.5;r<rMax;r+=0.5){const y=cv.height-4-(r/rMax)*(cv.height-10);
+    ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(cv.width,y);ctx.stroke();
+    ctx.fillStyle='#5a7a92';ctx.font='9px sans-serif';ctx.fillText(r.toFixed(1),2,y-2);}
+  ctx.strokeStyle='#ffd479'; ctx.beginPath();
+  log.forEach((p,i)=>{const x=(p.t/tMax)*cv.width,y=cv.height-4-(p.rms/rMax)*(cv.height-10);
+    i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+  ctx.stroke();
+  const xc=(PB.t/tMax)*cv.width;
+  ctx.strokeStyle='#8fd8ff'; ctx.beginPath(); ctx.moveTo(xc,0); ctx.lineTo(xc,cv.height); ctx.stroke();
+}
+$('btnPlay').onclick=()=>{PB.playing=!PB.playing;$('btnPlay').textContent=PB.playing?'⏸ 暂停':'▶ 播放';};
+$('btnCam').onclick=()=>{PB.cam=PB.cam==='orbit'?'follow':'orbit';$('btnCam').textContent=PB.cam==='orbit'?'📷 视角：环绕':'📷 视角：跟随';};
+$('selSpd').onchange=()=>PB.spd=parseFloat($('selSpd').value);
+$('timeline').oninput=()=>{if(!RUN)return;PB.t=(parseFloat($('timeline').value)/1000)*RUN.log[RUN.log.length-1].t;};
+renderer.domElement.addEventListener('mousedown',e=>{orbit.drag=true;orbit.px=e.clientX;orbit.py=e.clientY;});
+addEventListener('mouseup',()=>orbit.drag=false);
+addEventListener('mousemove',e=>{if(!orbit.drag)return;
+  orbit.az-=(e.clientX-orbit.px)*0.005; orbit.el=Math.min(1.35,Math.max(0.05,orbit.el+(e.clientY-orbit.py)*0.004));
+  orbit.px=e.clientX; orbit.py=e.clientY;});
+addEventListener('wheel',e=>{orbit.dist=Math.min(40,Math.max(2,orbit.dist*(1+Math.sign(e.deltaY)*0.1)));});
+
+let lastT=performance.now();
+function loop(){
+  requestAnimationFrame(loop);
+  const now=performance.now(),dt=Math.min(0.1,(now-lastT)/1000); lastT=now;
+  if(RUN){
+    const tMax=RUN.log[RUN.log.length-1].t;
+    if(PB.playing){PB.t+=dt*PB.spd; if(PB.t>=tMax){PB.t=tMax;PB.playing=false;$('btnPlay').textContent='▶ 播放';}}
+    const fr=frameAt(PB.t);
+    for(let i=0;i<3;i++){
+      const b=boats[i],[x,y,z]=fr.pos[i];
+      b.mesh.group.position.copy(N2T(x,y,z));
+      b.mesh.group.rotation.set(0,fr.psi[i],0);
+      b.mesh.props.forEach((s,k)=>s.rotation.z+=(k?-1:1)*dt*20);
+      b.label.quaternion.copy(camera.quaternion);
+      if(PB.playing&&b.trailN<b.TRAIL_MAX){
+        const arr=b.trailGeo.attributes.position.array,v=N2T(x,y,z);
+        arr[b.trailN*3]=v.x;arr[b.trailN*3+1]=v.y;arr[b.trailN*3+2]=v.z;
+        b.trailN++; b.trailGeo.setDrawRange(0,b.trailN); b.trailGeo.attributes.position.needsUpdate=true;}
+    }
+    $('tNow').textContent=PB.t.toFixed(1);
+    $('rmsNow').textContent=fr.rms.toFixed(2);
+    $('wpNow').textContent=(fr.wp_i+1)+'/4';
+    $('timeline').value=Math.round((PB.t/tMax)*1000);
+    drawChart();
+    const s0=boats[0].mesh.group.position;
+    if(PB.cam==='follow'){
+      camera.position.set(s0.x-Math.sin(orbit.az)*3,s0.y+1.6,s0.z-Math.cos(orbit.az)*3);
+      camera.lookAt(s0);
+    }else{
+      orbit.target.lerp(new THREE.Vector3(s0.x,0,s0.z),0.02);
+      camera.position.set(orbit.target.x+orbit.dist*Math.cos(orbit.el)*Math.sin(orbit.az),
+        orbit.target.y+orbit.dist*Math.sin(orbit.el),
+        orbit.target.z+orbit.dist*Math.cos(orbit.el)*Math.cos(orbit.az));
+      camera.lookAt(orbit.target);
+    }
+  } else {
+    camera.position.set(20,10,-6); camera.lookAt(new THREE.Vector3(9,0,14));
+  }
+  renderer.render(scene,camera);
+}
+loadData(); loop();
+</script>
+</body>
+</html>

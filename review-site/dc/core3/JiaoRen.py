@@ -65,7 +65,7 @@ class JiaoRen:
         self.est = StateEstimator()
         self.vision = VisionTracker()
         self.mission = Mission(wps, width=width, start_z=0.4, loop=False)
-        self.ctrl = Controller(protect=True)   # 实物：O3 工程保护全开
+        self.ctrl = Controller()
         self.running = True
         self.lock = threading.Lock()
         self.meas = {'imu': None, 'depth': None, 'dets': None}
@@ -115,8 +115,7 @@ class JiaoRen:
             # 实物定位：VO/SLAM 输出接入点（阶段二 ORB-SLAM3+深度尺度锚）。
             # 未接入时航位推算自持（有界漂移由深度锚+回航点修正兜底）
             vo = None
-            self.est.update(imu, dep, vo, dt,
-                            u_cmd=(self.ctrl.out[0] + self.ctrl.out[1]) * 0.5)
+            self.est.update(imu, dep, vo, dt)
             if dets is not None:
                 self.vision.tick(dets, self.est, t, 1.0 / RATE_VISION)
             if t >= next_dec:

@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0a1e30"/><stop offset="1" stop-color="#04101c"/>
+    </linearGradient>
+    <linearGradient id="river" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0f4066"/><stop offset="1" stop-color="#082238"/>
+    </linearGradient>
+  </defs>
+  <rect width="720" height="420" fill="url(#bg2)"/>
+
+  <!-- 两岸 -->
+  <polygon points="0,80 720,80 720,120 0,140" fill="#0d2b40"/>
+  <polygon points="0,80 720,80 720,96 0,110" fill="#123754"/>
+
+  <!-- 河面（透视） -->
+  <polygon points="0,140 720,120 720,420 0,420" fill="url(#river)"/>
+  <g stroke="#9fd8ff" stroke-opacity=".08">
+    <line x1="0" y1="190" x2="720" y2="168"/><line x1="0" y1="250" x2="720" y2="228"/>
+    <line x1="0" y1="320" x2="720" y2="300"/>
+  </g>
+
+  <!-- 公路桥：桥面+双桥墩 -->
+  <rect x="392" y="58" width="328" height="16" fill="#1a3d5c"/>
+  <rect x="392" y="58" width="328" height="4" fill="#2c6fd6" opacity=".6"/>
+  <g>
+    <rect x="452" y="74" width="30" height="210" fill="#153450"/>
+    <rect x="452" y="74" width="30" height="210" fill="none" stroke="#56b8e6" stroke-opacity=".25"/>
+    <rect x="600" y="74" width="34" height="260" fill="#12304a"/>
+    <rect x="600" y="74" width="34" height="260" fill="none" stroke="#56b8e6" stroke-opacity=".2"/>
+  </g>
+
+  <!-- 大鱼剪影 -->
+  <g fill="#0d2f4a" opacity=".9">
+    <path d="M120,268 q42,-26 96,0 q-20,24 -48,24 q-28,0 -48,-24 z"/>
+    <path d="M118,268 l-26,-14 v28 z"/>
+    <circle cx="196" cy="264" r="3" fill="#04101c"/>
+  </g>
+
+  <!-- 漂浮木 -->
+  <g transform="translate(360,150)">
+    <rect x="-52" y="-8" width="104" height="15" rx="7.5" fill="#c99a3f"/>
+    <rect x="-52" y="-1" width="104" height="8" rx="4" fill="#96702a"/>
+    <animateTransform attributeName="transform" type="translate" dur="7s" repeatCount="indefinite"
+      values="360,150; 348,152; 360,150"/>
+  </g>
+  <line x1="0" y1="152" x2="720" y2="132" stroke="#6fd3ff" stroke-opacity=".4" stroke-width="1.2"/>
+
+  <!-- 航迹：下潜从漂流木下穿越 -->
+  <path d="M40,190 C160,196 240,206 300,236 C340,258 400,258 440,236 C490,210 560,206 690,214"
+        fill="none" stroke="#3fbf8f" stroke-opacity=".55" stroke-width="2" stroke-dasharray="7 7"/>
+
+  <!-- 半潜艇：入水下潜姿态（半透明） -->
+  <g transform="translate(352,246) rotate(-4)">
+    <ellipse cx="0" cy="18" rx="46" ry="8" fill="#04101c" opacity=".4"/>
+    <rect x="-48" y="-11" width="96" height="22" rx="11" fill="#4aa8d8" opacity=".85"/>
+    <rect x="-48" y="-11" width="96" height="22" rx="11" fill="none" stroke="#bfe6ff" stroke-opacity=".5"/>
+    <rect x="-8" y="-21" width="22" height="12" rx="4" fill="#dceaf5" opacity=".9"/>
+    <rect x="-60" y="-5" width="14" height="14" rx="3" fill="#2c6fd6"/>
+    <!-- 气泡 -->
+    <g fill="#9fd8ff" opacity=".5">
+      <circle cx="-58" cy="-14" r="2.4"><animate attributeName="cy" dur="3s" repeatCount="indefinite" values="-14;-52"/><animate attributeName="opacity" dur="3s" repeatCount="indefinite" values=".5;0"/></circle>
+      <circle cx="-66" cy="-8" r="1.8"><animate attributeName="cy" dur="4s" repeatCount="indefinite" values="-8;-58"/><animate attributeName="opacity" dur="4s" repeatCount="indefinite" values=".45;0"/></circle>
+    </g>
+  </g>
+</svg>

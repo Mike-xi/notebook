@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 400" font-family="'Microsoft YaHei','PingFang SC',sans-serif">
+  <defs>
+    <linearGradient id="lane" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0a2438"/><stop offset="1" stop-color="#061826"/>
+    </linearGradient>
+  </defs>
+  <rect width="880" height="400" fill="#081826"/>
+  <line x1="440" y1="16" x2="440" y2="384" stroke="#56b8e6" stroke-opacity=".18"/>
+
+  <!-- ============ 左：无协同基线 ============ -->
+  <g>
+    <text x="30" y="40" font-size="14" fill="#dceaf5" font-weight="bold">无协同基线</text>
+    <text x="30" y="58" font-size="10.5" fill="#5f7f9c" letter-spacing="1">PURE LEADER-FOLLOWER · 无通信 · 无递补</text>
+    <rect x="24" y="130" width="392" height="150" rx="10" fill="url(#lane)" stroke="#56b8e6" stroke-opacity=".12"/>
+    <line x1="46" y1="205" x2="398" y2="205" stroke="#8fb0cc" stroke-opacity=".35" stroke-dasharray="4 6"/>
+    <path d="M398,199 l7,6 -7,6 z" fill="#8fb0cc" opacity=".4"/>
+
+    <!-- 三艇：0-4s 前进，4s 领航失效，全队停摆 -->
+    <g>
+      <animate attributeName="opacity" dur="12s" repeatCount="indefinite"
+        values="0;1;1;0;0" keyTimes="0;.03;.94;.985;1"/>
+      <animateTransform attributeName="transform" type="translate" dur="12s" repeatCount="indefinite"
+        values="0,0; 110,0; 118,6; 118,6" keyTimes="0;.33;.42;1"/>
+      <!-- 领航 -->
+      <g>
+        <rect x="96" y="198" width="34" height="13" rx="6.5" fill="#56b8e6">
+          <animate attributeName="fill" dur="12s" repeatCount="indefinite"
+            values="#56b8e6;#56b8e6;#e05c5c;#e05c5c" keyTimes="0;.32;.34;1"/>
+        </rect>
+        <text x="113" y="192" font-size="9.5" fill="#8fb0cc" text-anchor="middle">领航</text>
+        <g opacity="0">
+          <animate attributeName="opacity" dur="12s" repeatCount="indefinite"
+            values="0;0;1;0;1;0;0" keyTimes="0;.33;.36;.39;.42;.45;1"/>
+          <path d="M108,193 l12,12 m0,-12 l-12,12" stroke="#e05c5c" stroke-width="2.4"/>
+        </g>
+      </g>
+      <!-- 跟随×2：失效后灰暗漂停 -->
+      <g>
+        <animate attributeName="opacity" dur="12s" repeatCount="indefinite"
+          values="1;1;.38;.38" keyTimes="0;.34;.40;1"/>
+        <rect x="54" y="176" width="34" height="13" rx="6.5" fill="#3f7fae"/>
+        <rect x="54" y="222" width="34" height="13" rx="6.5" fill="#3f7fae"/>
+        <text x="71" y="171" font-size="9.5" fill="#5f7f9c" text-anchor="middle">跟随1</text>
+        <text x="71" y="249" font-size="9.5" fill="#5f7f9c" text-anchor="middle">跟随2</text>
+      </g>
+    </g>
+
+    <g opacity="0" font-size="12">
+      <animate attributeName="opacity" dur="12s" repeatCount="indefinite"
+        values="0;0;1;1;0" keyTimes="0;.40;.44;.94;1"/>
+      <rect x="96" y="298" width="220" height="26" rx="7" fill="#0a1e30" stroke="#e05c5c" stroke-opacity=".55"/>
+      <text x="206" y="315" fill="#e05c5c" text-anchor="middle">领航失效 → 跟随失锚，任务停摆</text>
+    </g>
+    <!-- 推进距离刻度 -->
+    <g font-size="10" fill="#5f7f9c">
+      <line x1="46" y1="262" x2="164" y2="262" stroke="#e05c5c" stroke-opacity=".55" stroke-width="2"/>
+      <text x="50" y="252">失效后推进 ≈ 0</text>
+    </g>
+  </g>
+
+  <!-- ============ 右：图论一致性 ============ -->
+  <g>
+    <text x="470" y="40" font-size="14" fill="#dceaf5" font-weight="bold">图论一致性协同</text>
+    <text x="470" y="58" font-size="10.5" fill="#5f7f9c" letter-spacing="1">CONSENSUS + PINNING · 邻居通信 · 自动重构</text>
+    <rect x="464" y="130" width="392" height="150" rx="10" fill="url(#lane)" stroke="#56b8e6" stroke-opacity=".12"/>
+    <line x1="486" y1="205" x2="838" y2="205" stroke="#8fb0cc" stroke-opacity=".35" stroke-dasharray="4 6"/>
+    <path d="M838,199 l7,6 -7,6 z" fill="#8fb0cc" opacity=".4"/>
+
+    <!-- 三艇：同样 4s 时 1 号失效，但剩余两艇重构继续前进 -->
+    <g>
+      <animate attributeName="opacity" dur="12s" repeatCount="indefinite"
+        values="0;1;1;0;0" keyTimes="0;.03;.94;.985;1"/>
+      <animateTransform attributeName="transform" type="translate" dur="12s" repeatCount="indefinite"
+        values="0,0; 110,0; 128,0; 290,0" keyTimes="0;.33;.45;1"/>
+      <!-- 领航（失效） -->
+      <g>
+        <rect x="536" y="198" width="34" height="13" rx="6.5" fill="#56b8e6">
+          <animate attributeName="fill" dur="12s" repeatCount="indefinite"
+            values="#56b8e6;#56b8e6;#e05c5c;#e05c5c" keyTimes="0;.32;.34;1"/>
+        </rect>
+        <animate attributeName="opacity" dur="12s" repeatCount="indefinite"
+          values="1;1;.35;.35" keyTimes="0;.34;.42;1"/>
+        <text x="553" y="192" font-size="9.5" fill="#8fb0cc" text-anchor="middle">1号</text>
+        <!-- 失效艇原地掉队（相对编队向后退） -->
+        <animateTransform attributeName="transform" type="translate" additive="sum" dur="12s" repeatCount="indefinite"
+          values="0,0; 0,0; -18,4; -180,4" keyTimes="0;.34;.45;1"/>
+      </g>
+      <!-- 跟随两艇：重构为并排继续 -->
+      <g>
+        <rect x="494" y="176" width="34" height="13" rx="6.5" fill="#3f9fd6">
+          <animateTransform attributeName="transform" type="translate" dur="12s" repeatCount="indefinite"
+            values="0,0; 0,0; 26,11; 26,11" keyTimes="0;.34;.48;1"/>
+        </rect>
+        <rect x="494" y="222" width="34" height="13" rx="6.5" fill="#3f9fd6">
+          <animateTransform attributeName="transform" type="translate" dur="12s" repeatCount="indefinite"
+            values="0,0; 0,0; 26,-11; 26,-11" keyTimes="0;.34;.48;1"/>
+        </rect>
+        <!-- 通信连线（脉冲） -->
+        <line x1="511" y1="189" x2="511" y2="222" stroke="#56b8e6" stroke-width="1.6" stroke-dasharray="3 4" opacity="0">
+          <animate attributeName="opacity" dur="12s" repeatCount="indefinite"
+            values="0;0;.9;.9;0" keyTimes="0;.36;.40;.96;1"/>
+          <animate attributeName="stroke-dashoffset" dur="1.2s" repeatCount="indefinite" values="0;-14"/>
+          <animateTransform attributeName="transform" type="translate" dur="12s" repeatCount="indefinite"
+            values="0,0; 0,0; 26,0; 26,0" keyTimes="0;.34;.48;1"/>
+        </line>
+      </g>
+    </g>
+
+    <g opacity="0" font-size="12">
+      <animate attributeName="opacity" dur="12s" repeatCount="indefinite"
+        values="0;0;1;1;0" keyTimes="0;.44;.48;.94;1"/>
+      <rect x="536" y="298" width="230" height="26" rx="7" fill="#0a1e30" stroke="#3fbf8f" stroke-opacity=".55"/>
+      <text x="651" y="315" fill="#3fbf8f" text-anchor="middle">一致性重构 → 双艇并排，任务继续</text>
+    </g>
+    <g font-size="10" fill="#5f7f9c">
+      <line x1="486" y1="262" x2="820" y2="262" stroke="#3fbf8f" stroke-opacity=".55" stroke-width="2">
+        <animate attributeName="x2" dur="12s" repeatCount="indefinite"
+          values="486;604;620;820" keyTimes="0;.33;.45;1"/>
+      </line>
+      <text x="490" y="252">失效后持续推进 · 拓扑重构不停航</text>
+    </g>
+  </g>
+
+  <!-- 同步时钟 -->
+  <g font-size="10" fill="#5f7f9c">
+    <text x="30" y="384">t</text>
+    <rect x="42" y="376" width="796" height="4" rx="2" fill="#0a1e30"/>
+    <rect x="42" y="376" width="0" height="4" rx="2" fill="#56b8e6" opacity=".6">
+      <animate attributeName="width" dur="12s" repeatCount="indefinite" values="0;796"/>
+    </rect>
+    <line x1="311" y1="372" x2="311" y2="384" stroke="#e05c5c" stroke-opacity=".7"/>
+    <text x="317" y="371" fill="#e05c5c">领航艇失效时刻</text>
+  </g>
+</svg>

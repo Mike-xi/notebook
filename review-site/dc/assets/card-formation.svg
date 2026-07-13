@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420">
+  <defs>
+    <linearGradient id="bg3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0a1e30"/><stop offset="1" stop-color="#04101c"/>
+    </linearGradient>
+    <linearGradient id="riv3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0e3a5e"/><stop offset="1" stop-color="#072036"/>
+    </linearGradient>
+    <filter id="lineGlow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="2.2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="720" height="420" fill="url(#bg3)"/>
+
+  <!-- 河道（俯视微倾） -->
+  <polygon points="0,60 720,40 720,420 0,420" fill="url(#riv3)"/>
+  <line x1="0" y1="60" x2="720" y2="40" stroke="#56b8e6" stroke-opacity=".3"/>
+
+  <!-- 河床三条搜索覆盖带 -->
+  <g opacity=".8">
+    <polygon points="0,130 720,106 720,146 0,172" fill="#56b8e6" opacity=".10"/>
+    <polygon points="0,196 720,172 720,212 0,238" fill="#3fbf8f" opacity=".10"/>
+    <polygon points="0,262 720,238 720,278 0,304" fill="#e8b64c" opacity=".08"/>
+    <text x="18" y="156" font-size="10" fill="#56b8e6" opacity=".5" letter-spacing="2">SWEEP 1</text>
+    <text x="18" y="222" font-size="10" fill="#3fbf8f" opacity=".5" letter-spacing="2">SWEEP 2</text>
+    <text x="18" y="288" font-size="10" fill="#e8b64c" opacity=".45" letter-spacing="2">SWEEP 3</text>
+  </g>
+
+  <!-- 三艇三角编队 + 发光通信连线 -->
+  <g>
+    <g stroke="#56b8e6" stroke-width="1.6" stroke-dasharray="4 5" opacity=".85" filter="url(#lineGlow)">
+      <line x1="430" y1="148" x2="330" y2="214">
+        <animate attributeName="stroke-dashoffset" dur="1.4s" repeatCount="indefinite" values="0;-18"/>
+      </line>
+      <line x1="430" y1="148" x2="330" y2="282" stroke-opacity=".7">
+        <animate attributeName="stroke-dashoffset" dur="1.4s" repeatCount="indefinite" values="0;-18"/>
+      </line>
+      <line x1="330" y1="214" x2="330" y2="282" stroke-opacity=".7">
+        <animate attributeName="stroke-dashoffset" dur="1.8s" repeatCount="indefinite" values="0;-18"/>
+      </line>
+    </g>
+    <!-- 艇（俯视胶囊） -->
+    <g>
+      <g transform="translate(430,148)">
+        <ellipse cx="0" cy="10" rx="34" ry="6" fill="#04101c" opacity=".35"/>
+        <rect x="-34" y="-9" width="68" height="18" rx="9" fill="#56b8e6"/>
+        <rect x="-34" y="-9" width="68" height="18" rx="9" fill="none" stroke="#cfeaff" stroke-opacity=".6"/>
+        <rect x="26" y="-4" width="14" height="8" rx="3" fill="#dceaf5"/>
+      </g>
+      <g transform="translate(330,214)">
+        <ellipse cx="0" cy="10" rx="30" ry="5.5" fill="#04101c" opacity=".35"/>
+        <rect x="-30" y="-8" width="60" height="16" rx="8" fill="#3f9fd6"/>
+        <rect x="-30" y="-8" width="60" height="16" rx="8" fill="none" stroke="#cfeaff" stroke-opacity=".5"/>
+      </g>
+      <g transform="translate(330,282)">
+        <ellipse cx="0" cy="10" rx="30" ry="5.5" fill="#04101c" opacity=".35"/>
+        <rect x="-30" y="-8" width="60" height="16" rx="8" fill="#3f9fd6"/>
+        <rect x="-30" y="-8" width="60" height="16" rx="8" fill="none" stroke="#cfeaff" stroke-opacity=".5"/>
+      </g>
+    </g>
+    <animateTransform attributeName="transform" type="translate" dur="9s" repeatCount="indefinite"
+      values="0,0; 26,-4; 0,0"/>
+  </g>
+
+  <!-- 航向箭头 -->
+  <g stroke="#8fb0cc" stroke-opacity=".5" fill="none">
+    <path d="M496,150 h84"/><path d="M576,144 l12,6 -12,6"/>
+  </g>
+</svg>

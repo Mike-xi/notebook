@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0a1e30"/><stop offset="1" stop-color="#04101c"/>
+    </linearGradient>
+    <linearGradient id="waterTop" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#155a86"/><stop offset="1" stop-color="#0d3a5c"/>
+    </linearGradient>
+    <linearGradient id="wallL" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0a2438"/><stop offset="1" stop-color="#0e2f4a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".5" cy=".35" r=".6">
+      <stop offset="0" stop-color="#56b8e6" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#56b8e6" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="720" height="420" fill="url(#bg)"/>
+  <rect width="720" height="420" fill="url(#glow)"/>
+
+  <!-- 等轴测水池：后壁/左壁/水面 -->
+  <polygon points="130,96 620,96 668,170 92,170" fill="#0d2b44"/>          <!-- 后壁上沿斜面 -->
+  <polygon points="92,170 668,170 668,330 92,330" fill="url(#wallL)"/>      <!-- 前视池体 -->
+  <polygon points="118,150 645,150 668,186 96,186" fill="url(#waterTop)" opacity=".95"/> <!-- 水面 -->
+  <line x1="96" y1="186" x2="668" y2="186" stroke="#6fd3ff" stroke-opacity=".55" stroke-width="1.4"/>
+  <polygon points="96,186 668,186 668,330 96,330" fill="#0b304e" opacity=".72"/>          <!-- 水体 -->
+
+  <!-- 水面网格 -->
+  <g stroke="#9fd8ff" stroke-opacity=".12">
+    <line x1="190" y1="152" x2="176" y2="185"/><line x1="290" y1="152" x2="280" y2="185"/>
+    <line x1="390" y1="151" x2="384" y2="185"/><line x1="490" y1="151" x2="488" y2="185"/>
+    <line x1="590" y1="151" x2="592" y2="185"/>
+    <line x1="112" y1="163" x2="656" y2="163" /><line x1="105" y1="174" x2="663" y2="174"/>
+  </g>
+
+  <!-- 池壁标定板 -->
+  <g>
+    <g transform="translate(180,214)">
+      <rect width="34" height="34" fill="#dceaf5"/>
+      <path d="M0,0h11v11h-11z M22,0h12v11h-12z M11,11h11v12h-11z M0,23h11v11h-11z M22,23h12v11h-12z" fill="#0a1420"/>
+    </g>
+    <g transform="translate(330,220)">
+      <rect width="30" height="30" fill="#dceaf5"/>
+      <path d="M0,0h10v10h-10z M20,0h10v10h-10z M10,10h10v10h-10z M20,20h10v10h-10z M0,20h10v10h-10z" fill="#0a1420"/>
+    </g>
+    <g transform="translate(500,214)">
+      <rect width="34" height="34" fill="#dceaf5"/>
+      <path d="M0,0h12v12h-12z M23,0h11v12h-11z M12,12h11v11h-11z M0,23h12v11h-12z M23,23h11v11h-11z" fill="#0a1420"/>
+    </g>
+  </g>
+
+  <!-- 半潜艇：半浸于水面线 -->
+  <g transform="translate(368,182)">
+    <ellipse cx="0" cy="16" rx="52" ry="9" fill="#04101c" opacity=".35"/>
+    <rect x="-56" y="-12" width="112" height="26" rx="13" fill="#4aa8d8"/>
+    <rect x="-56" y="-12" width="112" height="26" rx="13" fill="none" stroke="#bfe6ff" stroke-opacity=".55" stroke-width="1.4"/>
+    <rect x="-10" y="-24" width="26" height="14" rx="4" fill="#dceaf5"/>
+    <rect x="-10" y="-24" width="26" height="14" rx="4" fill="none" stroke="#9fc9e8" stroke-opacity=".6"/>
+    <rect x="-70" y="-6" width="16" height="16" rx="3" fill="#2c6fd6"/>
+    <circle cx="62" cy="1" r="5" fill="#0a1e30" stroke="#9fd8ff" stroke-opacity=".7"/>
+    <!-- 水线遮挡：下半身透入水色 -->
+    <rect x="-58" y="4" width="120" height="12" fill="#0b304e" opacity=".55"/>
+    <!-- 尾流 -->
+    <g stroke="#9fd8ff" stroke-opacity=".4" fill="none">
+      <path d="M-58,2 q-16,2 -30,10"/><path d="M-58,-2 q-20,-2 -34,-8"/>
+    </g>
+    <animateTransform attributeName="transform" type="translate" dur="6s" repeatCount="indefinite"
+      values="368,182; 368,179; 368,182" keyTimes="0;.5;1" additive="replace"/>
+  </g>
+
+  <!-- 体积光 -->
+  <polygon points="330,60 410,60 470,186 290,186" fill="#9fd8ff" opacity=".05"/>
+</svg>

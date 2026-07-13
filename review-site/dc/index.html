@@ -16,7 +16,6 @@
   html,body{ height:100%; }
   body{ background:var(--bg); color:var(--txt); overflow:hidden;
     font-family:"Microsoft YaHei","PingFang SC","Segoe UI",sans-serif; }
-  .mono{ font-variant-numeric:tabular-nums; font-family:"Cascadia Code",Consolas,monospace; }
 
   /* ---------- 顶栏 ---------- */
   header{ position:fixed; top:0; left:0; right:0; height:52px; z-index:50;
@@ -26,9 +25,9 @@
   .brand{ display:flex; align-items:baseline; gap:10px; white-space:nowrap; min-width:0; }
   .brand b{ font-size:15px; letter-spacing:.06em; }
   .brand span{ font-size:11px; color:var(--faint); letter-spacing:.08em; }
-  nav{ display:flex; gap:6px; margin-left:auto; }
+  nav{ display:flex; gap:4px; margin-left:auto; }
   nav button{ appearance:none; border:1px solid transparent; background:none; color:var(--dim);
-    font:12.5px/1 inherit; letter-spacing:.04em; padding:8px 14px; border-radius:7px; cursor:pointer;
+    font:12.5px/1 inherit; letter-spacing:.04em; padding:8px 12px; border-radius:7px; cursor:pointer;
     transition:color .15s, background .15s, border-color .15s; white-space:nowrap; }
   nav button:hover{ color:var(--txt); background:rgba(110,180,255,.07); }
   nav button.on{ color:#fff; background:var(--acc); border-color:rgba(140,200,255,.45); }
@@ -45,83 +44,53 @@
 
   /* ---------- 总览 ---------- */
   #view-home{ overflow-y:auto; }
-  .wrap{ max-width:1060px; margin:0 auto; padding:44px 28px 80px; }
-  .hero{ padding:8px 0 30px; border-bottom:1px solid var(--line); }
+  .wrap{ max-width:1060px; margin:0 auto; padding:40px 28px 60px; }
+  .hero{ padding:6px 0 26px; }
   .hero .tag{ display:inline-block; font-size:11px; letter-spacing:.18em; color:var(--blue);
-    border:1px solid rgba(86,184,230,.35); border-radius:99px; padding:4px 12px; margin-bottom:16px; }
-  .hero h1{ font-size:30px; font-weight:700; letter-spacing:.03em; line-height:1.35; }
-  .hero h1 small{ display:block; font-size:13px; font-weight:400; color:var(--dim);
-    letter-spacing:.12em; margin-top:10px; }
-  .hero p{ margin-top:16px; max-width:760px; font-size:13.5px; line-height:1.9; color:var(--dim); }
-  .hero p b{ color:var(--txt); font-weight:600; }
+    border:1px solid rgba(86,184,230,.35); border-radius:99px; padding:4px 12px; margin-bottom:14px; }
+  .hero h1{ font-size:28px; font-weight:700; letter-spacing:.03em; line-height:1.4; }
 
   h2.sec{ font-size:12px; font-weight:600; letter-spacing:.22em; color:var(--faint);
-    margin:40px 0 16px; display:flex; align-items:center; gap:12px; }
+    margin:26px 0 16px; display:flex; align-items:center; gap:12px; }
   h2.sec::after{ content:""; flex:1; height:1px; background:var(--line); }
 
-  /* 场景卡 */
-  .scenes{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
-  .scene{ position:relative; text-align:left; appearance:none; cursor:pointer;
-    background:linear-gradient(180deg,var(--panel2),var(--panel)); color:var(--txt);
-    border:1px solid var(--line); border-radius:12px; padding:20px 18px 16px;
-    transition:border-color .15s, transform .15s; }
+  /* 场景卡：背景插画 + 极简文字 */
+  .scenes{ display:grid; grid-template-columns:repeat(2,1fr); gap:14px; }
+  .scene{ position:relative; text-align:left; appearance:none; cursor:pointer; overflow:hidden;
+    background:var(--panel); color:var(--txt); border:1px solid var(--line); border-radius:14px;
+    aspect-ratio:12/5; padding:0; transition:border-color .15s, transform .15s; }
   .scene:hover{ border-color:var(--line2); transform:translateY(-2px); }
-  .scene .no{ font-size:11px; letter-spacing:.2em; color:var(--faint); }
-  .scene h3{ font-size:16px; margin:8px 0 2px; letter-spacing:.02em; }
-  .scene .en{ font-size:10.5px; letter-spacing:.14em; color:var(--faint); text-transform:uppercase; }
-  .scene p{ font-size:12px; line-height:1.8; color:var(--dim); margin-top:12px; min-height:88px; }
-  .scene .foot{ margin-top:12px; padding-top:10px; border-top:1px solid var(--line);
-    font-size:11.5px; color:var(--blue); letter-spacing:.06em; }
-  .scene[data-c="gold"] .foot{ color:var(--gold); }
-  .scene[data-c="green"] .foot{ color:var(--green); }
+  .scene img.bg{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover;
+    transition:transform .4s ease; }
+  .scene:hover img.bg{ transform:scale(1.04); }
+  .scene .shade{ position:absolute; inset:0;
+    background:linear-gradient(180deg, rgba(4,16,28,.10) 30%, rgba(4,16,28,.86) 100%); }
+  .scene .info{ position:absolute; left:16px; right:16px; bottom:12px; display:flex;
+    align-items:baseline; gap:10px; }
+  .scene .no{ font-size:10.5px; letter-spacing:.2em; color:var(--blue); }
+  .scene h3{ font-size:16.5px; letter-spacing:.02em; font-weight:700; }
+  .scene .en{ font-size:10px; letter-spacing:.12em; color:var(--dim); text-transform:uppercase; }
+  .scene .go{ margin-left:auto; font-size:12px; color:var(--blue); letter-spacing:.06em; white-space:nowrap; }
 
-  /* 数据流 */
-  .flow{ display:flex; align-items:stretch; gap:0; border:1px solid var(--line);
-    border-radius:12px; overflow:hidden; background:var(--panel); }
-  .flow .node{ flex:1; padding:16px 16px 14px; position:relative; }
-  .flow .node + .node{ border-left:1px solid var(--line); }
-  .flow .node i{ display:block; font-style:normal; font-size:10.5px; letter-spacing:.16em;
-    text-transform:uppercase; margin-bottom:6px; }
-  .flow .node:nth-child(1) i{ color:var(--blue); }
-  .flow .node:nth-child(2) i{ color:var(--blue); }
-  .flow .node:nth-child(3) i{ color:var(--gold); }
-  .flow .node:nth-child(4) i{ color:var(--green); }
-  .flow .node b{ font-size:13.5px; display:block; margin-bottom:6px; }
-  .flow .node span{ font-size:11.5px; line-height:1.7; color:var(--dim); display:block; }
-  .flow .node .py{ margin-top:10px; font-size:10.5px; color:var(--faint); }
-  .flow .node .py code{ color:var(--blue); background:rgba(86,184,230,.08);
-    padding:1px 6px; border-radius:4px; font-size:10px; }
+  /* 算法体系 */
+  .arch-lead{ font-size:13.5px; line-height:1.95; color:var(--dim); max-width:920px; margin-bottom:6px; }
+  .arch-lead b{ color:var(--txt); font-weight:600; }
+  .arch-chain{ font-size:12px; letter-spacing:.12em; color:var(--blue); margin-bottom:16px; }
+  .logic{ border:1px solid var(--line); border-radius:14px; background:var(--panel);
+    overflow:hidden; margin-bottom:14px; }
+  .logic .cap{ display:flex; align-items:baseline; gap:10px; padding:12px 16px 0; }
+  .logic .cap b{ font-size:13.5px; }
+  .logic .cap span{ font-size:11px; color:var(--faint); letter-spacing:.08em; }
+  .logic svg, .logic img{ display:block; width:100%; height:auto; }
 
-  /* 成果表 */
-  table{ width:100%; border-collapse:collapse; border:1px solid var(--line); border-radius:12px;
-    overflow:hidden; background:var(--panel); font-size:12.5px; }
-  th,td{ text-align:left; padding:11px 16px; border-bottom:1px solid var(--line); line-height:1.7; }
-  th{ font-size:11px; letter-spacing:.14em; color:var(--faint); font-weight:600;
-    background:rgba(110,180,255,.04); }
-  tr:last-child td{ border-bottom:0; }
-  td b{ color:var(--txt); font-weight:600; }
-  td .hl{ color:var(--gold); font-weight:600; }
-  td .stage{ display:inline-block; font-size:10.5px; letter-spacing:.08em; color:var(--blue);
-    border:1px solid rgba(86,184,230,.3); border-radius:5px; padding:1px 8px; white-space:nowrap; }
-
-  /* 说明块 */
-  .note{ border:1px solid var(--line); border-left:3px solid var(--acc); border-radius:8px;
-    background:var(--panel); padding:14px 18px; font-size:12.5px; line-height:1.9; color:var(--dim); }
-  .note b{ color:var(--txt); }
-  .note code{ color:var(--blue); background:rgba(86,184,230,.08); padding:1px 6px;
-    border-radius:4px; font-size:11.5px; }
-
-  footer.page{ margin-top:52px; padding-top:18px; border-top:1px solid var(--line);
+  footer.page{ margin-top:36px; padding-top:16px; border-top:1px solid var(--line);
     font-size:11px; color:var(--faint); letter-spacing:.08em; line-height:2;
     display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; }
 
   @media (max-width:900px){
     .scenes{ grid-template-columns:1fr; }
-    .scene p{ min-height:0; }
-    .flow{ flex-direction:column; }
-    .flow .node + .node{ border-left:0; border-top:1px solid var(--line); }
     .brand span{ display:none; }
-    nav button{ padding:8px 9px; }
+    nav button{ padding:8px 8px; }
     nav button em{ display:none; }
   }
 </style>
@@ -135,9 +104,10 @@
   </div>
   <nav id="tabs">
     <button data-v="home" class="on"><em>00</em>总览</button>
-    <button data-v="sim"><em>01</em>交互仿真平台</button>
-    <button data-v="cruise"><em>02</em>综合场景巡航</button>
-    <button data-v="formation"><em>03</em>多机编队协同</button>
+    <button data-v="sim"><em>01</em>交互仿真</button>
+    <button data-v="cruise"><em>02</em>综合巡航</button>
+    <button data-v="formation"><em>03</em>编队协同</button>
+    <button data-v="system"><em>04</em>系统集成</button>
   </nav>
 </header>
 
@@ -147,113 +117,51 @@
     <div class="wrap">
       <div class="hero">
         <span class="tag">INTEGRATED DEMONSTRATION PLATFORM</span>
-        <h1>水下半潜式机器人<br>自主巡航与多机协同 · 综合演示平台
-          <small>感知融合 — 制导决策 — 运动控制 — 图论一致性编队 · 全链路 Python 算法在线运行</small>
-        </h1>
-        <p>本平台将项目三个阶段的成果整合为可切换的三个演示场景。网页端仅承担<b>数字水池物理仿真、
-        传感器仿真（含噪声）与三维渲染</b>；每一控制拍的感知融合、制导决策与运动控制均来自
-        <b>蛟人核心算法包（Python）</b>——与装机运行完全同一份代码，经 Pyodide 在浏览器内实时执行。</p>
+        <h1>水下半潜式机器人 · 自主巡航与多机协同综合演示平台</h1>
       </div>
 
       <h2 class="sec">演示场景 SCENARIOS</h2>
       <div class="scenes">
         <button class="scene" data-go="sim">
-          <span class="no">SCENE 01</span>
-          <h3>交互仿真平台</h3>
-          <span class="en">Interactive Digital Pool</span>
-          <p>研究用数字水池：6 种环境（标准水池 / 长直水道 / 横流场 / 巡逻航点 / 立柱地标 / 编队开阔场），
-          手动驾驶与自动驾驶，多算法同场对比，虚拟传感器（IMU · 深度计 · 单目相机），数据回放定量分析。</p>
-          <span class="foot">进入场景 →</span>
+          <img class="bg" src="assets/card-sim.svg" alt="">
+          <span class="shade"></span>
+          <span class="info"><span class="no">01</span><h3>交互仿真平台</h3>
+            <span class="en">Digital Pool</span><span class="go">进入 →</span></span>
         </button>
-        <button class="scene" data-c="gold" data-go="cruise">
-          <span class="no">SCENE 02</span>
-          <h3>综合场景巡航</h3>
-          <span class="en">Autonomous River Transit</span>
-          <p>汇报用综合场景：动态河流中 5 巡逻点变深巡航，漂流木下潜穿越、渡船会遇避让、桥墩窄门绕行，
-          感知→决策→控制全链路演示，判定几何与评估指标实时可视。</p>
-          <span class="foot">进入场景 →</span>
+        <button class="scene" data-go="cruise">
+          <img class="bg" src="assets/card-cruise.svg" alt="">
+          <span class="shade"></span>
+          <span class="info"><span class="no">02</span><h3>综合场景巡航</h3>
+            <span class="en">River Transit</span><span class="go">进入 →</span></span>
         </button>
-        <button class="scene" data-c="green" data-go="formation">
-          <span class="no">SCENE 03</span>
-          <h3>多机编队协同</h3>
-          <span class="en">Consensus-based Formation</span>
-          <p>3 机分布式编队巡航：图论拉普拉斯一致性 + pinning 控制，仅凭邻居通信达成队形一致；
-          可在线切换队形与通信拓扑、注入个体失效，并与无协同基线对照。</p>
-          <span class="foot">进入场景 →</span>
+        <button class="scene" data-go="formation">
+          <img class="bg" src="assets/card-formation.svg" alt="">
+          <span class="shade"></span>
+          <span class="info"><span class="no">03</span><h3>多机编队协同</h3>
+            <span class="en">Consensus Formation</span><span class="go">进入 →</span></span>
+        </button>
+        <button class="scene" data-go="system">
+          <img class="bg" src="assets/card-system.svg" alt="">
+          <span class="shade"></span>
+          <span class="info"><span class="no">04</span><h3>系统集成 · 实验矩阵</h3>
+            <span class="en">96-Run Matrix Replay</span><span class="go">进入 →</span></span>
         </button>
       </div>
 
       <h2 class="sec">算法体系 ARCHITECTURE</h2>
-      <div class="flow">
-        <div class="node">
-          <i>Sensing · 100 Hz</i>
-          <b>多源传感</b>
-          <span>JY901 惯性单元 · MS5837 压力深度计 · 艏部单目相机，统一采样接口，仿真与实物同构。</span>
-          <div class="py"><code>Lib/Sensors.py</code></div>
-        </div>
-        <div class="node">
-          <i>Estimation</i>
-          <b>状态估计</b>
-          <span>视惯压融合：姿态互补滤波 + 深度尺度锚 + 航位推算 / 视觉里程修正，治 VI 尺度发散。</span>
-          <div class="py"><code>Lib/StateEstimation.py</code> <code>Lib/Vision.py</code></div>
-        </div>
-        <div class="node">
-          <i>Guidance · 20 Hz</i>
-          <b>制导决策</b>
-          <span>航点状态机 + ILOS 抗流制导 + 双通道规避（下潜穿越 / 平面绕行）；编队层为图论一致性协议。</span>
-          <div class="py"><code>Lib/Guidance.py</code> <code>Lib/Formation.py</code></div>
-        </div>
-        <div class="node">
-          <i>Control</i>
-          <b>运动控制</b>
-          <span>M1 整定航向环 + 浮潜协同变深级联，输出双桨差速 / 尾舵 / 压载注排水指令。</span>
-          <div class="py"><code>Lib/Control.py</code> <code>Lib/Actuators.py</code></div>
-        </div>
+      <p class="arch-chain">感知融合 — 制导决策 — 运动控制 — 图论一致性编队 · 全链路 Python 算法在线运行</p>
+      <p class="arch-lead">本平台将项目各阶段成果整合为可切换的演示场景。网页端仅承担<b>数字水池物理仿真、
+        传感器仿真与三维渲染</b>；每一控制拍的感知融合、制导决策与运动控制均来自
+        <b>蛟人核心算法包（Python）</b>——与装机运行完全同一份代码，经 Pyodide 在浏览器内实时执行
+        （进入场景后自动加载并开始，首次约需十余秒）。</p>
+
+      <div class="logic">
+        <div class="cap"><b>单艇 · 复杂场景判定逻辑</b><span>感知 → 决策 → 控制，双通道规避</span></div>
+        <img src="assets/logic-single.svg" alt="单艇判定逻辑动画">
       </div>
-
-      <h2 class="sec">阶段成果 MILESTONES</h2>
-      <table>
-        <tr><th style="width:110px">阶段</th><th>成果</th><th>要点</th></tr>
-        <tr>
-          <td><span class="stage">阶段一</span></td>
-          <td><b>动力学建模与运动控制</b></td>
-          <td>5 自由度动力学建模与验证（RK2 数值水池）；M1 航向环参数整定
-              <span class="mono">k<sub>p</sub>=3.0 / k<sub>d</sub>=1.5</span>；
-              浮潜协同变深使调节时间缩短 <span class="hl">29%</span>。</td>
-        </tr>
-        <tr>
-          <td><span class="stage">阶段一</span></td>
-          <td><b>ILOS 抗流制导</b></td>
-          <td>积分视线法补偿横流，横流场对比中稳态横偏降低 <span class="hl">68%</span>；经济巡航油门伺服。</td>
-        </tr>
-        <tr>
-          <td><span class="stage">阶段二</span></td>
-          <td><b>多模态感知</b></td>
-          <td>视惯压融合定位（深度计尺度锚抑制视觉-惯性尺度发散）；水下图像增强对比实验；
-              目标检测 → α-β 跟踪 → 短时记忆局部障碍地图。</td>
-        </tr>
-        <tr>
-          <td><span class="stage">阶段三</span></td>
-          <td><b>图论一致性编队</b></td>
-          <td>分布式参考观测器（二阶一致性 + pinning）+ 邻居相对队形反馈，个体仅需邻居信息，
-              拓扑可切换、个体可失效；地速闭环治欠驱动稳态滞后；5 种队形在线变换。</td>
-        </tr>
-        <tr>
-          <td><span class="stage">部署</span></td>
-          <td><b>装机同款算法包</b></td>
-          <td>仿真验证与实物装机共用同一份 <code style="color:var(--blue)">Lib/</code>：
-              实物入口 <span class="mono">JiaoRen.py</span>（四线程），
-              仿真接线 <span class="mono">sim_entry.py / swarm_entry.py</span>。</td>
-        </tr>
-      </table>
-
-      <h2 class="sec">运行说明 NOTES</h2>
-      <div class="note">
-        <b>算法真实在线运行，非预录动画。</b>
-        进入场景后浏览器将从本站加载 <code>core/</code> 下的 Python 算法包并通过
-        <b>Pyodide</b>（WebAssembly CPython）执行——首次加载约需十余秒，请耐心等待；
-        网页与 Python 每拍交换「传感器读数 → 执行器指令」，算法不读取任何仿真真值。
-        建议使用<b>桌面端 Chrome / Edge</b> 浏览，场景内操作说明见各场景页面。
+      <div class="logic">
+        <div class="cap"><b>多艇 · 一致性编队优势</b><span>领航失效对照：无协同停摆 vs 一致性重构续航</span></div>
+        <img src="assets/logic-formation.svg" alt="编队优势对照动画">
       </div>
 
       <footer class="page">
@@ -264,15 +172,16 @@
   </div>
 
   <!-- ================= 场景 iframe（懒加载，切换保活） ================= -->
-  <div class="view" id="view-sim"      data-src="sim.html"><div class="iframe-wait">正在载入场景…</div></div>
-  <div class="view" id="view-cruise"   data-src="cruise.html"><div class="iframe-wait">正在载入场景…</div></div>
-  <div class="view" id="view-formation" data-src="formation.html"><div class="iframe-wait">正在载入场景…</div></div>
+  <div class="view" id="view-sim"       data-src="sim.html"><div class="iframe-wait">正在载入场景…</div></div>
+  <div class="view" id="view-cruise"    data-src="cruise.html?auto=1"><div class="iframe-wait">正在载入场景…</div></div>
+  <div class="view" id="view-formation" data-src="formation.html?auto=1"><div class="iframe-wait">正在载入场景…</div></div>
+  <div class="view" id="view-system"    data-src="system.html"><div class="iframe-wait">正在载入场景…</div></div>
 </main>
 
 <script>
 (function(){
   const tabs = document.getElementById('tabs');
-  const views = { home:v('home'), sim:v('sim'), cruise:v('cruise'), formation:v('formation') };
+  const views = { home:v('home'), sim:v('sim'), cruise:v('cruise'), formation:v('formation'), system:v('system') };
   function v(n){ return document.getElementById('view-'+n); }
 
   function show(name, push){
@@ -301,7 +210,7 @@
   document.querySelectorAll('.scene[data-go]').forEach(s=>{
     s.addEventListener('click', ()=>show(s.dataset.go));
   });
-  // 场景页内部跳转（sim → cruise）
+  // 场景页内部跳转（sim→cruise / system 导览）
   window.addEventListener('message', e=>{
     if(e.data && e.data.dcNav && views[e.data.dcNav]) show(e.data.dcNav);
   });

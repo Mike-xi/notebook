@@ -13,9 +13,20 @@
   .panel { position:absolute; background:rgba(8,20,34,.85); border:1px solid rgba(110,180,255,.25);
     border-radius:12px; padding:10px 12px; font-size:12.5px; backdrop-filter:blur(5px); }
 
-  #titlebar { left:50%; top:10px; transform:translateX(-50%); text-align:center; padding:8px 26px; }
+  #titlebar { left:50%; top:10px; transform:translateX(-50%); text-align:center; padding:9px 26px; }
   #titlebar h1 { font-size:17px; color:#7fd0ff; letter-spacing:1px; }
-  #titlebar p { font-size:11.5px; color:#9fc3e0; margin-top:2px; }
+
+  /* 右上角说明按钮 + 面板 */
+  #helpBtn { position:absolute; right:12px; top:12px; width:auto; padding:6px 16px; z-index:22;
+    background:#0c2438; color:#dceaf5; border:1px solid rgba(110,180,255,.3); border-radius:6px;
+    font-size:12.5px; cursor:pointer; }
+  #helpBtn:hover { background:#14324c; }
+  #helpBtn.on { background:#2c6fd6; border-color:#6fd3ff; }
+  #helpPanel { display:none; right:12px; top:52px; width:352px; max-height:calc(100% - 70px);
+    overflow-y:auto; z-index:21; font-size:12px; line-height:1.85; color:#9fc3e0; }
+  #helpPanel h3 { color:#7fd0ff; font-size:12.5px; margin:9px 0 3px; }
+  #helpPanel h3:first-child { margin-top:0; }
+  #helpPanel b { color:#ffd479; }
 
   /* 左侧：引擎管线（感知→决策→控制）＋判定逻辑 */
   #pipe { left:12px; top:74px; width:262px; max-height:calc(100% - 330px); overflow-y:auto; }
@@ -99,58 +110,70 @@
 <div id="flash"></div>
 
 <div class="panel" id="titlebar">
-  <h1>蛟人半潜器 · 自主巡航综合演示</h1>
-  <p>算法 = 文件夹内 <b style="color:#ffd479">蛟人核心</b> Python 包（装机同款）｜ 网页只做水池仿真与渲染 ｜ IPP32027</p>
+  <h1>蛟人半潜器 · 自主巡航演示</h1>
+</div>
+<button id="helpBtn">❓ 说明</button>
+<div class="panel" id="helpPanel">
+  <h3>这是什么</h3>
+  网页只是"数字水池"（物理仿真 · 传感器仿真 · 渲染）；巡航算法是同文件夹的
+  <b>蛟人核心</b> Python 包（与装机运行同一份代码），每 10ms 由它给出桨 / 舵 / 压载指令。
+  <h3>三层框架</h3>
+  <b>感知</b>：JY901 + MS5837 + 艏部单目 → 视惯压融合定位、目标检测-跟踪；<br>
+  <b>决策</b>：航点状态机 + ILOS 抗流制导 + 避障判定；<br>
+  <b>控制</b>：M1 整定航向环 + 浮潜协同变深级联。
+  <h3>场景与规避（每段航路都被挡）</h3>
+  🐟 <b>大鱼</b>（潜深不够只能绕）：一条<b>顶流悬停在航线正中</b>、一条<b>横穿河道</b>、一条顺流漂游；<br>
+  🌉 <b>北桥墩</b>：正挡在 2→3 航段上 → 绕行过桥；<br>
+  🪨 <b>礁石</b>：正挡在 3→4 航段上 → 绕行；<br>
+  🚤 <b>渡船</b>：机器人临近才离岸横穿 → 下潜穿越；<br>
+  🟡 <b>琥珀色立柱</b>：可用鼠标拖动去挡路，考验临时重规划。
+  <h3>操作</h3>
+  鼠标拖拽转视角、滚轮缩放；▶ 开始 / ↺ 复位 / 倍速；电影 · 跟随 · 俯瞰三视角；
+  判定图形与机载相机可开关；滑杆调节河流流速。
+  <div style="color:#6f93b0;margin-top:8px">上海交通大学大创 IPP32027 ｜ 阶段一二成果集成</div>
 </div>
 
 <div class="panel" id="pipe">
-  <h3>🧠 引擎管线（Python 实时）</h3>
   <div class="layer">
-    <h4>① 感知层 · 多模态融合</h4>
-    <div class="row"><span>视惯压融合定位</span><b id="p_slam">–</b></div>
-    <div class="row"><span>定位漂移(有界)</span><b id="p_drift">–</b></div>
-    <div class="row"><span>深度计 MS5837</span><b id="p_z">–</b></div>
-    <div class="row"><span>IMU 航向/俯仰</span><b id="p_att">–</b></div>
-    <div class="row"><span>视觉目标跟踪</span><b id="p_vis">0 个</b></div>
+    <h4>① 感知层</h4>
+    <div class="row"><span>融合定位</span><b id="p_slam">–</b></div>
+    <div class="row"><span>深度</span><b id="p_z">–</b></div>
+    <div class="row"><span>航向</span><b id="p_att">–</b></div>
+    <div class="row"><span>跟踪目标</span><b id="p_vis">0 个</b></div>
   </div>
   <div class="flow">▼</div>
   <div class="layer decide">
-    <h4>② 决策层 · 制导与规避</h4>
-    <div class="row"><span>状态机</span><span class="badge" id="d_state">待命</span></div>
-    <div class="row"><span>航点进度</span><b id="d_wp">–</b></div>
-    <div class="row"><span>ILOS 期望航向</span><b id="d_psid">–</b></div>
+    <h4>② 决策层</h4>
+    <div class="row"><span>状态</span><span class="badge" id="d_state">待命</span></div>
+    <div class="row"><span>航点</span><b id="d_wp">–</b></div>
+    <div class="row"><span>期望航向</span><b id="d_psid">–</b></div>
     <div class="row"><span>目标深度</span><b id="d_zref">–</b></div>
-    <div class="row"><span>经济油门基值</span><b id="d_base">–</b></div>
   </div>
   <div class="flow">▼</div>
   <div class="layer logic">
-    <h4>⚖ 判定逻辑（决策依据）</h4>
+    <h4>⚖ 判定逻辑</h4>
     <div id="d_logic"><div>等待任务开始…</div></div>
   </div>
   <div class="flow">▼</div>
   <div class="layer control">
-    <h4>③ 控制层 · M1 双闭环+浮潜协同</h4>
+    <h4>③ 控制层</h4>
     <div class="row"><span>左桨</span></div><div class="bar"><i id="c_l"></i></div>
     <div class="row"><span>右桨</span></div><div class="bar"><i id="c_r"></i></div>
-    <div class="row"><span>尾舵 δ / 俯仰指令</span><b id="c_rud">–</b></div>
-    <div class="row"><span>压载注水</span><b id="c_bal">–</b></div>
-    <div class="row"><span>推进功率</span><b id="c_pw">–</b></div>
+    <div class="row"><span>尾舵</span><b id="c_rud">–</b></div>
+    <div class="row"><span>压载</span><b id="c_bal">–</b></div>
   </div>
 </div>
 
 <div class="panel" id="dash">
-  <h3>📊 任务指标</h3>
   <div class="kgrid">
     <div class="kpi"><span>任务用时</span><b id="k_time">0.0<em> s</em></b></div>
     <div class="kpi"><span>航点进度</span><b id="k_wp">0 / 5</b></div>
     <div class="kpi"><span>平均横偏</span><b id="k_xte">–</b></div>
-    <div class="kpi"><span>平均深度误差</span><b id="k_zerr">–</b></div>
-    <div class="kpi"><span>累计能耗</span><b id="k_e">0<em> J</em></b></div>
-    <div class="kpi"><span>能耗 / 米</span><b id="k_epm">–</b></div>
+    <div class="kpi"><span>深度误差</span><b id="k_zerr">–</b></div>
     <div class="kpi"><span>规避机动</span><b id="k_avoid">0<em> 次</em></b></div>
-    <div class="kpi"><span>最小会遇距离</span><b id="k_clear">–</b></div>
+    <div class="kpi"><span>最小会遇</span><b id="k_clear">–</b></div>
   </div>
-  <h3>🎬 演示操控</h3>
+  <h3>🎬 操控</h3>
   <div class="btnrow">
     <button id="btnGo" disabled>▶ 开始</button>
     <button id="btnReset">↺ 复位</button>
@@ -161,22 +184,17 @@
     <button id="camFollow">跟随</button>
     <button id="camTop">俯瞰</button>
   </div>
-  <button id="btnFov" class="on">👁 判定图形与航路：显示</button>
-  <button id="pipBtn" class="on">📷 机载相机：开</button>
-  <label class="sl">河流流速（中泓） <span id="curV">0.18 m/s</span></label>
-  <input type="range" id="curSl" min="0" max="0.30" step="0.01" value="0.18">
-  <h3>🌊 场景要素（皆与航线冲突）</h3>
-  <div style="font-size:11.5px;color:#8fb0cc;line-height:1.8">
-    🪵 漂流木 ×3：刷在<b style="color:#e8b64c">航线正前方</b>顺流漂来 → 下潜穿越<br>
-    🚤 渡船 ×2：机器人临近才<b style="color:#e8b64c">离岸横穿</b>（必然会遇）<br>
-    🌉 桥墩窄门 / 礁石 ×2：全水深 → 绕行规避<br>
-    ⚓ 5 巡逻点按序（变深 0.5↔1.5 m）＋抛物线流速剖面
+  <div class="btnrow">
+    <button id="btnFov" class="on">👁 判定图形</button>
+    <button id="pipBtn" class="on">📷 机载相机</button>
   </div>
+  <label class="sl">河流流速 <span id="curV">0.18 m/s</span></label>
+  <input type="range" id="curSl" min="0" max="0.30" step="0.01" value="0.18">
 </div>
 
 <div id="pipFrame">
   <canvas id="pipOv" width="600" height="450"></canvas>
-  <span class="cap">📷 机载相机（艏部单目 70°）· 检测/跟踪叠加</span>
+  <span class="cap">📷 机载相机</span>
 </div>
 
 <div class="panel" id="elog"><div>—— 事件流 ——</div></div>
@@ -184,10 +202,10 @@
 <div class="overlay" id="startOverlay">
   <div class="card">
     <h1>水下半潜机器人自主巡航</h1>
-    <h2>动态河流综合演示 —— 网页仿真水池，算法在 Python（蛟人核心，装机同款）</h2>
-    <p><b style="color:#56b8e6">① 感知</b>：JY901 + MS5837 + 艏部单目 → 视惯压融合定位、目标检测-跟踪（Lib/StateEstimation.py、Lib/Vision.py）</p>
-    <p><b style="color:#e8b64c">② 决策</b>：航点状态机 + ILOS 抗流制导 + 双通道规避：漂浮物<b>下潜穿越</b>、全水深障碍<b>绕行</b>（Lib/Guidance.py）</p>
-    <p><b style="color:#3fbf8f">③ 控制</b>：M1 整定航向环 + 浮潜协同变深级联（Lib/Control.py）</p>
+    <h2>动态河流演示 —— 网页仿真水池，算法在 Python（蛟人核心，装机同款）</h2>
+    <p><b style="color:#56b8e6">感知</b> IMU+深度计+单目相机 → <b style="color:#e8b64c">决策</b> ILOS 制导+避障 → <b style="color:#3fbf8f">控制</b> 航向环+浮潜协同变深</p>
+    <p>沿 5 个巡逻点变深巡航，<b>每段航路都被挡</b>：🐟 悬停/横穿的大鱼、🌉 正挡航段的桥墩与礁石、
+    🚤 触发横穿的渡船；还可<b>拖动琥珀色立柱</b>随时加障。详见右上角「❓说明」。</p>
     <div id="pyState">⏳ 正在准备 Python 运行环境…</div>
     <button id="btnPickCore">📁 选择"蛟人核心"文件夹（直接双击打开本页时用）</button>
     <input type="file" id="coreDir" webkitdirectory multiple style="display:none">
@@ -254,7 +272,8 @@ const MARGIN = 1.35;                     // 与 Lib/Params.py 一致（仅用于
 /* ---------- 动态河流 ---------- */
 const RIVER = { len:40, wid:10, dep:2.2 };
 const START = [2, 5, 0.4, 0];            // x y z psi（NED，psi=0 朝下游）
-const WPS = [ [7,2.5,0.5], [13,7.2,1.4], [21,3.0,0.6], [28,7.0,1.5], [35,5.0,0.8] ];
+// 航点刻意制造"直线走不通"：2→3 段正穿北桥墩(17,7.1)，3→4 段正穿礁石(24.5,6.75)
+const WPS = [ [7,2.5,0.5], [13,7.2,1.4], [21,6.5,0.6], [28,7.0,1.5], [35,5.0,0.8] ];
 let U0 = 0.18;
 function currentAt(x, y, t){
   const f = 4*(y/RIVER.wid)*(1 - y/RIVER.wid);
@@ -272,43 +291,86 @@ function routeYatX(x){
 }
 
 /* ---------- 障碍编排：每个移动物都对巡航构成挑战 ----------
-   rock/pylon：全水深、挡在航线上 → 绕行；
-   log：初始就刷在航线正前方、顺流漂来，被追上→下潜穿越；漂出后在
-        机器人前方 7m 的航线上重生（保持每段航路都有会遇）；
-   boat：触发式渡船——机器人进入触发区才离岸横穿，航线必然交叉。 */
-const OB_NAME = { rock:'礁石', pylon:'桥墩', log:'漂流木', boat:'渡船' };
+   rock/pylon：全水深静态、挡在航线上 → 绕行；
+   fish：大鱼，顺流游动（水流+自游+蛇形摆动），身长约1.2m、占据大半水深
+         → 潜不过去，逼出对"深吃水动态目标"的绕行；刷在航线前方，被甩
+         在身后则重生到前方航线上（保持每段航路都有会遇）；
+   boat：触发式渡船——机器人进入触发区才离岸横穿 → 下潜穿越。 */
+const OB_NAME = { rock:'礁石', pylon:'桥墩', boat:'渡船', pillar:'移动立柱', fish:'大鱼' };
 let obstacles = [];
 function makeObstacles(){
   obstacles = [
-    { type:'rock',  x:10,   y:4.6, r:0.50, full:true },
+    // 桥墩：北墩 (17,7.1) 正挡在 2→3 航段上（航段线在 x=17 处 y=6.85）
     { type:'pylon', x:17,   y:3.3, r:0.45, full:true },
     { type:'pylon', x:17,   y:7.1, r:0.45, full:true },
-    { type:'rock',  x:25,   y:3.9, r:0.55, full:true },
-    // 漂流木：直接放在航线上（routeYatX），顺当地流速下漂
-    { type:'log',  x:6.5,  y:routeYatX(6.5),  r:0.55, draft:0.45, vx:0, vy:0 },
-    { type:'log',  x:19,   y:routeYatX(19),   r:0.55, draft:0.45, vx:0, vy:0 },
-    { type:'log',  x:30.5, y:routeYatX(30.5), r:0.55, draft:0.45, vx:0, vy:0 },
+    // 礁石：正挡在 3→4 航段上（航段线在 x=24.5 处 y=6.75）
+    { type:'rock',  x:24.5, y:6.75, r:0.55, full:true },
+    // 大鱼三种行为，都是真拦路（潜深不够，必须绕行）：
+    // hold  顶流悬停在 2 号航段正中（鱼类顶流定位，真实行为）
+    // cross 横穿河道往返巡游（贯穿全水深的"移动闸门"，5 号航段）
+    // drift 顺流漂游（1 号航段起步就要超越，甩掉后在前方航线重生）
+    { type:'fish', mode:'hold',  x:10.8, y:routeYatX(10.8), ax:10.8, ay:routeYatX(10.8),
+      r:0.60, draft:1.7, full:true, zc:0.9, vx:0, vy:0 },
+    { type:'fish', mode:'cross', x:30.8, y:2.0, ax:30.8, dir:1,
+      r:0.60, draft:1.7, full:true, zc:1.0, vx:0, vy:0 },
+    { type:'fish', mode:'drift', x:4,    y:routeYatX(4),
+      r:0.60, draft:1.7, full:true, zc:0.8, vx:0, vy:0 },
     // 触发式渡船：wait→(机器人进触发区)cross→dwell→return→wait
-    { type:'boat', x:11.5, y:1.4, r:0.50, draft:0.35, vx:0, vy:0,
-      homeY:1.4, farY:8.6, speed:0.30, phase:'wait', trig:[8.0,10.5] },
+    // （曾有 x=11.5 的 1 号渡船，横穿线正压在悬停鱼头上双挑战堆叠，已删）
     { type:'boat', x:32.5, y:8.6, r:0.50, draft:0.35, vx:0, vy:0,
       homeY:8.6, farY:1.4, speed:0.30, phase:'wait', trig:[28.5,31.0] },
+    // 可拖动立柱（全水深）：初始停在上游岸角（远离所有航段），演示中用
+    // 鼠标拖到航线上考验临时重规划（Python 侧无专门代码，走同一套静态判定）
+    { type:'pillar', x:2, y:9.2, r:0.45, full:true, user:true },
   ];
   obstacles.forEach((o,i)=>o.id=i+1);
 }
 function stepObstacles(dt, t){
   const rx = sim.s[0], mission = MSTATE();
   for(const o of obstacles){
-    if(o.type==='log'){
+    if(o.type==='fish'){
       const c = currentAt(o.x, o.y, t);
-      o.vx = c[0]; o.vy = c[1];
+      if(o.mode==='hold'){
+        // 顶流悬停：弹簧回锚点 + 轻摆——它就赖在航线正中，机器人必须绕
+        o.vx = 0.25*(o.ax-o.x);
+        o.vy = 0.25*(o.ay-o.y) + 0.04*Math.sin(0.5*t+o.id);
+      } else if(o.mode==='cross'){
+        // 横穿巡游：往返横渡（贯穿全水深的移动闸门）
+        o.vx = 0.2*(o.ax-o.x);
+        o.vy = o.dir*0.16;
+        if(o.y>8.8) o.dir=-1; if(o.y<1.2) o.dir=1;
+      } else {
+        o.vx = c[0] + 0.02;                              // 顺流漂游
+        o.vy = c[1] + 0.06*Math.sin(0.30*t + o.id*2.1);  // 轻微蛇形
+      }
+      // 鱼自己绕开礁石/桥墩/立柱（真实行为，也免得造出"障碍夹击"死局）
+      for(const s of obstacles){
+        if(!s.full || s===o || s.type==='fish') continue;
+        const ds=Math.hypot(o.x-s.x, o.y-s.y);
+        if(ds < s.r+1.2 && ds>1e-3){
+          o.vx += 0.25*(o.x-s.x)/ds; o.vy += 0.25*(o.y-s.y)/ds;
+        }
+      }
+      // 受惊逃逸：只在 1.3m 贴身时窜开（兜底物理死局，不"客气让路"——
+      // 挡路是它的本职，避让必须由机器人完成）
+      const drx=o.x-sim.s[0], dry=o.y-sim.s[1], dr=Math.hypot(drx,dry);
+      if(dr<1.6 && dr>1e-3){
+        const k=0.6*(1-dr/1.6);
+        o.vx += k*drx/dr; o.vy += k*dry/dr;
+      }
       o.x += o.vx*dt; o.y = clamp(o.y + o.vy*dt, 0.8, RIVER.wid-0.8);
-      // 漂出河道 / 被机器人甩在身后 5m → 若任务仍在进行，重生到前方航线上
-      if(o.x > RIVER.len+1 || (mission==='TRANSIT' && o.x < rx-5)){
-        if(mission==='TRANSIT' && rx+7 < RIVER.len-3){
-          const ahead = obstacles.filter(q=>q.type==='log' && q.x>rx && q.x<rx+12).length;
-          if(ahead < 2){ o.x = rx+7; o.y = clamp(routeYatX(o.x)+gauss(0.25), 0.8, RIVER.wid-0.8); }
-          else o.x = RIVER.len+2;      // 前方已够热闹，先停在界外待命
+      // 仅 drift 鱼：游出河道/被甩在身后 5m → 重生到前方航线上
+      if(o.mode==='drift' && (o.x > RIVER.len+1 || (mission==='TRANSIT' && o.x < rx-5))){
+        if(mission==='TRANSIT' && rx+8 < RIVER.len-3){
+          const ahead = obstacles.filter(q=>q.type==='fish' && q.mode==='drift' && q.x>rx && q.x<rx+12).length;
+          if(ahead < 1){
+            let nx = rx+8, ny = routeYatX(nx);
+            // 避开航点拐角与静态障碍（那些位置已有专属挑战）
+            for(const w of WPS){ if(Math.hypot(w[0]-nx, w[1]-ny)<2.5){ nx+=2.5; ny=routeYatX(nx); break; } }
+            for(const s of obstacles){ if(s.full && s.type!=='fish' && Math.hypot(s.x-nx, s.y-ny)<2.5){ nx+=2.5; ny=routeYatX(nx); break; } }
+            o.x = nx; o.y = clamp(ny+gauss(0.25), 0.8, RIVER.wid-0.8);
+          }
+          else o.x = RIVER.len+2;      // 前方已有会遇，先停在界外待命
         } else o.x = RIVER.len+2;
       }
     } else if(o.type==='boat'){
@@ -601,35 +663,94 @@ sun.shadow.camera.left=-30; sun.shadow.camera.right=30; sun.shadow.camera.top=30
 scene.add(sun);
 const N2T=(x,y,z)=>new THREE.Vector3(y,-z,x);
 
-/* ---- 河道 ---- */
+/* ---- 河道与两岸 ---- */
 let waterGeo=null;
 (function buildRiver(){
   const {len,wid,dep}=RIVER;
+  // 河床：沙泥底 + 卵石 + 水草（去掉了 CAD 感的网格线）
   const bed=new THREE.Mesh(new THREE.PlaneGeometry(wid,len),
-    new THREE.MeshStandardMaterial({color:0x3a5a4e,roughness:0.95}));
+    new THREE.MeshStandardMaterial({color:0x556052,roughness:1}));
   bed.rotation.x=-Math.PI/2; bed.position.set(wid/2,-dep,len/2); bed.receiveShadow=true; scene.add(bed);
-  const grid=new THREE.GridHelper(len,len,0x4a7a68,0x40685c);
-  grid.position.set(wid/2,-dep+0.01,len/2); scene.add(grid);
-  const bankMat=new THREE.MeshStandardMaterial({color:0x4e7a4a,roughness:0.95});
-  [[-0.05,-1],[wid+0.05,1]].forEach(([xe,sgn])=>{
-    const bank=new THREE.Mesh(new THREE.PlaneGeometry(6,len+16),bankMat);
-    bank.rotation.x=-Math.PI/2; bank.rotation.y=sgn*0.22;
-    bank.position.set(xe+sgn*2.9,0.55,len/2); bank.receiveShadow=true; scene.add(bank);
-  });
+  const pebMat=new THREE.MeshStandardMaterial({color:0x6e7a70,roughness:0.95});
+  for(let i=0;i<46;i++){
+    const p=new THREE.Mesh(new THREE.DodecahedronGeometry(0.05+Math.random()*0.09,0),pebMat);
+    p.position.set(Math.random()*wid,-dep+0.04,Math.random()*len);
+    p.rotation.set(Math.random()*3,Math.random()*3,0); scene.add(p);
+  }
+  const weedMat=new THREE.MeshStandardMaterial({color:0x2f6b3f,roughness:0.9});
+  for(let i=0;i<16;i++){
+    const h=0.3+Math.random()*0.5;
+    const w=new THREE.Mesh(new THREE.ConeGeometry(0.05,h,5),weedMat);
+    w.position.set(Math.random()*wid,-dep+h/2,Math.random()*len);
+    w.rotation.z=gauss(0.15); scene.add(w);
+  }
+  // 两岸：河床→水线沙滩→草坡 连续剖面条带（不再是悬空的斜板）
+  function bank(edgeX,sgn){
+    const prof=[[0,-dep],[0.55,-0.03],[1.15,0.2],[3.4,0.6],[9,1.25]];
+    const cols=[0x4f4433,0xc9b585,0x5b8a4a,0x4e7a42];
+    const L=len+24, z0=-12;
+    for(let i=0;i<prof.length-1;i++){
+      const [x1,y1]=prof[i],[x2,y2]=prof[i+1];
+      const g=new THREE.BufferGeometry();
+      g.setAttribute('position',new THREE.BufferAttribute(new Float32Array([
+        edgeX+sgn*x1,y1,z0, edgeX+sgn*x2,y2,z0, edgeX+sgn*x2,y2,z0+L,
+        edgeX+sgn*x1,y1,z0, edgeX+sgn*x2,y2,z0+L, edgeX+sgn*x1,y1,z0+L]),3));
+      g.computeVertexNormals();
+      const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({
+        color:cols[i],roughness:0.95,side:THREE.DoubleSide}));
+      m.receiveShadow=true; scene.add(m);
+    }
+  }
+  bank(0,-1); bank(wid,1);
+  // 岸上植被：双层伞树 / 灌木 / 水缘芦苇；半沉大石
   const trunkMat=new THREE.MeshStandardMaterial({color:0x6a4a30}),
-        leafMat=new THREE.MeshStandardMaterial({color:0x3c6b3a,roughness:0.9});
+        leaf1=new THREE.MeshStandardMaterial({color:0x3c6b3a,roughness:0.9}),
+        leaf2=new THREE.MeshStandardMaterial({color:0x4b7d43,roughness:0.9}),
+        bushMat=new THREE.MeshStandardMaterial({color:0x51804a,roughness:0.95}),
+        reedMat=new THREE.MeshStandardMaterial({color:0x7fa05a,roughness:0.9}),
+        stoneMat=new THREE.MeshStandardMaterial({color:0x77828a,roughness:0.9});
+  for(let i=0;i<16;i++){
+    const sgn=i%2?-1:1, edge=i%2?0:wid;
+    const off=2.8+Math.random()*3.6, zz=(i*2.7)%len+1;
+    const s=0.8+Math.random()*0.6, g=new THREE.Group();
+    const tr=new THREE.Mesh(new THREE.CylinderGeometry(0.06*s,0.09*s,0.8*s),trunkMat);
+    tr.position.y=0.4*s; g.add(tr);
+    const l1=new THREE.Mesh(new THREE.ConeGeometry(0.55*s,1.0*s,8),leaf1);
+    l1.position.y=1.1*s; l1.castShadow=true; g.add(l1);
+    const l2=new THREE.Mesh(new THREE.ConeGeometry(0.4*s,0.8*s,8),leaf2);
+    l2.position.y=1.65*s; l2.castShadow=true; g.add(l2);
+    g.position.set(edge+sgn*off,0.45+off*0.09,zz); scene.add(g);
+  }
+  for(let i=0;i<12;i++){
+    const sgn=i%2?-1:1, edge=i%2?0:wid;
+    const off=1.6+Math.random()*2.2, zz=(i*3.3+1.5)%len;
+    const b=new THREE.Mesh(new THREE.IcosahedronGeometry(0.22+Math.random()*0.18,0),bushMat);
+    b.position.set(edge+sgn*off,0.3+off*0.08,zz); b.scale.y=0.7; scene.add(b);
+  }
   for(let i=0;i<14;i++){
-    const side=i%2? -2.2 : wid+2.2, zz=2+ (i*2.9)%len;
-    const g=new THREE.Group();
-    const tr=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.1,0.9),trunkMat); tr.position.y=0.45; g.add(tr);
-    const lf=new THREE.Mesh(new THREE.ConeGeometry(0.55,1.5,8),leafMat); lf.position.y=1.5; lf.castShadow=true; g.add(lf);
-    g.position.set(side+gauss(0.6),0.75+Math.abs(side<0?side+2.2:side-wid-2.2)*0.2,zz); scene.add(g);
+    const sgn=i%2?-1:1, edge=i%2?0:wid;
+    const off=0.7+Math.random()*0.35, zz=(i*2.9+0.8)%len;
+    for(let k=0;k<4;k++){
+      const r=new THREE.Mesh(new THREE.CylinderGeometry(0.012,0.02,0.5+Math.random()*0.3),reedMat);
+      r.position.set(edge+sgn*(off+gauss(0.1)),0.22,zz+gauss(0.15));
+      r.rotation.z=gauss(0.1); scene.add(r);
+    }
   }
-  const stoneMat=new THREE.MeshStandardMaterial({color:0x7d8a92,roughness:0.9});
-  for(let i=0;i<26;i++){
-    const side=i%2?0:wid, st=new THREE.Mesh(new THREE.SphereGeometry(0.12+Math.random()*0.1,8,6),stoneMat);
-    st.position.set(side+(i%2?-0.15:0.15),0.06,(i*1.7)%len); scene.add(st);
+  for(let i=0;i<8;i++){
+    const sgn=i%2?-1:1, edge=i%2?0:wid;
+    const rk=new THREE.Mesh(new THREE.DodecahedronGeometry(0.2+Math.random()*0.16,0),stoneMat);
+    rk.position.set(edge+sgn*(0.25+Math.random()*0.3),-0.05,(i*4.9+2)%len);
+    rk.rotation.set(Math.random()*3,Math.random()*3,0); scene.add(rk);
   }
+  // 远景丘陵（雾中轮廓）
+  const hillMat=new THREE.MeshStandardMaterial({color:0x486e42,roughness:1});
+  for(let i=0;i<6;i++){
+    const sgn=i%2?-1:1, edge=i%2?0:wid;
+    const h=new THREE.Mesh(new THREE.SphereGeometry(6+Math.random()*5,12,8),hillMat);
+    h.position.set(edge+sgn*(14+Math.random()*6),-2.5,(i*8+4)%len);
+    h.scale.y=0.55; scene.add(h);
+  }
+  // 桥（x=17 跨河）
   const deck=new THREE.Mesh(new THREE.BoxGeometry(wid+5,0.18,1.7),
     new THREE.MeshStandardMaterial({color:0x8a949c,roughness:0.7}));
   deck.position.set(wid/2,0.75,17); deck.castShadow=true; scene.add(deck);
@@ -638,6 +759,7 @@ let waterGeo=null;
       new THREE.MeshStandardMaterial({color:0xaab4bc}));
     rail.position.set(wid/2,1.0,17+off); scene.add(rail);
   });
+  // 水面
   waterGeo=new THREE.PlaneGeometry(wid,len,24,60);
   const water=new THREE.Mesh(waterGeo,new THREE.MeshStandardMaterial({
     color:0x2e7fb8,transparent:true,opacity:0.55,metalness:0.35,roughness:0.2,side:THREE.DoubleSide}));
@@ -667,7 +789,6 @@ function buildObstacleMeshes(){
   obMeshes.forEach(m=>scene.remove(m.mesh)); obMeshes=[];
   const rockMat=new THREE.MeshStandardMaterial({color:0x6f7d86,roughness:0.95});
   const pylMat=new THREE.MeshStandardMaterial({color:0x8a949c,roughness:0.8});
-  const logMat=new THREE.MeshStandardMaterial({color:0x7a4f2c,roughness:0.9});
   for(const o of obstacles){
     let mesh;
     if(o.type==='rock'){
@@ -676,12 +797,44 @@ function buildObstacleMeshes(){
     } else if(o.type==='pylon'){
       mesh=new THREE.Mesh(new THREE.CylinderGeometry(o.r,o.r+0.06,RIVER.dep+0.8,18),pylMat);
       mesh.position.set(o.y,(0.8-RIVER.dep)/2,o.x);
-    } else if(o.type==='log'){
+    } else if(o.type==='pillar'){
+      // 可拖动立柱：河床伸出水面的琥珀色警示柱（origin 在柱底）
       mesh=new THREE.Group();
-      const c=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.14,2.2,10),logMat);
-      c.rotation.x=Math.PI/2; mesh.add(c);
-      const c2=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.04,0.5,8),logMat);
-      c2.rotation.z=0.6; c2.position.set(0.1,0.1,0.4); mesh.add(c2);
+      const H=RIVER.dep+1.0;
+      const body=new THREE.Mesh(new THREE.CylinderGeometry(o.r,o.r+0.05,H,20),
+        new THREE.MeshStandardMaterial({color:0xd8a13a,roughness:0.6}));
+      body.position.y=H/2; body.castShadow=true; mesh.add(body);
+      const stripeMat=new THREE.MeshStandardMaterial({color:0x21282e,roughness:0.7});
+      for(let k=0;k<3;k++){
+        const ring=new THREE.Mesh(new THREE.CylinderGeometry(o.r+0.012,o.r+0.012,0.18,20),stripeMat);
+        ring.position.y=H*0.5+k*0.45; mesh.add(ring);
+      }
+      const knob=new THREE.Mesh(new THREE.SphereGeometry(0.17,14,10),
+        new THREE.MeshStandardMaterial({color:0xff5544,emissive:0x662211}));
+      knob.position.y=H+0.12; mesh.add(knob);
+      mesh.position.set(o.y,-RIVER.dep,o.x);
+      mesh.userData.drag=o;                       // 鼠标拾取拖拽
+    } else if(o.type==='fish'){
+      // 大鱼：椭球身 + 摆动尾鳍 + 背鳍/胸鳍，身长≈1.2 m
+      mesh=new THREE.Group();
+      const bodyMat=new THREE.MeshStandardMaterial({color:0x49626f,roughness:0.5,metalness:0.2});
+      const finMat=new THREE.MeshStandardMaterial({color:0x39505c,roughness:0.6,side:THREE.DoubleSide});
+      const body=new THREE.Mesh(new THREE.SphereGeometry(0.3,16,12),bodyMat);
+      body.scale.set(0.6,0.72,1.95); body.castShadow=true; mesh.add(body);
+      const tail=new THREE.Mesh(new THREE.ConeGeometry(0.22,0.34,3),finMat);
+      tail.scale.x=0.18; tail.rotation.x=Math.PI/2; tail.position.z=-0.72; mesh.add(tail);
+      const dorsal=new THREE.Mesh(new THREE.ConeGeometry(0.14,0.22,3),finMat);
+      dorsal.scale.x=0.15; dorsal.position.set(0,0.25,-0.05); mesh.add(dorsal);
+      [-1,1].forEach(sd=>{
+        const pec=new THREE.Mesh(new THREE.ConeGeometry(0.1,0.2,3),finMat);
+        pec.scale.x=0.15; pec.rotation.z=sd*1.9; pec.position.set(sd*0.17,-0.06,0.15); mesh.add(pec);
+      });
+      const eyeMat=new THREE.MeshStandardMaterial({color:0x101418});
+      [-1,1].forEach(sd=>{
+        const eye=new THREE.Mesh(new THREE.SphereGeometry(0.03,8,6),eyeMat);
+        eye.position.set(sd*0.15,0.06,0.46); mesh.add(eye);
+      });
+      mesh.userData.tail=tail;
     } else {
       mesh=new THREE.Group();
       const hull=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.22,1.1),
@@ -699,10 +852,19 @@ function buildObstacleMeshes(){
 function updateObstacleMeshes(t){
   for(const {o,mesh} of obMeshes){
     if(o.type==='rock'||o.type==='pylon') continue;
+    if(o.type==='pillar'){ mesh.position.set(o.y,-RIVER.dep,o.x); continue; }
     mesh.visible = o.x<=RIVER.len;
+    if(o.type==='fish'){
+      const bob = 0.06*Math.sin(0.9*t+o.id);
+      mesh.position.set(o.y, -o.zc+bob, o.x);
+      const spd=Math.hypot(o.vx,o.vy);
+      // 鱼头朝游动方向；悬停时稳定朝上游（顶流姿态）
+      mesh.rotation.y = spd>0.05 ? Math.atan2(o.vy,o.vx) : Math.PI;
+      if(mesh.userData.tail) mesh.userData.tail.rotation.y = 0.6*Math.sin(6*t+o.id*2);
+      continue;
+    }
     const bob = 0.02*Math.sin(1.3*t+o.id);
     mesh.position.set(o.y, -0.06+bob, o.x);
-    if(o.type==='log') mesh.rotation.y = 0.15*Math.sin(0.4*t+o.id*2);
     if(o.type==='boat') mesh.rotation.y = (o.vy>=0? Math.PI:0);
   }
 }
@@ -837,7 +999,9 @@ function updatePercViz(){
   tgtLine.visible=on;
   offLine.visible=false;
   if(on){
-    fovMesh.position.set(sim.s[1],-sim.s[2]+0.02,sim.s[0]); fovMesh.rotation.z=sim.s[4];
+    // Euler XYZ 下 Z 先转再被 Rx(-90°) 放平：+Y 弧心落到 (-sinα,0,-cosα)，
+    // 取 α=ψ+π 才指向艏向 (sinψ,0,cosψ)（此前少了 +π，扇区贴在艉部）
+    fovMesh.position.set(sim.s[1],-sim.s[2]+0.02,sim.s[0]); fovMesh.rotation.z=sim.s[4]+Math.PI;
     const m=DBG.mission, e=DBG.est;
     const p=N2T(sim.s[0],sim.s[1],sim.s[2]);
     psiArrow.position.copy(p);
@@ -920,18 +1084,24 @@ function poseObCam(){
   obCam.position.copy(g.localToWorld(new THREE.Vector3(0,0,P.L*0.39+P.D/2+0.01)));
   obCam.quaternion.copy(g.quaternion); obCam.rotateY(Math.PI);
 }
+/* 水下/水上 雾与底色切换（主视角与机载相机共用） */
+function applyFogFor(cam){
+  const under = cam.position.y<0;
+  scene.fog.color.setHex(under?0x14506e:0x9cc4de);
+  scene.background.setHex(under?0x0f4260:0x9cc4de);
+  scene.fog.density = under?0.085:0.014;
+}
 function renderPIP(){
   if(!UI.pip) return;
   poseObCam();
-  const fd=scene.fog.density;
-  scene.fog.density = obCam.position.y<0 ? 0.10 : 0.014;
+  applyFogFor(obCam);
   renderer.setScissorTest(true);
   renderer.setViewport(12,12,PIPW,PIPH);
   renderer.setScissor(12,12,PIPW,PIPH);
   renderer.render(scene,obCam);
   renderer.setScissorTest(false);
   renderer.setViewport(0,0,innerWidth,innerHeight);
-  scene.fog.density=fd;
+  applyFogFor(camera);
   // 检测/跟踪叠加（数据 = Python 跟踪器；投影到机载相机像面）
   const W=pipOv.width, H=pipOv.height;
   pipCtx.clearRect(0,0,W,H);
@@ -942,7 +1112,7 @@ function renderPIP(){
     const fpx=(H/2)/Math.tan(35*D2R);              // 垂直 FOV 70° 的焦距（像素）
     pipCtx.font='13px "Microsoft YaHei"'; pipCtx.textBaseline='bottom';
     for(const tr of DBG.tracks){
-      const h = tr.full ? -0.5 : -0.08;
+      const h = tr.type==='fish' ? -0.9 : (tr.full ? -0.5 : -0.08);
       const wpos=new THREE.Vector3(tr.y,h,tr.x);
       const dist=wpos.distanceTo(obCam.position);
       const ndc=wpos.clone().project(obCam);
@@ -967,10 +1137,47 @@ function renderPIP(){
 const UI={ running:false, cam:'cine', speed:1, fov:true, pip:true };
 let cineAz=2.2;
 let orbit={az:2.4, el:0.42, dist:5, target:new THREE.Vector3(5,0,2), drag:false, px:0, py:0};
-renderer.domElement.addEventListener('mousedown',e=>{orbit.drag=true;orbit.px=e.clientX;orbit.py=e.clientY;});
-addEventListener('mouseup',()=>orbit.drag=false);
+/* 立柱拖拽：按住琥珀色立柱可在河面内任意拖动（考验临时重规划）。
+   命中立柱→拖障碍；没命中→原有的视角旋转。 */
+const rayc=new THREE.Raycaster(), _ndc=new THREE.Vector2();
+const waterPlane=new THREE.Plane(new THREE.Vector3(0,1,0),0);
+let dragOb=null, dragged=false;
+function pickPillar(e){
+  _ndc.x=(e.clientX/innerWidth)*2-1; _ndc.y=-(e.clientY/innerHeight)*2+1;
+  rayc.setFromCamera(_ndc,camera);
+  const targets=obMeshes.filter(m=>m.o.type==='pillar').map(m=>m.mesh);
+  const hit=rayc.intersectObjects(targets,true)[0];
+  if(!hit) return null;
+  let g=hit.object;
+  while(g && !(g.userData&&g.userData.drag)) g=g.parent;
+  return g?g.userData.drag:null;
+}
+renderer.domElement.addEventListener('mousedown',e=>{
+  const ob=pickPillar(e);
+  if(ob){ dragOb=ob; dragged=false; renderer.domElement.style.cursor='grabbing'; return; }
+  orbit.drag=true;orbit.px=e.clientX;orbit.py=e.clientY;
+});
+addEventListener('mouseup',()=>{
+  if(dragOb && dragged) logEvent('🖱 立柱被移到 ('+dragOb.x.toFixed(1)+', '+dragOb.y.toFixed(1)+')——观察判定面板的临时重规划');
+  dragOb=null; orbit.drag=false; renderer.domElement.style.cursor='';
+});
 addEventListener('mousemove',e=>{
-  if(!orbit.drag)return;
+  if(dragOb){
+    _ndc.x=(e.clientX/innerWidth)*2-1; _ndc.y=-(e.clientY/innerHeight)*2+1;
+    rayc.setFromCamera(_ndc,camera);
+    const pt=new THREE.Vector3();
+    if(rayc.ray.intersectPlane(waterPlane,pt)){
+      dragOb.y=clamp(pt.x,0.6,RIVER.wid-0.6);
+      dragOb.x=clamp(pt.z,0.5,RIVER.len-0.5);
+      dragged=true;
+    }
+    return;
+  }
+  if(!orbit.drag){
+    if(e.target===renderer.domElement)
+      renderer.domElement.style.cursor=pickPillar(e)?'grab':'';
+    return;
+  }
   orbit.az-=(e.clientX-orbit.px)*0.006; orbit.el=clamp(orbit.el+(e.clientY-orbit.py)*0.004,0.06,1.5);
   orbit.px=e.clientX; orbit.py=e.clientY;
   if(UI.cam==='cine'){ UI.cam='follow'; syncCamBtns(); }
@@ -996,7 +1203,7 @@ function updateCamera(dt){
       t.y+d*Math.sin(orbit.el), t.z+d*Math.cos(orbit.el)*Math.sin(orbit.az));
     camera.lookAt(t);
   }
-  scene.fog.density = camera.position.y<0 ? 0.09 : 0.014;
+  applyFogFor(camera);
 }
 
 /* ---------- HUD / 判定逻辑面板 ---------- */
@@ -1011,39 +1218,36 @@ function stateBadge(){
 }
 function logicLines(){
   if(!DBG || MSTATE()==='IDLE') return ['等待任务开始…'];
-  if(MSTATE()==='DONE') return ['任务完成 → 排水上浮（压载 15%）'];
+  if(MSTATE()==='DONE') return ['任务完成 → 排水上浮'];
   const m=DBG.mission, L=[];
-  L.push('ILOS：横偏 e=<b>'+m.e.toFixed(2)+'m</b>'+(m.eT!==0
-    ? '，跟踪<b class="warn">偏移线 '+(m.eT>0?'+':'')+m.eT.toFixed(1)+'m</b>（冻结积分）'
-    : ' → ψd='+((m.psi_d*R2D%360+360)%360).toFixed(0)+'°'));
+  L.push('ILOS：横偏 <b>'+m.e.toFixed(2)+'m</b>'+(m.eT!==0
+    ? '，跟踪<b class="warn">偏移线 '+(m.eT>0?'+':'')+m.eT.toFixed(1)+'m</b>' : ''));
   const threats=DBG.tracks.filter(t=>t.threat);
   if(!threats.length){
-    L.push('威胁扫描：<b>无冲突</b>（跟踪 '+DBG.tracks.length+' 个目标）');
+    L.push('威胁扫描：<b>无冲突</b>');
   }else{
     for(const tr of threats.slice(0,2)){
       const rs=(tr.r+MARGIN).toFixed(1);
-      if(tr.full)
+      if(tr.static)
         L.push('<b class="warn">#'+tr.id+' '+OB_NAME[tr.type]+'</b>：挡在航段上，间隔 '
-          +(tr.cpa_d==null?'–':tr.cpa_d.toFixed(1))+'m &lt; 安全'+rs+'m → <b>绕行</b>');
+          +(tr.cpa_d==null?'–':tr.cpa_d.toFixed(1))+'m &lt; '+rs+'m → <b>绕行</b>');
+      else if(tr.full)
+        L.push('<b class="warn">#'+tr.id+' '+OB_NAME[tr.type]+'</b>：CPA '
+          +(tr.cpa_d==null?'–':tr.cpa_d.toFixed(1))+'m，潜深不够 → <b>绕行</b>');
       else
         L.push('<b class="warn">#'+tr.id+' '+OB_NAME[tr.type]+'</b>：CPA '
           +(tr.cpa_d==null?'–':tr.cpa_d.toFixed(1))+'m@'+(tr.cpa_t==null?'–':tr.cpa_t.toFixed(1))
-          +'s &lt; '+rs+'m → <b>下潜穿越</b>');
+          +'s → <b>下潜穿越</b>');
     }
-    if(m.lo!=null||m.hi!=null)
-      L.push('偏移约束：e ∈ ['+(m.lo==null?'−∞':m.lo.toFixed(1))+', '
-        +(m.hi==null?'+∞':m.hi.toFixed(1))+'] → 取 '+(m.eT>0?'+':'')+m.eT.toFixed(1)+'m');
-    if(m.slow<1) L.push('动态会遇 → <b class="warn">减速让行 ×'+m.slow.toFixed(2)+'</b>');
+    if(m.slow<1) L.push('动态会遇 → <b class="warn">减速让行</b>');
   }
-  L.push('经济巡航：油门基值 '+(m.base*100).toFixed(0)+'%（地速伺服 0.42 m/s）');
   return L;
 }
 function refreshHUD(){
   const e=DBG?DBG.est:null, m=DBG?DBG.mission:null;
   $('p_slam').textContent=e?e.x.toFixed(1)+', '+e.y.toFixed(1)+' m':'–';
-  $('p_drift').textContent=(SENSIM.drift()*100).toFixed(0)+' cm';
   $('p_z').textContent=e?e.z.toFixed(2)+' m':'–';
-  $('p_att').textContent=e?(((e.psi*R2D)%360+360)%360).toFixed(0)+'° / '+(e.theta*R2D).toFixed(0)+'°':'–';
+  $('p_att').textContent=e?(((e.psi*R2D)%360+360)%360).toFixed(0)+'°':'–';
   const trs=DBG?DBG.tracks:[];
   const near=trs.length&&e?Math.min(...trs.map(t=>Math.hypot(t.x-e.x,t.y-e.y))):null;
   $('p_vis').textContent=trs.length+' 个'+(near!=null?'（最近 '+near.toFixed(1)+' m）':'');
@@ -1052,19 +1256,15 @@ function refreshHUD(){
   $('d_wp').textContent=m&&m.state!=='IDLE'?Math.min(m.wp_i+1,m.n_wp)+' / '+m.n_wp:'–';
   $('d_psid').textContent=m&&m.state==='TRANSIT'?(((m.psi_d*R2D)%360+360)%360).toFixed(0)+'°':'–';
   $('d_zref').textContent=m?m.zref.toFixed(2)+' m':'–';
-  $('d_base').textContent=m?(m.base*100).toFixed(0)+' %'+(m.slow<1?' (减速)':''):'–';
   $('d_logic').innerHTML=logicLines().map(s=>'<div>'+s+'</div>').join('');
   $('c_l').style.width=(50+clamp(lastCmd[0],-1,1)*50)+'%';
   $('c_r').style.width=(50+clamp(lastCmd[1],-1,1)*50)+'%';
-  $('c_rud').textContent=(sim.s[11]*R2D).toFixed(0)+'° / '+(DBG?(DBG.ctrl.th_ref*R2D).toFixed(0):'0')+'°';
+  $('c_rud').textContent=(sim.s[11]*R2D).toFixed(0)+'°';
   $('c_bal').textContent=(sim.s[10]*100).toFixed(0)+' %';
-  $('c_pw').textContent=METRICS.power.toFixed(1)+' W';
   $('k_time').innerHTML=sim.t.toFixed(1)+'<em> s</em>';
   $('k_wp').textContent=(m?Math.min(m.wp_i+(m.state==='DONE'?m.n_wp:0),m.n_wp):0)+' / '+WPS.length;
   $('k_xte').textContent=METRICS.n?(METRICS.xteSum/METRICS.n).toFixed(2)+' m':'–';
   $('k_zerr').textContent=METRICS.n?(METRICS.zerrSum/METRICS.n).toFixed(2)+' m':'–';
-  $('k_e').innerHTML=METRICS.energy.toFixed(0)+'<em> J</em>';
-  $('k_epm').textContent=METRICS.dist>1?(METRICS.energy/METRICS.dist).toFixed(1)+' J/m':'–';
   $('k_avoid').innerHTML=(m?m.avoid_count:0)+'<em> 次</em>';
   $('k_clear').textContent=isFinite(METRICS.minClear)?METRICS.minClear.toFixed(2)+' m':'–';
   $('k_clear').style.color=METRICS.collisions>0?'#e2604c':(isFinite(METRICS.minClear)&&METRICS.minClear<0.3?'#e8b64c':'#ffd479');
@@ -1117,12 +1317,13 @@ function syncCamBtns(){
 [['camCine','cine'],['camFollow','follow'],['camTop','top']].forEach(([id,k])=>{
   $(id).onclick=()=>{ UI.cam=k; syncCamBtns(); };
 });
-$('btnFov').onclick=e=>{ UI.fov=!UI.fov; e.target.classList.toggle('on');
-  e.target.textContent=UI.fov?'👁 判定图形与航路：显示':'👁 判定图形与航路：隐藏'; };
+$('btnFov').onclick=e=>{ UI.fov=!UI.fov; e.target.classList.toggle('on'); };
 $('pipBtn').onclick=e=>{ UI.pip=!UI.pip; e.target.classList.toggle('on');
-  e.target.textContent=UI.pip?'📷 机载相机：开':'📷 机载相机：关';
   $('pipFrame').style.display=UI.pip?'block':'none'; };
 $('curSl').oninput=e=>{ U0=+e.target.value; $('curV').textContent=U0.toFixed(2)+' m/s'; };
+$('helpBtn').onclick=()=>{ const p=$('helpPanel');
+  p.style.display=p.style.display==='block'?'none':'block';
+  $('helpBtn').classList.toggle('on'); };
 
 /* ---------- 主循环 ---------- */
 let lastT=performance.now(), simAcc=0, frameN=0;

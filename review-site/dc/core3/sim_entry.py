@@ -56,8 +56,7 @@ class Engine:
     def step(self, imu, depth, vo, dets, t, dt):
         """一个控制拍：融合→(视觉)→(决策)→控制。dets=None 表示本拍无视觉帧。"""
         self.t = t
-        self.est.update(imu, depth, vo, dt,
-                        u_cmd=(self.ctrl.out[0] + self.ctrl.out[1]) * 0.5)
+        self.est.update(imu, depth, vo, dt)
         if dets is not None:
             self.vision.tick(dets, self.est, t, 1.0 / RATE_VISION)
         if t >= self._next_dec:
