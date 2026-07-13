@@ -1,134 +1,199 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 400" font-family="'Microsoft YaHei','PingFang SC',sans-serif">
-  <defs>
-    <linearGradient id="lane" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#0a2438"/><stop offset="1" stop-color="#061826"/>
-    </linearGradient>
-  </defs>
-  <rect width="880" height="400" fill="#081826"/>
-  <line x1="440" y1="16" x2="440" y2="384" stroke="#56b8e6" stroke-opacity=".18"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 480" font-family="'Microsoft YaHei','PingFang SC',sans-serif">
+<defs>
+  <linearGradient id="rv" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#0e3a5e"/><stop offset="1" stop-color="#082238"/>
+  </linearGradient>
+</defs>
 
-  <!-- ============ 左：无协同基线 ============ -->
+<!-- ══════════ 俯视河道场景 ══════════ -->
+<rect x="14" y="16" width="852" height="330" rx="10" fill="#081826" stroke="#56b8e6" stroke-opacity=".14"/>
+<rect x="30" y="52" width="820" height="258" fill="url(#rv)" rx="4"/>
+<rect x="30" y="44" width="820" height="10" fill="#123754"/>
+<rect x="30" y="308" width="820" height="10" fill="#123754"/>
+<text x="38" y="40" font-size="10" fill="#5f7f9c" letter-spacing="1.5">3 艇河道搜索巡逻（俯视） · 决策全部来自 Python 一致性协议</text>
+
+<!-- 桥：两侧桥墩 + 3.7m 窄通航孔（居中） -->
+<g>
+  <rect x="470" y="52" width="26" height="98" fill="#153450" stroke="#e05c5c" stroke-opacity=".5"/>
+  <rect x="470" y="212" width="26" height="96" fill="#153450" stroke="#e05c5c" stroke-opacity=".5"/>
+  <text x="483" y="170" font-size="9.5" fill="#e05c5c" text-anchor="middle" opacity=".9">窄</text>
+  <text x="483" y="184" font-size="9.5" fill="#e05c5c" text-anchor="middle" opacity=".9">门</text>
+  <text x="483" y="330" font-size="9.5" fill="#8fb0cc" text-anchor="middle">通航孔 3.7m · 装不下横队</text>
+</g>
+
+<!-- 三条搜索覆盖带：随横队前进增长，纵队段中断 -->
+<g opacity=".85">
+  <rect x="56" y="100" width="0" height="26" fill="#56b8e6" opacity=".10">
+    <animate attributeName="width" dur="16s" repeatCount="indefinite"
+      values="0;300;300;300;300" keyTimes="0;.28;.60;.98;1"/>
+  </rect>
+  <rect x="56" y="167" width="0" height="26" fill="#3fbf8f" opacity=".10">
+    <animate attributeName="width" dur="16s" repeatCount="indefinite"
+      values="0;300;300;300;300" keyTimes="0;.28;.60;.98;1"/>
+  </rect>
+  <rect x="56" y="234" width="0" height="26" fill="#e8b64c" opacity=".08">
+    <animate attributeName="width" dur="16s" repeatCount="indefinite"
+      values="0;300;300;300;300" keyTimes="0;.28;.60;.98;1"/>
+  </rect>
+  <!-- 过桥后恢复的覆盖带 -->
+  <rect x="540" y="100" width="0" height="26" fill="#56b8e6" opacity=".10">
+    <animate attributeName="width" dur="16s" repeatCount="indefinite"
+      values="0;0;250;250" keyTimes="0;.56;.98;1"/>
+  </rect>
+  <rect x="540" y="167" width="0" height="26" fill="#3fbf8f" opacity=".10">
+    <animate attributeName="width" dur="16s" repeatCount="indefinite"
+      values="0;0;250;250" keyTimes="0;.56;.98;1"/>
+  </rect>
+  <rect x="540" y="234" width="0" height="26" fill="#e8b64c" opacity=".08">
+    <animate attributeName="width" dur="16s" repeatCount="indefinite"
+      values="0;0;250;250" keyTimes="0;.56;.98;1"/>
+  </rect>
+</g>
+<text x="60" y="94" font-size="9" fill="#56b8e6" opacity=".55">搜索覆盖 ~5m（单艇需 3 趟）</text>
+
+<!-- ══ 编队（组整体前进；艇相对组变换队形） ══ -->
+<g>
+  <animate attributeName="opacity" dur="16s" repeatCount="indefinite"
+    values="0;1;1;0;0" keyTimes="0;.02;.955;.985;1"/>
+  <animateTransform attributeName="transform" type="translate" dur="16s" repeatCount="indefinite"
+    values="0,0; 240,0; 400,0; 500,0; 660,0" keyTimes="0;.30;.52;.66;.96" calcMode="linear"/>
+
+  <!-- 通信连线（领航↔僚机；失效段领航线变红消隐、僚机间直连） -->
+  <g stroke-width="1.5" stroke-dasharray="4 5">
+    <line x1="118" y1="180" x2="96" y2="113" stroke="#56b8e6" opacity=".8">
+      <animate attributeName="stroke-dashoffset" dur="1.3s" repeatCount="indefinite" values="0;-18"/>
+      <animate attributeName="opacity" dur="16s" repeatCount="indefinite"
+        values=".8;.8;0;0;.8;.8" keyTimes="0;.66;.70;.84;.88;1"/>
+      <animate attributeName="y2" dur="16s" repeatCount="indefinite"
+        values="113;113;180;180;113;113" keyTimes="0;.32;.40;.56;.62;1"/>
+      <animate attributeName="x2" dur="16s" repeatCount="indefinite"
+        values="96;96;74;74;96;96" keyTimes="0;.32;.40;.56;.62;1"/>
+    </line>
+    <line x1="118" y1="180" x2="96" y2="247" stroke="#56b8e6" opacity=".8">
+      <animate attributeName="stroke-dashoffset" dur="1.3s" repeatCount="indefinite" values="0;-18"/>
+      <animate attributeName="opacity" dur="16s" repeatCount="indefinite"
+        values=".8;.8;0;0;.8;.8" keyTimes="0;.66;.70;.84;.88;1"/>
+      <animate attributeName="y2" dur="16s" repeatCount="indefinite"
+        values="247;247;180;180;247;247" keyTimes="0;.32;.40;.56;.62;1"/>
+      <animate attributeName="x2" dur="16s" repeatCount="indefinite"
+        values="96;96;30;30;96;96" keyTimes="0;.32;.40;.56;.62;1"/>
+    </line>
+    <!-- 失效段：僚机间无领航直连（绿） -->
+    <line x1="96" y1="113" x2="96" y2="247" stroke="#3fbf8f" opacity="0">
+      <animate attributeName="stroke-dashoffset" dur="1.1s" repeatCount="indefinite" values="0;-18"/>
+      <animate attributeName="opacity" dur="16s" repeatCount="indefinite"
+        values="0;0;.95;.95;0;0" keyTimes="0;.68;.71;.84;.87;1"/>
+    </line>
+  </g>
+
+  <!-- 领航艇（中路）：窄门前有感知扇形；失效段变红 -->
   <g>
-    <text x="30" y="40" font-size="14" fill="#dceaf5" font-weight="bold">无协同基线</text>
-    <text x="30" y="58" font-size="10.5" fill="#5f7f9c" letter-spacing="1">PURE LEADER-FOLLOWER · 无通信 · 无递补</text>
-    <rect x="24" y="130" width="392" height="150" rx="10" fill="url(#lane)" stroke="#56b8e6" stroke-opacity=".12"/>
-    <line x1="46" y1="205" x2="398" y2="205" stroke="#8fb0cc" stroke-opacity=".35" stroke-dasharray="4 6"/>
-    <path d="M398,199 l7,6 -7,6 z" fill="#8fb0cc" opacity=".4"/>
-
-    <!-- 三艇：0-4s 前进，4s 领航失效，全队停摆 -->
+    <path d="M20,0 L64,-17 A48,48 0 0 1 64,17 Z" fill="#56b8e6" opacity=".13" transform="translate(118,180)">
+      <animate attributeName="fill" dur="16s" repeatCount="indefinite"
+        values="#56b8e6;#56b8e6;#e8b64c;#e8b64c;#56b8e6;#56b8e6" keyTimes="0;.27;.30;.42;.46;1"/>
+    </path>
     <g>
-      <animate attributeName="opacity" dur="12s" repeatCount="indefinite"
-        values="0;1;1;0;0" keyTimes="0;.03;.94;.985;1"/>
-      <animateTransform attributeName="transform" type="translate" dur="12s" repeatCount="indefinite"
-        values="0,0; 110,0; 118,6; 118,6" keyTimes="0;.33;.42;1"/>
-      <!-- 领航 -->
-      <g>
-        <rect x="96" y="198" width="34" height="13" rx="6.5" fill="#56b8e6">
-          <animate attributeName="fill" dur="12s" repeatCount="indefinite"
-            values="#56b8e6;#56b8e6;#e05c5c;#e05c5c" keyTimes="0;.32;.34;1"/>
-        </rect>
-        <text x="113" y="192" font-size="9.5" fill="#8fb0cc" text-anchor="middle">领航</text>
-        <g opacity="0">
-          <animate attributeName="opacity" dur="12s" repeatCount="indefinite"
-            values="0;0;1;0;1;0;0" keyTimes="0;.33;.36;.39;.42;.45;1"/>
-          <path d="M108,193 l12,12 m0,-12 l-12,12" stroke="#e05c5c" stroke-width="2.4"/>
-        </g>
+      <rect x="88" y="171" width="60" height="18" rx="9" fill="#56b8e6" stroke="#cfeaff" stroke-opacity=".55">
+        <animate attributeName="fill" dur="16s" repeatCount="indefinite"
+          values="#56b8e6;#56b8e6;#e05c5c;#e05c5c;#56b8e6;#56b8e6" keyTimes="0;.665;.675;.845;.855;1"/>
+      </rect>
+      <rect x="134" y="176" width="12" height="8" rx="3" fill="#dceaf5"/>
+      <text x="118" y="165" font-size="9.5" fill="#8fb0cc" text-anchor="middle">领航</text>
+      <g opacity="0">
+        <animate attributeName="opacity" dur="16s" repeatCount="indefinite"
+          values="0;0;1;0;1;0;1;0;0" keyTimes="0;.67;.69;.71;.73;.75;.77;.79;1"/>
+        <text x="118" y="207" font-size="10" fill="#e05c5c" text-anchor="middle">✕ 通信失效</text>
       </g>
-      <!-- 跟随×2：失效后灰暗漂停 -->
-      <g>
-        <animate attributeName="opacity" dur="12s" repeatCount="indefinite"
-          values="1;1;.38;.38" keyTimes="0;.34;.40;1"/>
-        <rect x="54" y="176" width="34" height="13" rx="6.5" fill="#3f7fae"/>
-        <rect x="54" y="222" width="34" height="13" rx="6.5" fill="#3f7fae"/>
-        <text x="71" y="171" font-size="9.5" fill="#5f7f9c" text-anchor="middle">跟随1</text>
-        <text x="71" y="249" font-size="9.5" fill="#5f7f9c" text-anchor="middle">跟随2</text>
-      </g>
-    </g>
-
-    <g opacity="0" font-size="12">
-      <animate attributeName="opacity" dur="12s" repeatCount="indefinite"
-        values="0;0;1;1;0" keyTimes="0;.40;.44;.94;1"/>
-      <rect x="96" y="298" width="220" height="26" rx="7" fill="#0a1e30" stroke="#e05c5c" stroke-opacity=".55"/>
-      <text x="206" y="315" fill="#e05c5c" text-anchor="middle">领航失效 → 跟随失锚，任务停摆</text>
-    </g>
-    <!-- 推进距离刻度 -->
-    <g font-size="10" fill="#5f7f9c">
-      <line x1="46" y1="262" x2="164" y2="262" stroke="#e05c5c" stroke-opacity=".55" stroke-width="2"/>
-      <text x="50" y="252">失效后推进 ≈ 0</text>
     </g>
   </g>
 
-  <!-- ============ 右：图论一致性 ============ -->
+  <!-- 僚机 1（上路 → 纵队时并入中线后方） -->
   <g>
-    <text x="470" y="40" font-size="14" fill="#dceaf5" font-weight="bold">图论一致性协同</text>
-    <text x="470" y="58" font-size="10.5" fill="#5f7f9c" letter-spacing="1">CONSENSUS + PINNING · 邻居通信 · 自动重构</text>
-    <rect x="464" y="130" width="392" height="150" rx="10" fill="url(#lane)" stroke="#56b8e6" stroke-opacity=".12"/>
-    <line x1="486" y1="205" x2="838" y2="205" stroke="#8fb0cc" stroke-opacity=".35" stroke-dasharray="4 6"/>
-    <path d="M838,199 l7,6 -7,6 z" fill="#8fb0cc" opacity=".4"/>
-
-    <!-- 三艇：同样 4s 时 1 号失效，但剩余两艇重构继续前进 -->
-    <g>
-      <animate attributeName="opacity" dur="12s" repeatCount="indefinite"
-        values="0;1;1;0;0" keyTimes="0;.03;.94;.985;1"/>
-      <animateTransform attributeName="transform" type="translate" dur="12s" repeatCount="indefinite"
-        values="0,0; 110,0; 128,0; 290,0" keyTimes="0;.33;.45;1"/>
-      <!-- 领航（失效） -->
-      <g>
-        <rect x="536" y="198" width="34" height="13" rx="6.5" fill="#56b8e6">
-          <animate attributeName="fill" dur="12s" repeatCount="indefinite"
-            values="#56b8e6;#56b8e6;#e05c5c;#e05c5c" keyTimes="0;.32;.34;1"/>
-        </rect>
-        <animate attributeName="opacity" dur="12s" repeatCount="indefinite"
-          values="1;1;.35;.35" keyTimes="0;.34;.42;1"/>
-        <text x="553" y="192" font-size="9.5" fill="#8fb0cc" text-anchor="middle">1号</text>
-        <!-- 失效艇原地掉队（相对编队向后退） -->
-        <animateTransform attributeName="transform" type="translate" additive="sum" dur="12s" repeatCount="indefinite"
-          values="0,0; 0,0; -18,4; -180,4" keyTimes="0;.34;.45;1"/>
-      </g>
-      <!-- 跟随两艇：重构为并排继续 -->
-      <g>
-        <rect x="494" y="176" width="34" height="13" rx="6.5" fill="#3f9fd6">
-          <animateTransform attributeName="transform" type="translate" dur="12s" repeatCount="indefinite"
-            values="0,0; 0,0; 26,11; 26,11" keyTimes="0;.34;.48;1"/>
-        </rect>
-        <rect x="494" y="222" width="34" height="13" rx="6.5" fill="#3f9fd6">
-          <animateTransform attributeName="transform" type="translate" dur="12s" repeatCount="indefinite"
-            values="0,0; 0,0; 26,-11; 26,-11" keyTimes="0;.34;.48;1"/>
-        </rect>
-        <!-- 通信连线（脉冲） -->
-        <line x1="511" y1="189" x2="511" y2="222" stroke="#56b8e6" stroke-width="1.6" stroke-dasharray="3 4" opacity="0">
-          <animate attributeName="opacity" dur="12s" repeatCount="indefinite"
-            values="0;0;.9;.9;0" keyTimes="0;.36;.40;.96;1"/>
-          <animate attributeName="stroke-dashoffset" dur="1.2s" repeatCount="indefinite" values="0;-14"/>
-          <animateTransform attributeName="transform" type="translate" dur="12s" repeatCount="indefinite"
-            values="0,0; 0,0; 26,0; 26,0" keyTimes="0;.34;.48;1"/>
-        </line>
-      </g>
-    </g>
-
-    <g opacity="0" font-size="12">
-      <animate attributeName="opacity" dur="12s" repeatCount="indefinite"
-        values="0;0;1;1;0" keyTimes="0;.44;.48;.94;1"/>
-      <rect x="536" y="298" width="230" height="26" rx="7" fill="#0a1e30" stroke="#3fbf8f" stroke-opacity=".55"/>
-      <text x="651" y="315" fill="#3fbf8f" text-anchor="middle">一致性重构 → 双艇并排，任务继续</text>
-    </g>
-    <g font-size="10" fill="#5f7f9c">
-      <line x1="486" y1="262" x2="820" y2="262" stroke="#3fbf8f" stroke-opacity=".55" stroke-width="2">
-        <animate attributeName="x2" dur="12s" repeatCount="indefinite"
-          values="486;604;620;820" keyTimes="0;.33;.45;1"/>
-      </line>
-      <text x="490" y="252">失效后持续推进 · 拓扑重构不停航</text>
-    </g>
+    <animateTransform attributeName="transform" type="translate" dur="16s" repeatCount="indefinite"
+      values="0,0; 0,0; -44,67; -44,67; 0,0; 0,0" keyTimes="0;.30;.40;.56;.64;1" calcMode="linear"/>
+    <rect x="66" y="104" width="60" height="18" rx="9" fill="#3f9fd6" stroke="#cfeaff" stroke-opacity=".45"/>
+    <rect x="112" y="109" width="12" height="8" rx="3" fill="#dceaf5" opacity=".9"/>
+    <text x="96" y="98" font-size="9.5" fill="#5f7f9c" text-anchor="middle">僚机1</text>
   </g>
+  <!-- 僚机 2（下路 → 纵队时并入中线更后方） -->
+  <g>
+    <animateTransform attributeName="transform" type="translate" dur="16s" repeatCount="indefinite"
+      values="0,0; 0,0; -110,-67; -110,-67; 0,0; 0,0" keyTimes="0;.30;.40;.56;.64;1" calcMode="linear"/>
+    <rect x="66" y="238" width="60" height="18" rx="9" fill="#3f9fd6" stroke="#cfeaff" stroke-opacity=".45"/>
+    <rect x="112" y="243" width="12" height="8" rx="3" fill="#dceaf5" opacity=".9"/>
+    <text x="96" y="232" font-size="9.5" fill="#5f7f9c" text-anchor="middle">僚机2</text>
+  </g>
+</g>
 
-  <!-- 同步时钟 -->
-  <g font-size="10" fill="#5f7f9c">
-    <text x="30" y="384">t</text>
-    <rect x="42" y="376" width="796" height="4" rx="2" fill="#0a1e30"/>
-    <rect x="42" y="376" width="0" height="4" rx="2" fill="#56b8e6" opacity=".6">
-      <animate attributeName="width" dur="12s" repeatCount="indefinite" values="0;796"/>
+<!-- 场景事件标签（固定位置，随阶段浮现） -->
+<g font-size="11">
+  <g opacity="0">
+    <animate attributeName="opacity" dur="16s" repeatCount="indefinite"
+      values="0;0;1;1;0;0" keyTimes="0;.28;.31;.52;.56;1"/>
+    <rect x="330" y="60" width="300" height="24" rx="7" fill="#0a1e30" stroke="#e8b64c" stroke-opacity=".55"/>
+    <text x="480" y="76" fill="#e8b64c" text-anchor="middle">领航艇相机识别窄门 → 全队收拢为纵队穿越</text>
+  </g>
+  <g opacity="0">
+    <animate attributeName="opacity" dur="16s" repeatCount="indefinite"
+      values="0;0;1;1;0;0" keyTimes="0;.55;.58;.66;.70;1"/>
+    <rect x="560" y="60" width="196" height="24" rx="7" fill="#0a1e30" stroke="#3fbf8f" stroke-opacity=".55"/>
+    <text x="658" y="76" fill="#3fbf8f" text-anchor="middle">过桥自动展开 · 恢复横队搜索</text>
+  </g>
+  <g opacity="0">
+    <animate attributeName="opacity" dur="16s" repeatCount="indefinite"
+      values="0;0;1;1;0;0" keyTimes="0;.68;.71;.84;.88;1"/>
+    <rect x="524" y="272" width="312" height="24" rx="7" fill="#0a1e30" stroke="#3fbf8f" stroke-opacity=".55"/>
+    <text x="680" y="288" fill="#3fbf8f" text-anchor="middle">领航失效 → 无领航一致性接替，编队不停航</text>
+  </g>
+  <g opacity="0">
+    <animate attributeName="opacity" dur="16s" repeatCount="indefinite"
+      values="0;0;1;1;0;0" keyTimes="0;.86;.88;.94;.97;1"/>
+    <rect x="700" y="240" width="120" height="22" rx="7" fill="#0a1e30" stroke="#56b8e6" stroke-opacity=".55"/>
+    <text x="760" y="255" fill="#56b8e6" text-anchor="middle" font-size="10.5">恢复 → 无缝归建</text>
+  </g>
+</g>
+
+<!-- ══════════ 阶段时间轴（能力清单，同步点亮） ══════════ -->
+<g font-size="11">
+  <text x="14" y="376" font-size="11" fill="#5f7f9c" letter-spacing="2">协同能力时间轴 CAPABILITIES</text>
+  <!-- 4 段 -->
+  <g>
+    <rect x="14" y="388" width="200" height="52" rx="8" fill="#0a1e30" stroke="#56b8e6" stroke-opacity=".35"/>
+    <rect x="14" y="388" width="200" height="52" rx="8" fill="none" stroke="#56b8e6" stroke-width="2" opacity="0">
+      <animate attributeName="opacity" dur="16s" repeatCount="indefinite" values="1;1;0;0" keyTimes="0;.28;.32;1"/>
     </rect>
-    <line x1="311" y1="372" x2="311" y2="384" stroke="#e05c5c" stroke-opacity=".7"/>
-    <text x="317" y="371" fill="#e05c5c">领航艇失效时刻</text>
+    <text x="114" y="409" fill="#56b8e6" text-anchor="middle">① 并行搜索</text>
+    <text x="114" y="427" fill="#8fb0cc" text-anchor="middle" font-size="9.5">一字横队 · 覆盖 ~5m/趟</text>
   </g>
+  <g>
+    <rect x="232" y="388" width="200" height="52" rx="8" fill="#0a1e30" stroke="#e8b64c" stroke-opacity=".35"/>
+    <rect x="232" y="388" width="200" height="52" rx="8" fill="none" stroke="#e8b64c" stroke-width="2" opacity="0">
+      <animate attributeName="opacity" dur="16s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;.28;.31;.56;.60;1"/>
+    </rect>
+    <text x="332" y="409" fill="#e8b64c" text-anchor="middle">② 环境自适应变队</text>
+    <text x="332" y="427" fill="#8fb0cc" text-anchor="middle" font-size="9.5">相机识别窄门 → 纵队穿越</text>
+  </g>
+  <g>
+    <rect x="450" y="388" width="200" height="52" rx="8" fill="#0a1e30" stroke="#3fbf8f" stroke-opacity=".35"/>
+    <rect x="450" y="388" width="200" height="52" rx="8" fill="none" stroke="#3fbf8f" stroke-width="2" opacity="0">
+      <animate attributeName="opacity" dur="16s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;.55;.58;.68;.72;1"/>
+    </rect>
+    <text x="550" y="409" fill="#3fbf8f" text-anchor="middle">③ 队形恢复</text>
+    <text x="550" y="427" fill="#8fb0cc" text-anchor="middle" font-size="9.5">图论偏移平滑过渡 · 自动展开</text>
+  </g>
+  <g>
+    <rect x="668" y="388" width="198" height="52" rx="8" fill="#0a1e30" stroke="#e05c5c" stroke-opacity=".35"/>
+    <rect x="668" y="388" width="198" height="52" rx="8" fill="none" stroke="#e05c5c" stroke-width="2" opacity="0">
+      <animate attributeName="opacity" dur="16s" repeatCount="indefinite" values="0;0;1;1;0" keyTimes="0;.66;.69;.94;1"/>
+    </rect>
+    <text x="767" y="409" fill="#e05c5c" text-anchor="middle">④ 故障鲁棒</text>
+    <text x="767" y="427" fill="#8fb0cc" text-anchor="middle" font-size="9.5">领航失效 → 一致性接替 → 归建</text>
+  </g>
+  <!-- 进度条 -->
+  <rect x="14" y="452" width="852" height="4" rx="2" fill="#0a1e30"/>
+  <rect x="14" y="452" width="0" height="4" rx="2" fill="#56b8e6" opacity=".6">
+    <animate attributeName="width" dur="16s" repeatCount="indefinite" values="0;852"/>
+  </rect>
+  <text x="14" y="472" font-size="9.5" fill="#5f7f9c">全程无人工干预、无预设剧本 —— 每一拍队形决策由各艇本地一致性协议算出（Lib/Formation.py）</text>
+</g>
 </svg>

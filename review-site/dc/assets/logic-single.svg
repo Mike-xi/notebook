@@ -1,100 +1,260 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 400" font-family="'Microsoft YaHei','PingFang SC',sans-serif">
-  <defs>
-    <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#0b2a44"/><stop offset="1" stop-color="#071c30"/>
-    </linearGradient>
-    <linearGradient id="deep" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#071c30"/><stop offset="1" stop-color="#04101c"/>
-    </linearGradient>
-    <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">
-      <feGaussianBlur stdDeviation="3"/>
-    </filter>
-  </defs>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 570" font-family="'Microsoft YaHei','PingFang SC',sans-serif">
+<defs>
+  <linearGradient id="wA" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#0c2c48"/><stop offset="1" stop-color="#05131f"/>
+  </linearGradient>
+  <linearGradient id="wB" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#0e3a5e"/><stop offset="1" stop-color="#082238"/>
+  </linearGradient>
+  <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M0,0 L10,5 L0,10 z" fill="#5f7f9c"/>
+  </marker>
+</defs>
 
-  <rect width="880" height="400" fill="#081826"/>
+<!-- ══════════ 场景 A：侧视 · 变深通道（下潜穿越） ══════════ -->
+<g>
+  <rect x="14" y="16" width="422" height="238" rx="10" fill="#081826" stroke="#56b8e6" stroke-opacity=".14"/>
+  <text x="30" y="40" font-size="12" fill="#dceaf5" font-weight="bold">侧视 · 变深通道</text>
+  <text x="128" y="40" font-size="10" fill="#5f7f9c" letter-spacing="1">DIVE-UNDER CHANNEL</text>
 
-  <!-- 等轴测水面（上）与水下（下） -->
-  <polygon points="60,120 820,120 880,200 20,200" fill="url(#water)" opacity=".9"/>
-  <polygon points="20,200 880,200 880,340 20,340" fill="url(#deep)"/>
-  <line x1="20" y1="200" x2="880" y2="200" stroke="#56b8e6" stroke-opacity=".5" stroke-width="1.2"/>
-  <text x="26" y="193" font-size="10" fill="#5f7f9c" letter-spacing="2">水面 SURFACE</text>
-  <text x="26" y="330" font-size="10" fill="#3d566e" letter-spacing="2">水下 SUBMERGED</text>
-  <!-- 水面网格 -->
-  <g stroke="#56b8e6" stroke-opacity=".08">
-    <line x1="140" y1="120" x2="105" y2="200"/><line x1="260" y1="120" x2="230" y2="200"/>
-    <line x1="380" y1="120" x2="355" y2="200"/><line x1="500" y1="120" x2="480" y2="200"/>
-    <line x1="620" y1="120" x2="605" y2="200"/><line x1="740" y1="120" x2="730" y2="200"/>
-    <line x1="48" y1="150" x2="843" y2="150"/><line x1="35" y1="172" x2="862" y2="172"/>
-  </g>
+  <!-- 水面与水体 -->
+  <line x1="30" y1="92" x2="420" y2="92" stroke="#6fd3ff" stroke-opacity=".55" stroke-width="1.3"/>
+  <rect x="30" y="92" width="390" height="140" fill="url(#wA)"/>
+  <text x="34" y="86" font-size="9" fill="#5f7f9c" letter-spacing="1.5">水面</text>
+  <text x="34" y="226" font-size="9" fill="#3d566e" letter-spacing="1.5">河床</text>
+  <line x1="30" y1="232" x2="420" y2="232" stroke="#3d566e" stroke-opacity=".5"/>
 
-  <!-- 计划航线（虚线）与航点 -->
-  <path id="route" d="M56,214 L300,214 C330,214 336,252 366,252 L446,252 C476,252 482,214 512,214 L560,214 C592,214 596,178 636,178 L700,178 C736,178 742,214 772,214 L844,214"
-        fill="none" stroke="#8fb0cc" stroke-opacity=".45" stroke-width="1.4" stroke-dasharray="5 6"/>
-  <g fill="none" stroke="#56b8e6" stroke-width="1.4">
-    <path d="M56,208 l6,6 -6,6 -6,-6 z" fill="#0a1e30"/>
-    <path d="M844,208 l6,6 -6,6 -6,-6 z" fill="#0a1e30"/>
-  </g>
+  <!-- 巡航深度参考线 zref -->
+  <line x1="30" y1="128" x2="420" y2="128" stroke="#8fb0cc" stroke-opacity=".35" stroke-dasharray="4 5"/>
+  <text x="392" y="123" font-size="9" fill="#8fb0cc" opacity=".7">z 巡航</text>
 
-  <!-- 障碍一：漂浮木（占水面浅层） -->
+  <!-- 漂浮物（浅吃水）：吃水标注 -->
   <g>
-    <rect x="378" y="204" width="66" height="14" rx="7" fill="#e8b64c" opacity=".92"/>
-    <rect x="378" y="211" width="66" height="7" rx="3.5" fill="#a87f2e" opacity=".8"/>
-    <text x="411" y="196" font-size="11" fill="#e8b64c" text-anchor="middle">漂浮障碍 · 吃水浅</text>
+    <rect x="228" y="86" width="76" height="12" rx="6" fill="#e8b64c"/>
+    <rect x="238" y="98" width="56" height="16" rx="4" fill="#a87f2e" opacity=".85"/>
+    <text x="266" y="78" font-size="10.5" fill="#e8b64c" text-anchor="middle">漂浮物 · 浅吃水</text>
+    <line x1="312" y1="92" x2="312" y2="114" stroke="#e8b64c" stroke-opacity=".7"/>
+    <text x="318" y="108" font-size="9" fill="#e8b64c" opacity=".85">吃水</text>
   </g>
+  <!-- 下潜深度线：吃水+余量 -->
+  <line x1="216" y1="168" x2="330" y2="168" stroke="#3fbf8f" stroke-opacity=".6" stroke-dasharray="3 4"/>
+  <text x="336" y="172" font-size="9" fill="#3fbf8f">潜深 = 吃水+余量</text>
 
-  <!-- 障碍二：全水深立柱 -->
-  <g>
-    <rect x="654" y="130" width="26" height="196" rx="4" fill="#7e3040"/>
-    <rect x="654" y="130" width="26" height="196" rx="4" fill="none" stroke="#e05c5c" stroke-opacity=".8"/>
-    <ellipse cx="667" cy="130" rx="13" ry="5" fill="#e05c5c" opacity=".85"/>
-    <text x="667" y="118" font-size="11" fill="#e05c5c" text-anchor="middle">全水深障碍</text>
-  </g>
+  <!-- CPA 会遇圈（红，闪烁于判定窗口） -->
+  <circle cx="266" cy="104" r="52" fill="none" stroke="#e05c5c" stroke-width="1.4" stroke-dasharray="5 5" opacity="0">
+    <animate attributeName="opacity" dur="14s" repeatCount="indefinite"
+      values="0;0;.9;.9;0;0" keyTimes="0;.13;.16;.34;.38;1"/>
+  </circle>
 
-  <!-- 半潜艇（沿航线运动；前方感知扇形） -->
+  <!-- 航迹：接近→下潜→穿越→上浮 -->
+  <path id="pDive" d="M46,128 L170,128 C204,128 208,168 240,168 L292,168 C324,168 328,128 360,128 L410,128"
+        fill="none" stroke="none"/>
+  <path d="M46,128 L170,128 C204,128 208,168 240,168 L292,168 C324,168 328,128 360,128 L410,128"
+        fill="none" stroke="#3fbf8f" stroke-opacity=".35" stroke-width="1.4" stroke-dasharray="5 6"/>
+
+  <!-- 半潜艇 A -->
   <g>
-    <animate attributeName="opacity" dur="12s" repeatCount="indefinite"
-      values="0;1;1;0;0" keyTimes="0;.03;.94;.985;1"/>
-    <animateMotion dur="12s" repeatCount="indefinite" rotate="auto">
-      <mpath href="#route"/>
+    <animate attributeName="opacity" dur="14s" repeatCount="indefinite"
+      values="0;1;1;0;0" keyTimes="0;.02;.45;.485;1"/>
+    <animateMotion dur="14s" repeatCount="indefinite" rotate="auto" keyPoints="0;1;1" keyTimes="0;.46;1" calcMode="linear">
+      <mpath href="#pDive"/>
     </animateMotion>
-    <!-- 感知扇形 -->
-    <path d="M14,0 L74,-24 A66,66 0 0 1 74,24 Z" fill="#56b8e6" opacity=".14">
-      <animate attributeName="fill" dur="12s" repeatCount="indefinite"
-        values="#56b8e6;#56b8e6;#e8b64c;#e8b64c;#56b8e6;#56b8e6;#e8b64c;#e8b64c;#56b8e6;#56b8e6"
-        keyTimes="0;.14;.16;.30;.34;.50;.52;.66;.70;1"/>
-      <animate attributeName="opacity" dur="2s" repeatCount="indefinite" values=".10;.22;.10"/>
+    <path d="M12,0 L52,-15 A44,44 0 0 1 52,15 Z" fill="#56b8e6" opacity=".15">
+      <animate attributeName="fill" dur="14s" repeatCount="indefinite"
+        values="#56b8e6;#56b8e6;#e8b64c;#e8b64c;#56b8e6;#56b8e6" keyTimes="0;.12;.14;.30;.33;1"/>
     </path>
-    <!-- 艇体 -->
-    <g>
-      <rect x="-22" y="-8" width="44" height="16" rx="8" fill="#56b8e6"/>
-      <rect x="-22" y="-8" width="44" height="16" rx="8" fill="none" stroke="#dceaf5" stroke-opacity=".5"/>
-      <rect x="-2" y="-13" width="10" height="6" rx="2" fill="#dceaf5" opacity=".85"/>
-      <rect x="-28" y="-5" width="8" height="10" rx="2" fill="#2c6fd6"/>
-      <animate attributeName="opacity" dur="12s" repeatCount="indefinite"
-        values="1;1;.7;.7;1;1" keyTimes="0;.20;.24;.40;.44;1"/>
-    </g>
+    <rect x="-17" y="-6.5" width="34" height="13" rx="6.5" fill="#56b8e6" stroke="#dceaf5" stroke-opacity=".5"/>
+    <rect x="-2" y="-11" width="8" height="5" rx="2" fill="#dceaf5" opacity=".85"/>
   </g>
 
-  <!-- 事件标签 -->
-  <g font-size="12">
-    <g opacity="0">
-      <animate attributeName="opacity" dur="12s" repeatCount="indefinite"
-        values="0;0;1;1;0;0" keyTimes="0;.16;.19;.42;.46;1"/>
-      <rect x="322" y="272" width="170" height="24" rx="6" fill="#0a1e30" stroke="#e8b64c" stroke-opacity=".5"/>
-      <text x="407" y="288" fill="#e8b64c" text-anchor="middle">判定：漂浮物 → 下潜穿越</text>
-    </g>
-    <g opacity="0">
-      <animate attributeName="opacity" dur="12s" repeatCount="indefinite"
-        values="0;0;1;1;0;0" keyTimes="0;.54;.57;.82;.86;1"/>
-      <rect x="586" y="272" width="170" height="24" rx="6" fill="#0a1e30" stroke="#e05c5c" stroke-opacity=".5"/>
-      <text x="671" y="288" fill="#e05c5c" text-anchor="middle">判定：全水深 → 绕行规避</text>
-    </g>
+  <!-- 场景 A 事件标签 -->
+  <g font-size="10.5" opacity="0">
+    <animate attributeName="opacity" dur="14s" repeatCount="indefinite"
+      values="0;0;1;1;0;0" keyTimes="0;.15;.18;.40;.44;1"/>
+    <rect x="118" y="196" width="216" height="22" rx="6" fill="#0a1e30" stroke="#e8b64c" stroke-opacity=".55"/>
+    <text x="226" y="211" fill="#e8b64c" text-anchor="middle">CPA 时间门触发 → 变深通道：下潜穿越</text>
+  </g>
+</g>
+
+<!-- ══════════ 场景 B：俯视 · 水平通道（绕行偏移线） ══════════ -->
+<g>
+  <rect x="444" y="16" width="422" height="238" rx="10" fill="#081826" stroke="#56b8e6" stroke-opacity=".14"/>
+  <text x="460" y="40" font-size="12" fill="#dceaf5" font-weight="bold">俯视 · 水平通道</text>
+  <text x="558" y="40" font-size="10" fill="#5f7f9c" letter-spacing="1">LATERAL-OFFSET CHANNEL</text>
+
+  <!-- 河道（俯视） -->
+  <rect x="460" y="56" width="390" height="176" fill="url(#wB)" rx="4"/>
+  <line x1="460" y1="56" x2="850" y2="56" stroke="#123754" stroke-width="5"/>
+  <line x1="460" y1="232" x2="850" y2="232" stroke="#123754" stroke-width="5"/>
+  <text x="466" y="70" font-size="9" fill="#5f7f9c" letter-spacing="1.5">岸</text>
+  <text x="466" y="228" font-size="9" fill="#5f7f9c" letter-spacing="1.5">岸</text>
+
+  <!-- 原航线（中线） -->
+  <line x1="476" y1="144" x2="844" y2="144" stroke="#8fb0cc" stroke-opacity=".4" stroke-dasharray="4 5"/>
+  <text x="820" y="138" font-size="9" fill="#8fb0cc" opacity=".7">航线</text>
+
+  <!-- 全水深障碍 + 安全圈（r+裕量） -->
+  <g>
+    <circle cx="672" cy="144" r="17" fill="#7e3040" stroke="#e05c5c" stroke-opacity=".9"/>
+    <circle cx="672" cy="144" r="34" fill="none" stroke="#e05c5c" stroke-opacity=".55" stroke-dasharray="5 5">
+      <animate attributeName="stroke-opacity" dur="14s" repeatCount="indefinite"
+        values=".35;.35;.9;.9;.35;.35" keyTimes="0;.52;.56;.78;.82;1"/>
+    </circle>
+    <text x="672" y="112" font-size="10.5" fill="#e05c5c" text-anchor="middle">全水深障碍 · 航线冲突</text>
+    <text x="700" y="180" font-size="9" fill="#e05c5c" opacity=".8">安全圈 r+裕量</text>
   </g>
 
-  <!-- 图例 -->
-  <g font-size="11" fill="#8fb0cc">
-    <circle cx="330" cy="374" r="4" fill="#56b8e6"/><text x="340" y="378">感知 · 单目+IMU+深度计</text>
-    <circle cx="500" cy="374" r="4" fill="#e8b64c"/><text x="510" y="378">决策 · ILOS 制导+双通道规避</text>
-    <circle cx="690" cy="374" r="4" fill="#3fbf8f"/><text x="700" y="378">控制 · 航向环+浮潜协同</text>
+  <!-- 偏移线（橙，eT 平行线段） -->
+  <line x1="600" y1="96" x2="762" y2="96" stroke="#ff9f43" stroke-width="1.6" stroke-dasharray="6 4" opacity="0">
+    <animate attributeName="opacity" dur="14s" repeatCount="indefinite"
+      values="0;0;.95;.95;0;0" keyTimes="0;.55;.58;.82;.86;1"/>
+  </line>
+  <text x="768" y="99" font-size="9" fill="#ff9f43" opacity="0">
+    <animate attributeName="opacity" dur="14s" repeatCount="indefinite"
+      values="0;0;.95;.95;0;0" keyTimes="0;.55;.58;.82;.86;1"/>偏移线 eT</text>
+
+  <!-- 航迹：沿中线→偏移绕行→回中线 -->
+  <path id="pDet" d="M476,144 L586,144 C616,144 618,96 648,96 L700,96 C730,96 734,144 766,144 L840,144" fill="none" stroke="none"/>
+  <path d="M476,144 L586,144 C616,144 618,96 648,96 L700,96 C730,96 734,144 766,144 L840,144"
+        fill="none" stroke="#3fbf8f" stroke-opacity=".35" stroke-width="1.4" stroke-dasharray="5 6"/>
+
+  <!-- 半潜艇 B：后半程运动（与 A 错时） -->
+  <g>
+    <animate attributeName="opacity" dur="14s" repeatCount="indefinite"
+      values="0;0;1;1;0;0" keyTimes="0;.47;.49;.94;.975;1"/>
+    <animateMotion dur="14s" repeatCount="indefinite" rotate="auto" keyPoints="0;0;1;1" keyTimes="0;.47;.94;1" calcMode="linear">
+      <mpath href="#pDet"/>
+    </animateMotion>
+    <path d="M12,0 L52,-15 A44,44 0 0 1 52,15 Z" fill="#56b8e6" opacity=".15">
+      <animate attributeName="fill" dur="14s" repeatCount="indefinite"
+        values="#56b8e6;#56b8e6;#e8b64c;#e8b64c;#56b8e6;#56b8e6" keyTimes="0;.52;.54;.72;.75;1"/>
+    </path>
+    <rect x="-17" y="-6.5" width="34" height="13" rx="6.5" fill="#56b8e6" stroke="#dceaf5" stroke-opacity=".5"/>
+    <rect x="-2" y="-11" width="8" height="5" rx="2" fill="#dceaf5" opacity=".85"/>
   </g>
+
+  <!-- 场景 B 事件标签 -->
+  <g font-size="10.5" opacity="0">
+    <animate attributeName="opacity" dur="14s" repeatCount="indefinite"
+      values="0;0;1;1;0;0" keyTimes="0;.56;.59;.82;.86;1"/>
+    <rect x="548" y="196" width="248" height="22" rx="6" fill="#0a1e30" stroke="#ff9f43" stroke-opacity=".55"/>
+    <text x="672" y="211" fill="#ff9f43" text-anchor="middle">航线冲突几何触发 → 水平通道：偏移绕行</text>
+  </g>
+</g>
+
+<!-- ══════════ 判定流程图（与上方场景同步点亮） ══════════ -->
+<g font-size="11.5">
+  <text x="14" y="292" font-size="11" fill="#5f7f9c" letter-spacing="2">判定管线 DECISION PIPELINE（随场景同步点亮）</text>
+
+  <!-- 第一行：感知 → 跟踪 → 威胁判定 -->
+  <g>
+    <rect x="14" y="308" width="150" height="46" rx="8" fill="#0a1e30" stroke="#56b8e6" stroke-opacity=".45"/>
+    <rect x="14" y="308" width="150" height="46" rx="8" fill="none" stroke="#56b8e6" stroke-width="1.8" opacity="0">
+      <animate attributeName="opacity" dur="14s" repeatCount="indefinite"
+        values="0;1;1;0;0;1;1;0;0" keyTimes="0;.04;.10;.14;.44;.48;.54;.58;1"/>
+    </rect>
+    <text x="89" y="327" fill="#56b8e6" text-anchor="middle">多源感知</text>
+    <text x="89" y="344" fill="#8fb0cc" text-anchor="middle" font-size="9.5">单目相机 + IMU + 深度计</text>
+  </g>
+  <line x1="164" y1="331" x2="196" y2="331" stroke="#5f7f9c" marker-end="url(#arr)"/>
+  <g>
+    <rect x="200" y="308" width="150" height="46" rx="8" fill="#0a1e30" stroke="#56b8e6" stroke-opacity=".45"/>
+    <rect x="200" y="308" width="150" height="46" rx="8" fill="none" stroke="#56b8e6" stroke-width="1.8" opacity="0">
+      <animate attributeName="opacity" dur="14s" repeatCount="indefinite"
+        values="0;0;1;1;0;0;1;1;0;0" keyTimes="0;.06;.09;.14;.18;.48;.51;.56;.60;1"/>
+    </rect>
+    <text x="275" y="327" fill="#56b8e6" text-anchor="middle">目标检测 · α-β 跟踪</text>
+    <text x="275" y="344" fill="#8fb0cc" text-anchor="middle" font-size="9.5">位置/速度/吃水估计</text>
+  </g>
+  <line x1="350" y1="331" x2="382" y2="331" stroke="#5f7f9c" marker-end="url(#arr)"/>
+  <g>
+    <rect x="386" y="308" width="180" height="46" rx="8" fill="#0a1e30" stroke="#e8b64c" stroke-opacity=".5"/>
+    <rect x="386" y="308" width="180" height="46" rx="8" fill="none" stroke="#e8b64c" stroke-width="1.8" opacity="0">
+      <animate attributeName="opacity" dur="14s" repeatCount="indefinite"
+        values="0;0;1;1;0;0;1;1;0;0" keyTimes="0;.10;.13;.30;.34;.50;.54;.74;.78;1"/>
+    </rect>
+    <text x="476" y="327" fill="#e8b64c" text-anchor="middle">威胁判定</text>
+    <text x="476" y="344" fill="#8fb0cc" text-anchor="middle" font-size="9.5">静态：航线冲突几何 ｜ 动态：CPA+时间门</text>
+  </g>
+
+  <!-- 菱形分支：吃水判据 -->
+  <line x1="566" y1="331" x2="598" y2="331" stroke="#5f7f9c" marker-end="url(#arr)"/>
+  <g>
+    <polygon points="688,306 776,331 688,356 600,331" fill="#0a1e30" stroke="#e8b64c" stroke-opacity=".5"/>
+    <polygon points="688,306 776,331 688,356 600,331" fill="none" stroke="#e8b64c" stroke-width="1.8" opacity="0">
+      <animate attributeName="opacity" dur="14s" repeatCount="indefinite"
+        values="0;0;1;1;0;0;1;1;0;0" keyTimes="0;.12;.15;.32;.36;.52;.56;.76;.80;1"/>
+    </polygon>
+    <text x="688" y="327" fill="#e8b64c" text-anchor="middle" font-size="10.5">吃水+余量</text>
+    <text x="688" y="342" fill="#e8b64c" text-anchor="middle" font-size="10.5">≤ 可潜深度 ?</text>
+  </g>
+
+  <!-- 分支输出 -->
+  <line x1="688" y1="356" x2="688" y2="384" stroke="#5f7f9c" marker-end="url(#arr)"/>
+  <text x="694" y="376" font-size="9.5" fill="#3fbf8f">是（潜得过去）</text>
+  <g>
+    <rect x="600" y="388" width="176" height="42" rx="8" fill="#0a1e30" stroke="#3fbf8f" stroke-opacity=".5"/>
+    <rect x="600" y="388" width="176" height="42" rx="8" fill="none" stroke="#3fbf8f" stroke-width="2" opacity="0">
+      <animate attributeName="opacity" dur="14s" repeatCount="indefinite"
+        values="0;0;1;1;0;0" keyTimes="0;.15;.18;.40;.44;1"/>
+    </rect>
+    <text x="688" y="406" fill="#3fbf8f" text-anchor="middle">下潜穿越 · 变深通道</text>
+    <text x="688" y="422" fill="#8fb0cc" text-anchor="middle" font-size="9.5">z 参考 = 吃水 + 安全余量</text>
+  </g>
+
+  <text x="780" y="322" font-size="9.5" fill="#ff9f43">否（全水深）</text>
+  <g>
+    <rect x="784" y="388" width="82" height="42" rx="8" fill="#0a1e30" stroke="#ff9f43" stroke-opacity=".5"/>
+    <rect x="784" y="388" width="82" height="42" rx="8" fill="none" stroke="#ff9f43" stroke-width="2" opacity="0">
+      <animate attributeName="opacity" dur="14s" repeatCount="indefinite"
+        values="0;0;1;1;0;0" keyTimes="0;.56;.59;.82;.86;1"/>
+    </rect>
+    <text x="825" y="406" fill="#ff9f43" text-anchor="middle" font-size="10.5">偏移绕行</text>
+    <text x="825" y="422" fill="#8fb0cc" text-anchor="middle" font-size="9" >水平通道 eT</text>
+  </g>
+  <path d="M776,331 L825,331 L825,384" fill="none" stroke="#5f7f9c" marker-end="url(#arr)"/>
+
+  <!-- 复合与解除 -->
+  <g>
+    <rect x="386" y="388" width="180" height="42" rx="8" fill="#0a1e30" stroke="#8fb0cc" stroke-opacity=".4"/>
+    <text x="476" y="406" fill="#dceaf5" text-anchor="middle">复合规避</text>
+    <text x="476" y="422" fill="#8fb0cc" text-anchor="middle" font-size="9.5">同时下潜 + 偏移（双双受限时）</text>
+  </g>
+  <path d="M600,409 L570,409" fill="none" stroke="#5f7f9c" stroke-dasharray="3 4" marker-end="url(#arr)"/>
+
+  <g>
+    <rect x="14" y="388" width="336" height="42" rx="8" fill="#0a1e30" stroke="#3fbf8f" stroke-opacity=".45"/>
+    <rect x="14" y="388" width="336" height="42" rx="8" fill="none" stroke="#3fbf8f" stroke-width="2" opacity="0">
+      <animate attributeName="opacity" dur="14s" repeatCount="indefinite"
+        values="0;0;1;1;0;0;1;1;0" keyTimes="0;.40;.43;.47;.50;.86;.89;.96;1"/>
+    </rect>
+    <text x="182" y="406" fill="#3fbf8f" text-anchor="middle">威胁解除 → 恢复 ILOS 抗流航线</text>
+    <text x="182" y="422" fill="#8fb0cc" text-anchor="middle" font-size="9.5">绕行期间冻结 ILOS 积分，防积偏；岸壁斥力兜底</text>
+  </g>
+  <path d="M386,409 L354,409" fill="none" stroke="#5f7f9c" marker-end="url(#arr)"/>
+
+  <!-- 底部：控制执行链 -->
+  <g font-size="10" fill="#8fb0cc">
+    <rect x="14" y="452" width="852" height="40" rx="8" fill="#081826" stroke="#56b8e6" stroke-opacity=".12"/>
+    <text x="32" y="477">执行：</text>
+    <text x="80" y="477" fill="#3fbf8f">M1 航向环（双桨差速+尾舵）</text>
+    <text x="268" y="477">＋</text>
+    <text x="288" y="477" fill="#3fbf8f">浮潜协同变深级联（压载注排水）</text>
+    <text x="510" y="477">＋</text>
+    <text x="530" y="477" fill="#3fbf8f">经济巡航油门 · 近障自动减速</text>
+    <text x="736" y="477" fill="#5f7f9c">Lib/Control.py · 20Hz</text>
+  </g>
+
+  <!-- 时间轴 -->
+  <g font-size="9.5" fill="#5f7f9c">
+    <rect x="14" y="516" width="852" height="4" rx="2" fill="#0a1e30"/>
+    <rect x="14" y="516" width="0" height="4" rx="2" fill="#56b8e6" opacity=".6">
+      <animate attributeName="width" dur="14s" repeatCount="indefinite" values="0;852"/>
+    </rect>
+    <text x="14" y="540">▲ 事件一：漂浮物会遇（变深通道）</text>
+    <text x="470" y="540">▲ 事件二：全水深障碍（水平通道）</text>
+    <line x1="140" y1="514" x2="140" y2="522" stroke="#e8b64c"/>
+    <line x1="490" y1="514" x2="490" y2="522" stroke="#ff9f43"/>
+  </g>
+</g>
 </svg>
