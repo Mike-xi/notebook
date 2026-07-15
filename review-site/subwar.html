@@ -2,16 +2,17 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>深海猎杀 · 潜艇鱼雷战</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%93%3C/text%3E%3C/svg%3E">
 <style>
   :root{ --bg:#04101c; --panel:rgba(6,20,34,.88); --line:rgba(110,180,255,.22);
     --txt:#dceaf5; --dim:#8fb0cc; --blue:#56b8e6; --gold:#e8b64c; --green:#3fbf8f; --red:#e05c5c; }
   *{ margin:0; padding:0; box-sizing:border-box; }
-  html,body{ height:100%; overflow:hidden; background:var(--bg); }
-  body{ font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:var(--txt); }
+  html,body{ height:100%; overflow:hidden; background:var(--bg); overscroll-behavior:none; }
+  body{ font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:var(--txt); touch-action:none; user-select:none; }
   #c3d{ position:fixed; inset:0; }
+  #c3d canvas{ display:block; width:100%; height:100%; touch-action:none; }
   .panel{ position:fixed; background:var(--panel); border:1px solid var(--line);
     border-radius:10px; backdrop-filter:blur(6px); }
 
@@ -67,6 +68,105 @@
   .card .stats span{ font-size:10.5px; color:var(--dim); letter-spacing:.1em; }
   #mute{ position:fixed; bottom:14px; right:14px; z-index:30; width:36px; height:36px; text-align:center;
     line-height:34px; cursor:pointer; font-size:15px; user-select:none; }
+
+  /* 战术 HUD / 战斗反馈 */
+  #objective{ top:14px; left:50%; transform:translateX(-50%); z-index:20; min-width:210px;
+    padding:8px 18px; text-align:center; pointer-events:none; }
+  #objective span{ display:block; color:var(--dim); font-size:9px; letter-spacing:.18em; }
+  #objective b{ display:block; margin-top:2px; color:var(--txt); font-size:12px; letter-spacing:.06em; }
+  #threat{ position:fixed; top:82px; left:50%; transform:translateX(-50%) translateY(-8px); z-index:24;
+    padding:7px 14px; border:1px solid rgba(255,95,70,.55); border-radius:999px; background:rgba(72,10,8,.78);
+    color:#ffb0a0; font-size:11px; font-weight:700; letter-spacing:.14em; opacity:0; transition:.18s; pointer-events:none; }
+  #threat.on{ opacity:1; transform:translateX(-50%) translateY(0); animation:threatPulse .8s ease-in-out infinite alternate; }
+  @keyframes threatPulse{ to{ box-shadow:0 0 24px rgba(255,72,50,.42); } }
+  #reticle,#leadDot,#targetBox{ position:fixed; z-index:18; pointer-events:none; opacity:0; }
+  #reticle{ width:34px; height:34px; margin:-17px 0 0 -17px; border:1px solid rgba(115,215,255,.48);
+    border-radius:50%; transition:opacity .15s; }
+  #reticle::before,#reticle::after{ content:""; position:absolute; background:rgba(155,230,255,.75); }
+  #reticle::before{ width:46px; height:1px; left:-7px; top:16px; }
+  #reticle::after{ width:1px; height:46px; left:16px; top:-7px; }
+  #leadDot{ width:11px; height:11px; margin:-5.5px 0 0 -5.5px; border:2px solid #ffe08a; border-radius:50%;
+    box-shadow:0 0 12px rgba(255,220,110,.6); }
+  #targetBox{ width:62px; height:42px; margin:-21px 0 0 -31px; border:1px solid rgba(255,115,85,.82);
+    filter:drop-shadow(0 0 5px rgba(255,80,55,.55)); }
+  #targetBox::before{ content:attr(data-label); position:absolute; left:50%; top:-19px; transform:translateX(-50%);
+    color:#ffb39c; font:700 9px/1.2 "Microsoft YaHei",sans-serif; white-space:nowrap; letter-spacing:.06em; }
+  #targetBox::after{ content:attr(data-meta); position:absolute; left:50%; bottom:-18px; transform:translateX(-50%);
+    color:#dceaf5; font:9px/1.2 monospace; white-space:nowrap; }
+  #hitmarker{ position:fixed; left:50%; top:50%; z-index:26; transform:translate(-50%,-50%) scale(.55);
+    color:#fff; font:700 42px/1 monospace; text-shadow:0 0 16px rgba(100,220,255,.9); opacity:0; pointer-events:none; }
+  #hitmarker.show{ animation:hit .25s ease-out; }
+  #hitmarker.kill{ color:#ffd66e; text-shadow:0 0 20px rgba(255,150,40,.9); }
+  @keyframes hit{ 0%{opacity:0;transform:translate(-50%,-50%) scale(.45)} 30%{opacity:1} 100%{opacity:0;transform:translate(-50%,-50%) scale(1.15)} }
+  #pauseBtn{ right:58px; bottom:14px; z-index:30; width:36px; height:36px; color:var(--txt); cursor:pointer;
+    display:grid; place-items:center; font:700 13px/1 monospace; }
+  #pauseOv{ display:none; z-index:38; background:rgba(2,9,16,.58); }
+  #pauseOv .card{ max-width:360px; padding:26px 30px; }
+  #pauseOv h2{ margin-bottom:6px; letter-spacing:.1em; }
+  #pauseOv p{ color:var(--dim); font-size:12px; margin-bottom:20px; }
+
+  /* 触控操作层：手机和平板由 JS 按设备能力启用 */
+  #touchControls{ display:none; position:fixed; inset:0; z-index:28; pointer-events:none; }
+  .touch-cluster{ position:absolute; bottom:max(18px,env(safe-area-inset-bottom)); pointer-events:auto; }
+  #movePad{ left:max(16px,env(safe-area-inset-left)); width:132px; height:132px; border-radius:50%; touch-action:none; }
+  .stick-base{ position:absolute; inset:12px; border-radius:50%; border:1px solid rgba(125,205,255,.28);
+    background:radial-gradient(circle,rgba(45,125,175,.22),rgba(4,18,31,.58)); box-shadow:inset 0 0 24px rgba(40,130,185,.14); }
+  #stickKnob{ position:absolute; left:50%; top:50%; width:46px; height:46px; margin:-23px; border-radius:50%;
+    border:1px solid rgba(160,225,255,.62); background:rgba(40,125,180,.72); box-shadow:0 0 18px rgba(70,180,240,.3); }
+  #movePad small{ position:absolute; left:0; right:0; bottom:-2px; text-align:center; color:var(--dim); font-size:9px; letter-spacing:.16em; }
+  #actionPad{ right:max(16px,env(safe-area-inset-right)); width:154px; height:142px; }
+  .touch-btn{ position:absolute; appearance:none; border:1px solid rgba(135,210,255,.38); color:var(--txt);
+    background:rgba(6,25,42,.78); backdrop-filter:blur(6px); box-shadow:0 5px 18px rgba(0,0,0,.25); touch-action:none; }
+  .touch-btn:active,.touch-btn.pressed{ transform:scale(.94); background:rgba(40,115,170,.85); }
+  #diveBtn,#surfaceBtn{ width:52px; height:40px; border-radius:13px; right:94px; font-size:11px; }
+  #surfaceBtn{ top:10px; } #diveBtn{ top:58px; }
+  #fireBtn{ right:0; top:21px; width:82px; height:82px; border-radius:50%; border-color:rgba(255,190,80,.62);
+    background:conic-gradient(rgba(232,182,76,.9) var(--ready,100%),rgba(18,38,52,.78) 0);
+    color:#07131d; font-weight:800; letter-spacing:.08em; box-shadow:0 0 24px rgba(232,182,76,.24); }
+  #fireBtn span{ display:block; font-size:19px; } #fireBtn small{ display:block; font-size:9px; }
+  #lockBtn{ right:19px; bottom:0; width:62px; height:31px; border-radius:999px; color:#bdeaff; font-size:10px; letter-spacing:.08em; }
+  body.mobile #touchControls{ display:block; }
+  body.mobile #hint{ display:none; }
+  body.mobile #pauseBtn{ display:grid; }
+
+  @media (max-width:900px), (pointer:coarse){
+    .panel{ border-radius:9px; backdrop-filter:blur(9px); }
+    #back{ top:max(10px,env(safe-area-inset-top)); left:max(10px,env(safe-area-inset-left)); padding:7px 11px; }
+    #mute{ top:max(10px,env(safe-area-inset-top)); right:max(10px,env(safe-area-inset-right)); bottom:auto; }
+    #pauseBtn{ top:max(10px,env(safe-area-inset-top)); right:52px; bottom:auto; }
+    #hud{ top:54px; left:10px; right:10px; min-width:0; padding:7px 9px; display:grid; grid-template-columns:1fr 1fr; gap:4px 10px; }
+    #hud .row{ min-width:0; margin:0; font-size:10px; gap:5px; }
+    #hud .row>span:first-child{ width:30px; flex:0 0 auto; }
+    #hud .row b{ font-size:10px; }
+    .bar{ height:6px; }
+    #score{ top:128px; left:10px; right:auto; width:76px; padding:7px 8px; }
+    #score b{ font-size:17px; } #score span{ font-size:8px; }
+    #objective{ top:128px; left:96px; right:128px; transform:none; min-width:0; padding:7px 8px; }
+    #objective span{ font-size:8px; } #objective b{ font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    #sonar{ top:128px; right:10px; padding:5px; }
+    #sonar canvas{ width:104px; height:104px; }
+    #sonar .cap{ margin-top:3px; font-size:8px; }
+    #threat{ top:188px; font-size:9px; max-width:70vw; white-space:nowrap; }
+    #toast{ top:28%; width:90%; text-align:center; font-size:17px; }
+    .card{ width:calc(100% - 24px); max-height:calc(100dvh - 24px); overflow:auto; padding:22px 20px; }
+    .card h1{ font-size:22px; } .card .sub{ font-size:9px; margin-bottom:14px; }
+    .card .keys{ padding:10px 12px; margin-bottom:14px; font-size:11px; line-height:1.9; }
+    .card button{ min-height:44px; padding:12px 34px; }
+    .desktop-copy{ display:none; }
+    .touch-copy{ display:block!important; }
+    #targetBox{ width:50px; height:34px; margin:-17px 0 0 -25px; }
+  }
+  @media (max-height:560px) and (orientation:landscape){
+    #hud{ top:8px; left:76px; right:auto; width:300px; }
+    #score{ top:8px; left:auto; right:132px; }
+    #objective{ top:54px; left:76px; right:auto; width:220px; }
+    #sonar{ top:8px; right:10px; }
+    #sonar canvas{ width:90px; height:90px; }
+    .touch-cluster{ bottom:10px; transform:scale(.88); transform-origin:bottom; }
+    .card{ max-width:600px; padding:16px 22px; }
+    .card .keys{ display:none!important; }
+  }
+  @media (prefers-reduced-motion:reduce){ *{ animation-duration:.01ms!important; transition-duration:.01ms!important; } }
 </style>
 </head>
 <body>
@@ -84,24 +184,59 @@
 
 <div id="sonar" class="panel"><canvas id="sonarCv" width="150" height="150"></canvas><div class="cap">SONAR</div></div>
 
+<div id="objective" class="panel" aria-live="polite"><span>当前任务</span><b id="objectiveText">等待出击</b></div>
+<div id="threat" role="status" aria-live="assertive">鱼雷来袭</div>
+<div id="reticle" aria-hidden="true"></div>
+<div id="leadDot" aria-hidden="true"></div>
+<div id="targetBox" aria-hidden="true" data-label="敌艇" data-meta=""></div>
+<div id="hitmarker" aria-hidden="true">×</div>
 <div id="hint" class="panel"><code>W/S</code> 油门 &nbsp;<code>A/D</code> 转向 &nbsp;<code>Q/E</code> 下潜/上浮 &nbsp;<code>空格</code> 鱼雷 &nbsp;<code>鼠标拖拽</code> 视角 · 滚轮缩放</div>
 <div id="toast"></div>
 <div id="vig"></div>
-<div id="mute" class="panel" title="声音开关">🔊</div>
+<button id="pauseBtn" class="panel" type="button" title="暂停 / P" aria-label="暂停游戏">Ⅱ</button>
+<button id="mute" class="panel" type="button" title="声音开关" aria-label="声音开关">🔊</button>
+
+<nav id="touchControls" aria-label="潜艇触控操作">
+  <div id="movePad" class="touch-cluster" aria-label="航行摇杆">
+    <div class="stick-base"><div id="stickKnob"></div></div><small>航速 · 转向</small>
+  </div>
+  <div id="actionPad" class="touch-cluster">
+    <button id="surfaceBtn" class="touch-btn" type="button" aria-label="上浮">上浮</button>
+    <button id="diveBtn" class="touch-btn" type="button" aria-label="下潜">下潜</button>
+    <button id="fireBtn" class="touch-btn" type="button" aria-label="发射鱼雷"><span>◎</span><small>鱼雷</small></button>
+    <button id="lockBtn" class="touch-btn" type="button" aria-label="切换锁定目标">锁定</button>
+  </div>
+</nav>
 
 <div class="overlay" id="startOv">
   <div class="card">
     <h1>深海猎杀 <em>SUB&nbsp;HUNT</em></h1>
     <div class="sub">蛟人半潜艇 · 鱼雷改装型 —— 基于大创数字水池 3D 引擎</div>
-    <div class="keys">
+    <div class="keys desktop-copy">
       <code>W / S</code> 前进 / 倒车（油门渐进）<br>
       <code>A / D</code> 左转 / 右转<br>
       <code>Q / E</code> 下潜 / 上浮（鱼雷只能命中同深度目标）<br>
       <code>空格</code> 发射鱼雷（双管，轮换装填）<br>
-      <code>鼠标</code> 拖拽旋转视角 · 滚轮缩放
+      <code>TAB / R</code> 切换目标 / 镜头回正<br>
+      <code>鼠标</code> 拖拽旋转视角 · 滚轮缩放 · P 暂停
     </div>
-    <div style="font-size:12px;color:var(--dim);margin-bottom:22px">敌艇按波次来袭，会侦测、追踪并向你发射鱼雷。<br>利用礁石与桥墩掩护，变深机动摆脱来袭鱼雷。每清一波回 1 格血。</div>
-    <button id="btnStart">开始出击</button>
+    <div class="keys touch-copy" style="display:none">
+      <code>左摇杆</code> 航速 / 转向<br>
+      <code>右侧按钮</code> 上浮 / 下潜 / 发射鱼雷<br>
+      <code>拖动水面</code> 旋转观察视角<br>
+      <code>锁定</code> 切换攻击目标
+    </div>
+    <div style="font-size:12px;color:var(--dim);margin-bottom:22px">锁定目标后鱼雷会进行有限角度制导，但敌艇仍能靠急转和变深规避。<br>留意红色来袭警报，利用礁石、桥墩和深度差脱离鱼雷航线。每清一波回复 1 格船体。</div>
+    <button id="btnStart" type="button">开始出击</button>
+  </div>
+</div>
+
+<div class="overlay" id="pauseOv">
+  <div class="card">
+    <h2>战术暂停</h2>
+    <div class="sub">TACTICAL PAUSE</div>
+    <p>战斗时间已冻结。调整姿势后继续出击。</p>
+    <button id="btnResume" type="button">继续战斗</button>
   </div>
 </div>
 
@@ -114,7 +249,7 @@
       <div><b id="fWave">1</b><span>波次</span></div>
       <div><b id="fTime">0:00</b><span>存活</span></div>
     </div>
-    <button id="btnAgain">再来一局</button>
+    <button id="btnAgain" type="button">再来一局</button>
   </div>
 </div>
 
@@ -140,22 +275,47 @@ const TEST=/[?&]test=1/.test(location.search);
 
 const LAKE={ len:46, wid:18, dep:2.6 };
 const SUB_L=0.55, SUB_D=0.09;
+const COARSE=matchMedia('(pointer:coarse)').matches;
+let MOBILE=COARSE || innerWidth<=900;
+document.body.classList.toggle('mobile',MOBILE);
 
 /* ---------- 渲染器 / 场景（同 /dc 演示风格） ---------- */
-const renderer=new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(innerWidth,innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-renderer.shadowMap.enabled=true; $('c3d').appendChild(renderer.domElement);
+const renderer=new THREE.WebGLRenderer({antialias:!MOBILE,powerPreference:'high-performance'});
+renderer.setSize(innerWidth,innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio,MOBILE?1.35:2));
+renderer.shadowMap.enabled=!MOBILE; renderer.outputEncoding=THREE.sRGBEncoding; renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.08; $('c3d').appendChild(renderer.domElement);
 const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x87b8d8);
-scene.fog=new THREE.FogExp2(0x7aa8c8,0.016);
+const SKY_SHALLOW=new THREE.Color(0x5d8ba6), SKY_DEEP=new THREE.Color(0x061e2d);
+const FOG_SHALLOW=new THREE.Color(0x628ca4), FOG_DEEP=new THREE.Color(0x092b3e);
+scene.background=SKY_SHALLOW.clone();
+scene.fog=new THREE.FogExp2(FOG_SHALLOW.clone(),0.011);
 const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.05,600);
-scene.add(new THREE.AmbientLight(0xbfd4e6,0.75));
-const sun=new THREE.DirectionalLight(0xfff2dd,1.1);
-sun.position.set(9+14,20,23+8); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048);
+scene.add(new THREE.AmbientLight(0xa9c7da,0.48));
+scene.add(new THREE.HemisphereLight(0xa8d4ee,0x10283a,0.42));
+const sun=new THREE.DirectionalLight(0xffefd8,0.92);
+sun.position.set(9+14,20,23+8); sun.castShadow=!MOBILE; sun.shadow.mapSize.set(MOBILE?1024:2048,MOBILE?1024:2048);
 sun.shadow.camera.left=-32; sun.shadow.camera.right=32; sun.shadow.camera.top=32; sun.shadow.camera.bottom=-32;
 sun.target.position.set(9,0,23); scene.add(sun.target); scene.add(sun);   // 阴影相机对准湖心，远端也有影
-addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+function syncViewport(){
+  MOBILE=COARSE||innerWidth<=900; document.body.classList.toggle('mobile',MOBILE);
+  camera.aspect=innerWidth/innerHeight; camera.fov=MOBILE?62:55; camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(devicePixelRatio,MOBILE?1.35:2)); renderer.setSize(innerWidth,innerHeight);
+  renderer.shadowMap.enabled=!MOBILE;
+}
+addEventListener('resize',syncViewport,{passive:true});
 const N2T=(x,y,z)=>new THREE.Vector3(y,-z,x);
+
+/* 水下悬浮颗粒：低成本增加纵深与速度感 */
+const particleCount=MOBILE?180:420;
+const particlePos=new Float32Array(particleCount*3);
+for(let i=0;i<particleCount;i++){
+  particlePos[i*3]=Math.random()*LAKE.wid;
+  particlePos[i*3+1]=-0.08-Math.random()*(LAKE.dep-0.1);
+  particlePos[i*3+2]=Math.random()*LAKE.len;
+}
+const particleGeo=new THREE.BufferGeometry(); particleGeo.setAttribute('position',new THREE.BufferAttribute(particlePos,3));
+const particles=new THREE.Points(particleGeo,new THREE.PointsMaterial({color:0xc8e8f5,size:MOBILE?0.025:0.032,transparent:true,opacity:0.24,depthWrite:false}));
+scene.add(particles);
 
 /* ---------- 河道场景（岸坡/树丛/芦苇/远山/水面/公路桥，沿用编队演示） ---------- */
 let waterGeo=null;
@@ -302,6 +462,7 @@ function placeMesh(s,t,dt){
 
 /* ---------- 鱼雷 ---------- */
 const torps=[];
+let lockTarget=null, lockCursor=-1;
 function makeTorpMesh(hostile){
   const g=new THREE.Group();
   const mat=new THREE.MeshStandardMaterial({color:hostile?0xd4593f:0x2b3640,roughness:0.4,metalness:0.5});
@@ -314,7 +475,8 @@ function makeTorpMesh(hostile){
 function fireTorp(from,hostile){
   const off=0.35;
   const t={ x:from.x+Math.cos(from.psi)*off, y:from.y+Math.sin(from.psi)*off, z:from.z,
-    psi:from.psi, v:hostile?1.7:2.3, life:hostile?7:6, hostile, mesh:makeTorpMesh(hostile), trailAcc:0 };
+    psi:from.psi, v:hostile?1.7:2.3, life:hostile?7:6, hostile, mesh:makeTorpMesh(hostile), trailAcc:0,
+    target:hostile?player:(lockTarget&&lockTarget.alive?lockTarget:null), turnRate:hostile?0.42:0.68 };
   torps.push(t); AU.fire();
 }
 /* 气泡尾迹（对象池） */
@@ -369,7 +531,27 @@ const TUBE_CD=1.6;
 
 /* ---------- 敌艇 AI ---------- */
 const enemies=[];
-let wave=0, kills=0, gameT=0;
+let wave=0, kills=0, gameT=0, enemySeq=0, waveDelay=0, autoLockT=0;
+function targetScore(e){
+  const dist=Math.hypot(e.x-player.x,e.y-player.y);
+  const err=Math.abs(wrap(Math.atan2(e.y-player.y,e.x-player.x)-player.psi));
+  return err*4+dist*0.08;
+}
+function acquireTarget(cycle=false){
+  const alive=enemies.filter(e=>e.alive&&!e.gone).sort((a,b)=>targetScore(a)-targetScore(b));
+  if(!alive.length){ lockTarget=null; lockCursor=-1; return null; }
+  if(!cycle && lockTarget&&lockTarget.alive) return lockTarget;
+  if(cycle){ const current=alive.indexOf(lockTarget); lockCursor=(current+1)%alive.length; }
+  else lockCursor=0;
+  lockTarget=alive[lockCursor]||alive[0];
+  if(cycle) toast('锁定 '+lockTarget.callsign,'#8fe0ff');
+  return lockTarget;
+}
+function leadPoint(e){
+  if(!e) return null;
+  const dist=Math.hypot(e.x-player.x,e.y-player.y), travel=clamp(dist/2.3,0,3.2);
+  return {x:e.x+Math.cos(e.psi)*e.u*travel,y:e.y+Math.sin(e.psi)*e.u*travel,z:e.z};
+}
 function spawnWave(){
   wave++;
   $('wave').textContent='第 '+wave+' 波';
@@ -378,12 +560,15 @@ function spawnWave(){
   for(let i=0;i<n;i++){
     const x=LAKE.len-4-Math.random()*6, y=2+Math.random()*(LAKE.wid-4);
     const e=makeSub(0xd4593f,0x3a2020, x,y, 0.5+Math.random()*1.4, Math.PI);
+    e.callsign='赤鲨-'+String(++enemySeq).padStart(2,'0');
     e.maxHp=e.hp=2;
     e.cd=2+Math.random()*2;
     e.wp=[Math.random()*LAKE.len, 2+Math.random()*(LAKE.wid-4)];
     e.speed=0.55+wave*0.05; e.fireCd=Math.max(2.2, 4.2-wave*0.3);
     enemies.push(e);
   }
+  $('objectiveText').textContent='歼灭 '+n+' 艘敌艇';
+  acquireTarget(false);
   if(wave>1 && player.hp<player.maxHp){ player.hp++; toast('清波奖励 +1 船体','#3fbf8f'); }
 }
 function stepEnemy(e,dt){
@@ -423,43 +608,98 @@ function stepEnemy(e,dt){
 
 /* ---------- 输入 ---------- */
 const KEY={};
-addEventListener('keydown',e=>{ if(e.code==='Space') e.preventDefault(); KEY[e.code]=true;
+const TOUCH={throttle:0,turn:0,depth:0,stickPointer:null};
+function clearInput(){ for(const k in KEY) KEY[k]=false; TOUCH.throttle=TOUCH.turn=TOUCH.depth=0; $('stickKnob').style.transform=''; }
+addEventListener('keydown',e=>{
+  if(['Space','Tab','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
+  KEY[e.code]=true;
+  if(e.repeat) return;
   if(e.code==='Space') tryFire();
-  if(e.code==='Enter' && $('startOv').style.display!=='none') startGame(); });
+  if(e.code==='Tab') acquireTarget(true);
+  if(e.code==='KeyR'){ cam.yaw=0; cam.pitch=0.42; cam.dist=MOBILE?4.2:3.4; toast('镜头已回正','#8fe0ff'); }
+  if(e.code==='KeyP'||e.code==='Escape') togglePause();
+  if(e.code==='Enter' && $('startOv').style.display!=='none') startGame();
+});
 addEventListener('keyup',e=>KEY[e.code]=false);
-addEventListener('blur',()=>{ for(const k in KEY) KEY[k]=false; });   // 失焦清键，防按键卡死
+addEventListener('blur',clearInput);   // 失焦清键，防按键卡死
 function tryFire(){
-  if(!RUN.on||!player.alive) return;
+  if(!RUN.on||RUN.paused||!player.alive) return;
   const i=tubes[0]<=0?0:(tubes[1]<=0?1:-1);
-  if(i<0) return;
+  if(i<0){ toast('鱼雷管装填中','#8fb0cc'); return; }
+  acquireTarget(false);
   tubes[i]=TUBE_CD*2;         // 双管轮换：单管冷却=2×发射间隔
   fireTorp(player,false);
+  $('fireBtn').classList.add('pressed'); setTimeout(()=>$('fireBtn').classList.remove('pressed'),120);
+  if(MOBILE&&navigator.vibrate) navigator.vibrate(18);
 }
-/* 相机轨道 */
-const cam={ yaw:0, pitch:0.42, dist:3.4, drag:false, px:0, py:0 };
-addEventListener('mousedown',e=>{ if(e.target.closest('.panel,.overlay,#back'))return; cam.drag=true; cam.px=e.clientX; cam.py=e.clientY; });
-addEventListener('mousemove',e=>{ if(!cam.drag)return; cam.yaw-=(e.clientX-cam.px)*0.005; cam.pitch=clamp(cam.pitch+(e.clientY-cam.py)*0.004,0.08,1.25); cam.px=e.clientX; cam.py=e.clientY; });
-addEventListener('mouseup',()=>cam.drag=false);
+
+/* 触控摇杆 */
+const movePad=$('movePad'), stickKnob=$('stickKnob');
+function updateStick(e){
+  const r=movePad.getBoundingClientRect(), max=r.width*0.31;
+  let dx=e.clientX-(r.left+r.width/2), dy=e.clientY-(r.top+r.height/2);
+  const d=Math.hypot(dx,dy); if(d>max){ dx*=max/d; dy*=max/d; }
+  const nx=dx/max, ny=dy/max;
+  TOUCH.turn=Math.abs(nx)<0.08?0:nx; TOUCH.throttle=Math.abs(ny)<0.08?0:-ny;
+  stickKnob.style.transform=`translate(${dx}px,${dy}px)`;
+}
+movePad.addEventListener('pointerdown',e=>{ e.preventDefault(); TOUCH.stickPointer=e.pointerId; movePad.setPointerCapture(e.pointerId); updateStick(e); });
+movePad.addEventListener('pointermove',e=>{ if(e.pointerId===TOUCH.stickPointer) updateStick(e); });
+function releaseStick(e){ if(e.pointerId!==TOUCH.stickPointer)return; TOUCH.stickPointer=null; TOUCH.throttle=TOUCH.turn=0; stickKnob.style.transform=''; }
+movePad.addEventListener('pointerup',releaseStick); movePad.addEventListener('pointercancel',releaseStick);
+function bindDepth(btn,value){
+  const down=e=>{ e.preventDefault(); btn.setPointerCapture(e.pointerId); btn.classList.add('pressed'); TOUCH.depth=value; };
+  const up=()=>{ btn.classList.remove('pressed'); if(TOUCH.depth===value) TOUCH.depth=0; };
+  btn.addEventListener('pointerdown',down); btn.addEventListener('pointerup',up); btn.addEventListener('pointercancel',up);
+}
+bindDepth($('diveBtn'),1); bindDepth($('surfaceBtn'),-1);
+$('fireBtn').addEventListener('pointerdown',e=>{ e.preventDefault(); tryFire(); });
+$('lockBtn').addEventListener('pointerdown',e=>{ e.preventDefault(); acquireTarget(true); });
+$('touchControls').addEventListener('contextmenu',e=>e.preventDefault());
+
+/* 鼠标 / 触控拖拽相机 */
+const cam={ yaw:0, pitch:0.42, dist:MOBILE?4.2:3.4, drag:false, pointer:null, px:0, py:0, shake:0 };
+renderer.domElement.addEventListener('pointerdown',e=>{ if(!RUN.on||RUN.paused)return; cam.drag=true; cam.pointer=e.pointerId; cam.px=e.clientX; cam.py=e.clientY; renderer.domElement.setPointerCapture(e.pointerId); });
+renderer.domElement.addEventListener('pointermove',e=>{ if(!cam.drag||cam.pointer!==e.pointerId)return; cam.yaw-=(e.clientX-cam.px)*(MOBILE?0.007:0.005); cam.pitch=clamp(cam.pitch+(e.clientY-cam.py)*0.004,0.08,1.18); cam.px=e.clientX; cam.py=e.clientY; });
+function releaseCamera(e){ if(e.pointerId!==cam.pointer)return; cam.drag=false; cam.pointer=null; }
+renderer.domElement.addEventListener('pointerup',releaseCamera); renderer.domElement.addEventListener('pointercancel',releaseCamera);
 addEventListener('wheel',e=>{ cam.dist=clamp(cam.dist+e.deltaY*0.002,1.6,10); },{passive:true});
 
 /* ---------- 游戏流程 ---------- */
-const RUN={ on:false, over:false };
+const RUN={ on:false, over:false, paused:false };
 function toast(msg,color){ const t=$('toast'); t.textContent=msg; t.style.color=color||'#e8b64c'; t.style.opacity=1; clearTimeout(t._h); t._h=setTimeout(()=>t.style.opacity=0,1800); }
+function togglePause(force){
+  if(!RUN.on||RUN.over) return;
+  RUN.paused=typeof force==='boolean'?force:!RUN.paused;
+  $('pauseOv').style.display=RUN.paused?'flex':'none';
+  $('pauseBtn').textContent=RUN.paused?'▶':'Ⅱ';
+  $('pauseBtn').setAttribute('aria-label',RUN.paused?'继续游戏':'暂停游戏');
+  if(RUN.paused) clearInput(); else last=performance.now();
+}
 function startGame(){
   $('startOv').style.display='none'; $('endOv').style.display='none';
+  $('pauseOv').style.display='none'; $('pauseBtn').textContent='Ⅱ';
   // 清场
   for(const e of enemies){ scene.remove(e.mesh.group); } enemies.length=0;
   for(const t of torps){ scene.remove(t.mesh); } torps.length=0;
+  for(const b of booms){ b.parts.forEach(p=>scene.remove(p.m)); scene.remove(b.light); if(b.ring)scene.remove(b.ring); } booms.length=0;
+  for(const b of bubbles){ b.on=false; b.mesh.visible=false; }
   player.x=5; player.y=9; player.z=0.8; player.psi=0; player.u=0;
   player.hp=player.maxHp=6; player.alive=true; player.sinkT=0;
-  wave=0; kills=0; gameT=0; RUN.on=true; RUN.over=false;
+  wave=0; kills=0; gameT=0; enemySeq=0; waveDelay=0; autoLockT=0; lockTarget=null; lockCursor=-1;
+  RUN.on=true; RUN.over=false; RUN.paused=false; clearInput();
+  cam.yaw=0; cam.pitch=0.42; cam.dist=MOBILE?4.2:3.4; cam.shake=0;
   tubes[0]=tubes[1]=0;
   AU.ensure(); spawnWave();
 }
 $('btnStart').onclick=startGame;
 $('btnAgain').onclick=startGame;
+$('pauseBtn').onclick=()=>togglePause();
+$('btnResume').onclick=()=>togglePause(false);
+$('pauseOv').addEventListener('click',e=>{ if(e.target===$('pauseOv')) togglePause(false); });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden&&RUN.on&&!RUN.paused) togglePause(true); });
 function gameOver(){
-  RUN.over=true;
+  RUN.over=true; RUN.paused=false; $('pauseOv').style.display='none';
   setTimeout(()=>{
     $('fKills').textContent=kills; $('fWave').textContent=wave;
     const m=Math.floor(gameT/60), s=Math.floor(gameT%60);
@@ -467,14 +707,19 @@ function gameOver(){
     $('endOv').style.display='flex'; RUN.on=false;
   },1600);
 }
+function showHitmarker(kill){
+  const h=$('hitmarker'); h.className=''; void h.offsetWidth; h.className='show'+(kill?' kill':'');
+  setTimeout(()=>h.className='',280);
+}
 function damage(s,isPlayer){
   s.hp--; s.flashT=0.6; AU.hit();
-  if(isPlayer){ $('vig').style.opacity=1; setTimeout(()=>$('vig').style.opacity=0,220); }
+  if(isPlayer){ cam.shake=Math.max(cam.shake,0.34); $('vig').style.opacity=1; setTimeout(()=>$('vig').style.opacity=0,220); if(MOBILE&&navigator.vibrate) navigator.vibrate([35,35,50]); }
+  else { cam.shake=Math.max(cam.shake,s.hp<=0?0.22:0.09); showHitmarker(s.hp<=0); }
   if(s.hp<=0 && s.alive){
     s.alive=false; s.sinkT=0; AU.sunk();
     explode(s.x,s.y,s.z,true);
     if(isPlayer){ toast('你的艇被击沉','#e05c5c'); gameOver(); }
-    else { kills++; $('kills').textContent=kills; toast('击沉敌艇 ×1','#3fbf8f'); }
+    else { kills++; $('kills').textContent=kills; toast('击沉 '+(s.callsign||'敌艇'),'#3fbf8f'); if(lockTarget===s) lockTarget=null; }
   }
 }
 
@@ -508,22 +753,60 @@ function drawHUD(){
   $('uv').textContent=player.u.toFixed(1);
   $('t0').className='tube'+(tubes[0]<=0?' ok':'');
   $('t1').className='tube'+(tubes[1]<=0?' ok':'');
+  const nextTube=Math.min(tubes[0],tubes[1]);
+  const ready=nextTube<=0?100:Math.round((1-nextTube/(TUBE_CD*2))*100);
+  $('fireBtn').style.setProperty('--ready',ready+'%');
+  $('fireBtn').setAttribute('aria-label',ready>=100?'发射鱼雷':'鱼雷装填 '+ready+'%');
+  const aliveCount=enemies.filter(e=>e.alive&&!e.gone).length;
+  if(RUN.on) $('objectiveText').textContent=waveDelay>0?'下一波 '+Math.max(1,Math.ceil(waveDelay))+' 秒':'第 '+wave+' 波 · 敌艇 '+aliveCount;
+  $('lockBtn').textContent=lockTarget&&lockTarget.alive?'换目标':'锁定';
+}
+
+function placeHudPoint(el,p){
+  const v=N2T(p.x,p.y,p.z).project(camera);
+  const visible=v.z>-1&&v.z<1&&Math.abs(v.x)<1.15&&Math.abs(v.y)<1.15;
+  el.style.left=((v.x+1)*0.5*innerWidth)+'px'; el.style.top=((-v.y+1)*0.5*innerHeight)+'px';
+  el.style.opacity=visible?1:0; return visible;
+}
+function updateCombatHud(){
+  const active=RUN.on&&!RUN.over&&player.alive;
+  const ret=$('reticle'), box=$('targetBox'), lead=$('leadDot');
+  if(active){
+    const ahead={x:player.x+Math.cos(player.psi)*4,y:player.y+Math.sin(player.psi)*4,z:player.z};
+    placeHudPoint(ret,ahead);
+  } else ret.style.opacity=0;
+  if(active&&lockTarget&&lockTarget.alive){
+    const dist=Math.hypot(lockTarget.x-player.x,lockTarget.y-player.y), dz=lockTarget.z-player.z;
+    box.dataset.label=lockTarget.callsign||'敌艇'; box.dataset.meta=dist.toFixed(1)+'m · 深差 '+Math.abs(dz).toFixed(1);
+    placeHudPoint(box,lockTarget);
+    const leadP=leadPoint(lockTarget); placeHudPoint(lead,leadP);
+  } else { box.style.opacity=0; lead.style.opacity=0; }
+  let nearest=null, nearestD=Infinity;
+  for(const tp of torps){ if(!tp.hostile)continue; const d=Math.hypot(tp.x-player.x,tp.y-player.y); if(d<nearestD){nearestD=d;nearest=tp;} }
+  const warning=$('threat');
+  if(active&&nearest&&nearestD<7){
+    const rel=wrap(Math.atan2(nearest.y-player.y,nearest.x-player.x)-player.psi);
+    const side=Math.abs(rel)<0.35?'正前方':(rel>0?'右舷':'左舷');
+    warning.textContent='⚠ 鱼雷来袭 · '+side+' '+nearestD.toFixed(1)+'m'; warning.classList.add('on');
+  } else warning.classList.remove('on');
 }
 
 /* ---------- 主循环 ---------- */
-let last=performance.now();
+let last=performance.now(), frameNo=0;
 function loop(now){
   requestAnimationFrame(loop);
   const dt=clamp((now-last)/1000,0,0.05); last=now;
   const t=now/1000;
+  frameNo++;
 
-  if(RUN.on){
+  if(RUN.on&&!RUN.paused){
     gameT+=dt;
+    autoLockT-=dt; if(autoLockT<=0){ autoLockT=0.45; acquireTarget(false); }
     // 玩家操控
     if(player.alive){
-      const thr=(KEY.KeyW||KEY.ArrowUp?1:0)+(KEY.KeyS||KEY.ArrowDown?-1:0);
-      const trn=(KEY.KeyA||KEY.ArrowLeft?-1:0)+(KEY.KeyD||KEY.ArrowRight?1:0);
-      const dz =(KEY.KeyQ?1:0)+(KEY.KeyE?-1:0);
+      const thr=clamp((KEY.KeyW||KEY.ArrowUp?1:0)+(KEY.KeyS||KEY.ArrowDown?-1:0)+TOUCH.throttle,-1,1);
+      const trn=clamp((KEY.KeyA||KEY.ArrowLeft?-1:0)+(KEY.KeyD||KEY.ArrowRight?1:0)+TOUCH.turn,-1,1);
+      const dz =clamp((KEY.KeyQ?1:0)+(KEY.KeyE?-1:0)+TOUCH.depth,-1,1);
       // 油门（学水池演示手感）：W 渐进推杆；松开滑行减速；S 在前进时先急制动，停稳后才倒车
       if(thr>0)           player.u += (U_MAX-player.u)*dt*1.6;
       else if(thr<0)      player.u += ((player.u>0.08? 0:U_REV)-player.u)*dt*(player.u>0.08?4.5:1.6);
@@ -538,10 +821,18 @@ function loop(now){
     // 敌艇
     for(const e of enemies) stepEnemy(e,dt);
     for(let i=enemies.length-1;i>=0;i--) if(enemies[i].gone) enemies.splice(i,1);
-    if(!enemies.some(e=>e.alive) && player.alive && enemies.length===0) spawnWave();
+    if(!enemies.some(e=>e.alive) && player.alive && enemies.length===0){
+      if(waveDelay<=0){ waveDelay=2.6; toast('海域肃清 · 准备下一波','#8fe0ff'); }
+      else { waveDelay-=dt; if(waveDelay<=0) spawnWave(); }
+    } else waveDelay=0;
 
     // 鱼雷
     for(let i=torps.length-1;i>=0;i--){ const tp=torps[i];
+      if(tp.target&&tp.target.alive){
+        const desired=Math.atan2(tp.target.y-tp.y,tp.target.x-tp.x), maxTurn=tp.turnRate*dt;
+        tp.psi+=clamp(wrap(desired-tp.psi),-maxTurn,maxTurn);
+        tp.z+=clamp(tp.target.z-tp.z,-0.42*dt,0.42*dt);
+      }
       tp.x+=Math.cos(tp.psi)*tp.v*dt; tp.y+=Math.sin(tp.psi)*tp.v*dt; tp.life-=dt;
       tp.trailAcc+=dt; if(tp.trailAcc>0.05){ tp.trailAcc=0; spawnBubble(tp.x,tp.y,tp.z); }
       tp.mesh.position.copy(N2T(tp.x,tp.y,tp.z));
@@ -563,27 +854,38 @@ function loop(now){
   for(const e of enemies) placeMesh(e,t,dt);
 
   // 水面微波
-  if(waterGeo){ const pos=waterGeo.attributes.position;
+  if(waterGeo&&(!MOBILE||frameNo%2===0)){ const pos=waterGeo.attributes.position;
     for(let i=0;i<pos.count;i+=3){ const x=pos.getX(i), y=pos.getY(i);
       pos.setZ(i, 0.02*Math.sin(0.8*x+1.4*t)+0.015*Math.cos(0.6*y+1.1*t)); }
     pos.needsUpdate=true; }
 
-  // 第三人称相机（默认吊在艇艉后方）
-  const anchor=N2T(player.x,player.y,Math.min(player.z,1.2));
+  // 第三人称相机：航向跟随、自动缓慢回正、深潜时真正进入水下
+  if(!cam.drag) cam.yaw+=(0-cam.yaw)*dt*0.18;
+  const anchor=N2T(player.x,player.y,player.z);
   const yaw=player.psi+Math.PI+cam.yaw;
   const cx=anchor.x+Math.sin(yaw)*Math.cos(cam.pitch)*cam.dist;
   const cz=anchor.z+Math.cos(yaw)*Math.cos(cam.pitch)*cam.dist;
   const cy=anchor.y+Math.sin(cam.pitch)*cam.dist;
-  camera.position.lerp(new THREE.Vector3(cx,Math.max(cy,0.35),cz),0.08);
+  cam.shake=Math.max(0,cam.shake-dt*1.4);
+  const cameraTarget=new THREE.Vector3(cx,clamp(cy,-LAKE.dep+0.12,4),cz);
+  if(cam.shake>0){ cameraTarget.x+=gauss(cam.shake); cameraTarget.y+=gauss(cam.shake*0.45); cameraTarget.z+=gauss(cam.shake); }
+  camera.position.lerp(cameraTarget,1-Math.exp(-dt*6.5));
   camera.lookAt(anchor);
 
-  drawSonar(dt); drawHUD();
+  const underwater=clamp(-camera.position.y/1.6,0,1);
+  scene.background.lerpColors(SKY_SHALLOW,SKY_DEEP,underwater);
+  scene.fog.color.lerpColors(FOG_SHALLOW,FOG_DEEP,underwater);
+  scene.fog.density=0.011+underwater*0.025;
+  particles.rotation.y+=dt*0.002;
+
+  drawSonar(RUN.paused?0:dt); drawHUD(); updateCombatHud();
   renderer.render(scene,camera);
 }
 requestAnimationFrame(loop);
 
 if(TEST){ startGame(); }
-window.__sub={ player, enemies, torps, fireTorp, startGame, damage, LAKE, get wave(){return wave;}, get kills(){return kills;}, RUN };
+window.__sub={ player, enemies, torps, fireTorp, startGame, damage, togglePause, acquireTarget, TOUCH, LAKE,
+  get target(){return lockTarget;}, get mobile(){return MOBILE;}, get wave(){return wave;}, get kills(){return kills;}, RUN };
 </script>
 </body>
 </html>
