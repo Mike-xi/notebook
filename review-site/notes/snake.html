@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>贪吃蛇 · Snake</title>
+<script>
+  (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
+</script>
+<style>
+  :root{
+    --bg:#edf7ef;--panel:#ffffff;--fg:#17211a;--muted:#647268;--line:#d5e4d8;
+    --accent:#178847;--accent-2:#36b96a;--on-accent:#fff;--chip:#e6f2e9;
+    --board:#12261a;--board-2:#183522;--shadow:rgba(24,73,40,.18);--danger:#b3261e;
+  }
+  html[data-theme="dark"]{
+    --bg:#0f1511;--panel:#18201a;--fg:#e2ebe4;--muted:#a5b2a8;--line:#2c3a2f;
+    --accent:#74d99a;--accent-2:#45bd73;--on-accent:#0b2716;--chip:#223027;
+    --board:#08110c;--board-2:#102319;--shadow:rgba(0,0,0,.5);--danger:#ffb4ab;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;overscroll-behavior:none}
+  body{
+    min-height:100dvh;background:
+      radial-gradient(circle at 14% 8%,color-mix(in srgb,var(--accent) 18%,transparent),transparent 30%),
+      radial-gradient(circle at 88% 90%,color-mix(in srgb,var(--accent-2) 14%,transparent),transparent 32%),var(--bg);
+    color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    display:flex;justify-content:center;padding:14px;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;
+  }
+  button{font:inherit}
+  .shell{width:min(100%,560px);display:flex;flex-direction:column;gap:12px;align-self:center}
+  .topbar{display:flex;align-items:center;gap:10px}
+  .back,.pill,.btn,.speed button,.dpad button{border:1px solid var(--line);background:var(--panel);color:var(--fg);box-shadow:0 5px 16px var(--shadow)}
+  .back{border-radius:999px;padding:8px 13px;font-weight:700;cursor:pointer}
+  .title{font-size:19px;font-weight:850;letter-spacing:-.02em}.title small{display:block;font-size:11px;color:var(--muted);font-weight:650;letter-spacing:.04em;text-transform:uppercase}
+  .stats{margin-left:auto;display:flex;gap:7px}.pill{min-width:68px;border-radius:14px;padding:7px 10px;text-align:center;font-size:11px;color:var(--muted)}
+  .pill b{display:block;color:var(--fg);font-size:18px;font-variant-numeric:tabular-nums;line-height:1.05}
+  .game-card{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:12px;box-shadow:0 18px 48px var(--shadow)}
+  .board-wrap{position:relative;width:100%;aspect-ratio:1;border-radius:17px;overflow:hidden;background:var(--board);outline:none;touch-action:none}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  .overlay{position:absolute;inset:0;display:grid;place-items:center;background:linear-gradient(#06140b77,#06140bcc);backdrop-filter:blur(3px);transition:.18s}
+  .overlay[hidden]{display:none}
+  .overlay-card{width:min(82%,330px);text-align:center;color:#fff;padding:24px;border:1px solid #ffffff38;border-radius:22px;background:#0d2418d9;box-shadow:0 20px 55px #0008}
+  .overlay-icon{font-size:42px;line-height:1}.overlay h1{font-size:24px;margin:10px 0 5px}.overlay p{font-size:13px;line-height:1.55;color:#d6eadc;margin:0 0 17px}
+  .overlay .start{width:100%;border:0;border-radius:999px;padding:12px 18px;background:#77e39e;color:#0c2a17;font-weight:850;cursor:pointer}
+  .status-row{display:flex;align-items:center;gap:10px;margin-top:11px;padding:0 3px;min-height:34px}
+  .status{font-size:13px;color:var(--muted);font-weight:650;flex:1}.status strong{color:var(--fg)}
+  .live-dot{width:9px;height:9px;border-radius:50%;background:var(--muted);box-shadow:0 0 0 4px color-mix(in srgb,var(--muted) 16%,transparent)}
+  .live-dot.run{background:var(--accent-2);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent-2) 22%,transparent)}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}.btn{border-radius:999px;padding:9px 14px;font-size:13px;font-weight:750;cursor:pointer}.btn:hover,.speed button:hover,.dpad button:hover{background:var(--chip)}
+  .btn.primary{background:var(--accent);border-color:transparent;color:var(--on-accent)}.btn.danger{color:var(--danger)}
+  .speed{display:flex;gap:4px;margin-left:auto;padding:4px;border-radius:999px;background:var(--chip)}
+  .speed button{border:0;box-shadow:none;border-radius:999px;padding:6px 10px;background:transparent;color:var(--muted);font-size:12px;font-weight:750;cursor:pointer}
+  .speed button.on{background:var(--accent);color:var(--on-accent)}
+  .dpad{width:184px;margin:0 auto;display:grid;grid-template-columns:repeat(3,54px);grid-template-rows:repeat(2,48px);gap:7px;justify-content:center}
+  .dpad button{border-radius:15px;font-size:20px;font-weight:900;cursor:pointer;touch-action:manipulation;user-select:none}.dpad button:active{transform:scale(.95);background:var(--accent);color:var(--on-accent)}
+  .dpad .up{grid-column:2}.dpad .left{grid-row:2;grid-column:1}.dpad .down{grid-row:2;grid-column:2}.dpad .right{grid-row:2;grid-column:3}
+  .tips{text-align:center;color:var(--muted);font-size:11.5px;line-height:1.55;margin:0 4px}
+  @media (min-width:720px) and (min-height:720px){.dpad{display:none}.shell{gap:14px}.tips{font-size:12px}}
+  @media (max-height:700px){body{padding:8px}.shell{gap:8px}.game-card{padding:9px}.topbar{transform:scale(.94);transform-origin:center left}.dpad{grid-template-columns:repeat(3,48px);grid-template-rows:repeat(2,42px)}.tips{display:none}}
+</style>
+</head>
+<body>
+<main class="shell">
+  <header class="topbar">
+    <button class="back" id="backBtn" aria-label="返回课程首页">‹ 课程</button>
+    <div class="title">🐍 贪吃蛇<small>Snake · Classic</small></div>
+    <div class="stats" aria-live="polite">
+      <div class="pill">分数<b id="score">0</b></div>
+      <div class="pill">最高<b id="best">0</b></div>
+    </div>
+  </header>
+
+  <section class="game-card">
+    <div class="board-wrap" id="boardWrap" tabindex="0" aria-label="贪吃蛇游戏区域">
+      <canvas id="board"></canvas>
+      <div class="overlay" id="overlay">
+        <div class="overlay-card">
+          <div class="overlay-icon" id="overlayIcon">🐍</div>
+          <h1 id="overlayTitle">准备出发</h1>
+          <p id="overlayText">方向键或 WASD 控制方向；手机可滑动棋盘或使用方向键。</p>
+          <button class="start" id="startBtn">开始游戏</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="status-row">
+      <span class="live-dot" id="liveDot"></span>
+      <div class="status" id="status">等待开始 · 吃到苹果得 <strong>10</strong> 分</div>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn primary" id="pauseBtn">开始</button>
+      <button class="btn danger" id="newBtn">重新开始</button>
+      <div class="speed" id="speed" aria-label="速度">
+        <button data-ms="170">悠闲</button>
+        <button class="on" data-ms="125">标准</button>
+        <button data-ms="88">疾速</button>
+      </div>
+    </div>
+  </section>
+
+  <nav class="dpad" aria-label="触屏方向控制">
+    <button class="up" data-dir="up" aria-label="向上">↑</button>
+    <button class="left" data-dir="left" aria-label="向左">←</button>
+    <button class="down" data-dir="down" aria-label="向下">↓</button>
+    <button class="right" data-dir="right" aria-label="向右">→</button>
+  </nav>
+  <p class="tips">键盘：方向键 / WASD　·　空格暂停　·　Enter 开始　·　离开页面会自动暂停</p>
+</main>
+
+<script>
+(function(){
+  'use strict';
+
+  const stripInvert = () => document.documentElement.classList.remove('nb-dark-invert');
+  stripInvert();
+  try { new MutationObserver(stripInvert).observe(document.documentElement,{attributes:true,attributeFilter:['class']}); } catch(e) {}
+
+  const $ = (s) => document.querySelector(s);
+  const canvas = $('#board');
+  const ctx = canvas.getContext('2d');
+  const boardWrap = $('#boardWrap');
+  const overlay = $('#overlay');
+  const scoreEl = $('#score');
+  const bestEl = $('#best');
+  const statusEl = $('#status');
+  const pauseBtn = $('#pauseBtn');
+  const liveDot = $('#liveDot');
+  const GRID = 20;
+
+  let snake = [];
+  let food = {x:14,y:10};
+  let dir = {x:1,y:0};
+  let nextDir = {x:1,y:0};
+  let score = 0;
+  let best = 0;
+  let stepMs = 125;
+  let running = false;
+  let paused = false;
+  let gameOver = false;
+  let frameId = 0;
+  let lastTime = 0;
+  let accumulator = 0;
+  let touchStart = null;
+
+  try { best = Math.max(0,Number(localStorage.getItem('snake-best'))||0); } catch(e) {}
+  try { stepMs = Number(localStorage.getItem('snake-speed'))||125; } catch(e) {}
+  bestEl.textContent = best;
+
+  function roundedRect(x,y,w,h,r){
+    const rr=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+rr,y);ctx.arcTo(x+w,y,x+w,y+h,rr);ctx.arcTo(x+w,y+h,x,y+h,rr);ctx.arcTo(x,y+h,x,y,rr);ctx.arcTo(x,y,x+w,y,rr);ctx.closePath();
+  }
+
+  function fitCanvas(){
+    const rect=canvas.getBoundingClientRect();
+    const dpr=Math.min(devicePixelRatio||1,2);
+    const w=Math.max(1,Math.round(rect.width*dpr));
+    const h=Math.max(1,Math.round(rect.height*dpr));
+    if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    draw();
+  }
+
+  function draw(){
+    const size=canvas.getBoundingClientRect().width;
+    if(!size)return;
+    const cell=size/GRID;
+    ctx.clearRect(0,0,size,size);
+    const dark=document.documentElement.dataset.theme==='dark';
+    ctx.fillStyle=dark?'#08110c':'#12261a';ctx.fillRect(0,0,size,size);
+    ctx.strokeStyle=dark?'rgba(116,217,154,.07)':'rgba(143,220,166,.08)';ctx.lineWidth=1;
+    for(let i=1;i<GRID;i++){const p=Math.round(i*cell)+.5;ctx.beginPath();ctx.moveTo(p,0);ctx.lineTo(p,size);ctx.stroke();ctx.beginPath();ctx.moveTo(0,p);ctx.lineTo(size,p);ctx.stroke();}
+
+    const fx=(food.x+.5)*cell,fy=(food.y+.52)*cell;
+    ctx.fillStyle='#ef4b4b';ctx.beginPath();ctx.arc(fx,fy,cell*.31,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#ff8a76';ctx.beginPath();ctx.arc(fx-cell*.10,fy-cell*.10,cell*.08,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#7a4a28';ctx.lineWidth=Math.max(2,cell*.07);ctx.beginPath();ctx.moveTo(fx,fy-cell*.26);ctx.quadraticCurveTo(fx+cell*.03,fy-cell*.42,fx+cell*.12,fy-cell*.48);ctx.stroke();
+    ctx.fillStyle='#58b96c';ctx.beginPath();ctx.ellipse(fx+cell*.15,fy-cell*.38,cell*.14,cell*.07,-.5,0,Math.PI*2);ctx.fill();
+
+    snake.forEach((part,i)=>{
+      const pad=i===0?cell*.09:cell*.12;
+      const x=part.x*cell+pad,y=part.y*cell+pad,w=cell-pad*2;
+      const t=Math.max(.25,1-i/Math.max(8,snake.length));
+      ctx.fillStyle=i===0?'#74e39b':`hsl(145 58% ${36+Math.round(t*12)}%)`;
+      roundedRect(x,y,w,w,cell*.24);ctx.fill();
+      if(i===0){
+        const ex=(dir.y!==0?cell*.18:cell*.06),ey=(dir.x!==0?cell*.18:cell*.06);
+        const frontX=dir.x*cell*.17,frontY=dir.y*cell*.17;
+        ctx.fillStyle='#092312';
+        ctx.beginPath();ctx.arc((part.x+.5)*cell+frontX+ex,(part.y+.5)*cell+frontY+ey,Math.max(1.5,cell*.055),0,Math.PI*2);ctx.fill();
+        ctx.beginPath();ctx.arc((part.x+.5)*cell+frontX-ex,(part.y+.5)*cell+frontY-ey,Math.max(1.5,cell*.055),0,Math.PI*2);ctx.fill();
+      }
+    });
+  }
+
+  function freeCells(){
+    const occupied=new Set(snake.map(p=>`${p.x},${p.y}`));
+    const free=[];
+    for(let y=0;y<GRID;y++)for(let x=0;x<GRID;x++)if(!occupied.has(`${x},${y}`))free.push({x,y});
+    return free;
+  }
+
+  function placeFood(){
+    const free=freeCells();
+    if(!free.length){finish(true);return;}
+    food=free[Math.floor(Math.random()*free.length)];
+  }
+
+  function setStatus(text,active){statusEl.innerHTML=text;liveDot.classList.toggle('run',!!active);}
+
+  function showOverlay(icon,title,text,button){
+    $('#overlayIcon').textContent=icon;$('#overlayTitle').textContent=title;$('#overlayText').textContent=text;$('#startBtn').textContent=button;overlay.hidden=false;
+  }
+
+  function reset(showIntro){
+    cancelAnimationFrame(frameId);
+    snake=[{x:9,y:10},{x:8,y:10},{x:7,y:10},{x:6,y:10}];
+    dir={x:1,y:0};nextDir={x:1,y:0};score=0;running=false;paused=false;gameOver=false;lastTime=0;accumulator=0;
+    placeFood();scoreEl.textContent='0';pauseBtn.textContent='开始';setStatus('等待开始 · 吃到苹果得 <strong>10</strong> 分',false);
+    if(showIntro)showOverlay('🐍','准备出发','方向键或 WASD 控制方向；手机可滑动棋盘或使用方向键。','开始游戏');
+    else overlay.hidden=true;
+    draw();
+  }
+
+  function start(){
+    if(running&&!paused)return;
+    if(gameOver)reset(false);
+    running=true;paused=false;overlay.hidden=true;pauseBtn.textContent='暂停';setStatus('游戏进行中 · <strong>别撞墙，也别咬到自己</strong>',true);lastTime=performance.now();accumulator=0;boardWrap.focus({preventScroll:true});
+    cancelAnimationFrame(frameId);frameId=requestAnimationFrame(loop);
+  }
+
+  function togglePause(){
+    if(!running){start();return;}
+    paused=!paused;pauseBtn.textContent=paused?'继续':'暂停';setStatus(paused?'已暂停 · 按空格或点击继续':'游戏进行中 · <strong>别撞墙，也别咬到自己</strong>',!paused);
+    if(!paused){lastTime=performance.now();accumulator=0;}
+  }
+
+  function finish(won){
+    running=false;paused=false;gameOver=true;cancelAnimationFrame(frameId);pauseBtn.textContent='再来一局';setStatus(won?'棋盘已填满 · <strong>完美通关</strong>':'游戏结束 · 最终得分 <strong>'+score+'</strong>',false);
+    showOverlay(won?'🏆':'💥',won?'完美通关':'撞到了',won?'你填满了整张棋盘！':'最终得分 '+score+'，最高分 '+best+'。','再来一局');
+  }
+
+  function step(){
+    dir={x:nextDir.x,y:nextDir.y};
+    const head={x:snake[0].x+dir.x,y:snake[0].y+dir.y};
+    const eating=head.x===food.x&&head.y===food.y;
+    const body=eating?snake:snake.slice(0,-1);
+    const hitWall=head.x<0||head.y<0||head.x>=GRID||head.y>=GRID;
+    const hitBody=body.some(p=>p.x===head.x&&p.y===head.y);
+    if(hitWall||hitBody){finish(false);return;}
+    snake.unshift(head);
+    if(eating){
+      score+=10;scoreEl.textContent=score;
+      if(score>best){best=score;bestEl.textContent=best;try{localStorage.setItem('snake-best',String(best));}catch(e){}}
+      placeFood();
+    }else snake.pop();
+  }
+
+  function loop(now){
+    if(!running)return;
+    if(paused){lastTime=now;frameId=requestAnimationFrame(loop);return;}
+    accumulator+=Math.min(250,now-lastTime);lastTime=now;
+    while(accumulator>=stepMs&&running){step();accumulator-=stepMs;}
+    draw();
+    if(running)frameId=requestAnimationFrame(loop);
+  }
+
+  function steer(x,y){
+    if(x===-nextDir.x&&y===-nextDir.y)return;
+    nextDir={x,y};
+    if(!running&&!gameOver)start();
+  }
+
+  const directions={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
+  function handleDirection(name){const d=directions[name];if(d)steer(d[0],d[1]);}
+
+  addEventListener('keydown',e=>{
+    const key=e.key.toLowerCase();
+    const map={arrowup:'up',w:'up',arrowdown:'down',s:'down',arrowleft:'left',a:'left',arrowright:'right',d:'right'};
+    if(map[key]){e.preventDefault();handleDirection(map[key]);return;}
+    if(key===' '){e.preventDefault();togglePause();}
+    if(key==='enter'&&!running){e.preventDefault();start();}
+  },{passive:false});
+
+  boardWrap.addEventListener('pointerdown',e=>{touchStart={x:e.clientX,y:e.clientY};boardWrap.focus({preventScroll:true});});
+  boardWrap.addEventListener('pointerup',e=>{
+    if(!touchStart)return;const dx=e.clientX-touchStart.x,dy=e.clientY-touchStart.y;touchStart=null;
+    if(Math.max(Math.abs(dx),Math.abs(dy))<18)return;
+    handleDirection(Math.abs(dx)>Math.abs(dy)?(dx>0?'right':'left'):(dy>0?'down':'up'));
+  });
+  boardWrap.addEventListener('pointercancel',()=>{touchStart=null;});
+  document.querySelector('.dpad').addEventListener('click',e=>{const b=e.target.closest('[data-dir]');if(b)handleDirection(b.dataset.dir);});
+  $('#startBtn').addEventListener('click',start);
+  pauseBtn.addEventListener('click',togglePause);
+  $('#newBtn').addEventListener('click',()=>{reset(false);start();});
+  $('#backBtn').addEventListener('click',()=>{location.href='/';});
+  $('#speed').addEventListener('click',e=>{
+    const b=e.target.closest('[data-ms]');if(!b)return;stepMs=Number(b.dataset.ms);document.querySelectorAll('#speed button').forEach(x=>x.classList.toggle('on',x===b));try{localStorage.setItem('snake-speed',String(stepMs));}catch(err){}
+  });
+  document.querySelectorAll('#speed button').forEach(b=>b.classList.toggle('on',Number(b.dataset.ms)===stepMs));
+  document.addEventListener('visibilitychange',()=>{if(document.hidden&&running&&!paused)togglePause();});
+  addEventListener('storage',e=>{if(e.key==='nb-theme')fitCanvas();});
+  new ResizeObserver(fitCanvas).observe(boardWrap);
+
+  reset(true);
+  fitCanvas();
+})();
+</script>
+</body>
+</html>
