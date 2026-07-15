@@ -1,5 +1,5 @@
-// 手写笔记 v4：书架 + 分页 Canvas 笔记（仿 GoodNotes）。
-// - Pencil 优先输入：pen 压感、合并事件高频采样、手掌拒绝、双指移动/缩放
+// 手写笔记 v4.1：书架 + 分页 Canvas 笔记（仿 GoodNotes）。
+// - Pencil 优先输入：pen 压感、合并事件高频采样、手掌拒绝、Safari TouchEvent 双指移动/缩放
 // - 活动笔迹独立 Canvas + rAF 合成，书写时不再反复重画整页历史笔迹
 // - 页面元素 items：图片（拖动/角柄或双指捏合缩放/裁切）与 Markdown 文本块
 // - 视图：竖直滚动（默认，多页纵向堆叠、滚动自动切页）/ 水平翻页 两种模式；−/+ 缩放
@@ -8,7 +8,7 @@
 // - 数据按登录密码隔离（owner），自动保存到 /api/notepad/*；图片字节存 R2 asset
 import { getStroke } from 'https://esm.sh/perfect-freehand@1.2.2';
 import { clampRect, applyCrop, resizeKeepAspect } from './notepad-geom.js';
-import { createMultiTapDetector } from './notepad-gestures.js';
+import { createMultiTapDetector, selectNavigationPair } from './notepad-gestures.js?v=20260715pencil2';
 
 const PAGE_W = 1240, PAGE_H = 1754; // 逻辑坐标系（A4 比例），显示尺寸靠 CSS/transform 缩放
 const PALETTE = ['#1c1c1e', '#f5f0e6', '#e53935', '#1e88e5', '#43a047', '#fb8c00', '#8e24aa', '#00acc1'];
@@ -72,11 +72,11 @@ const input = {
   mode: savedInputMode === 'pencil' || savedInputMode === 'touch' ? savedInputMode : (isIPad ? 'pencil' : 'touch'),
   explicitMode: savedInputMode === 'pencil' || savedInputMode === 'touch',
   activePen: null,
-  lastPenAt: -Infinity,
   detectedPen: false,
 };
 const navTouches = new Map();
 let touchGesture = null;
+let touchNavFrame = 0;
 
 function isEditableTarget(target) {
   return !!(target?.closest && target.closest('textarea,input,[contenteditable="true"]'));
@@ -91,32 +91,47 @@ function updateInputModeUI() {
   btn.classList.toggle('on', pencil);
   btn.setAttribute('aria-pressed', String(pencil));
   btn.title = pencil
-    ? 'Pencil 防误触已开启：单指/手掌忽略，双指移动与缩放'
+    ? 'Pencil 书写：双指移动纸张或捏合缩放'
     : '手指浏览：单指滚动；点此开启 Pencil 防误触';
   btn.setAttribute('aria-label', btn.title);
   $('#input-mode-label').textContent = pencil ? 'Pencil' : '触控';
 }
 
-function setInputMode(mode, { persist = false, announce = false } = {}) {
+function setInputMode(mode, { persist = false } = {}) {
   input.mode = mode === 'pencil' ? 'pencil' : 'touch';
   if (persist) {
     input.explicitMode = true;
     localStorage.setItem('np-input-mode', input.mode);
   }
-  finishTouchNavigation($('#page-surface-wrap'), true);
+  resetTouchNavigation($('#page-surface-wrap'), true);
   updateInputModeUI();
-  if (announce) toast(input.mode === 'pencil'
-    ? 'Pencil 防误触已开启 · 单指/手掌忽略，双指移动缩放'
-    : '手指浏览已开启 · 单指可滚动页面', 2800);
+  requestAnimationFrame(centerActivePageHorizontally);
 }
 
-function isPalmContact(e) {
-  // Pointer Events 的 width/height 是接触椭圆的 CSS 像素尺寸；Safari 能提供时可先排除大面积手掌。
-  return Math.max(Number(e.width) || 0, Number(e.height) || 0) >= 38;
+function syncNavigationTouches(touchList) {
+  const now = performance.now();
+  const next = new Map();
+  for (const touch of Array.from(touchList || [])) {
+    const prev = navTouches.get(touch.identifier);
+    const radiusX = Math.max(1, Number(touch.radiusX) || 1);
+    const radiusY = Math.max(1, Number(touch.radiusY) || 1);
+    next.set(touch.identifier, {
+      id: touch.identifier,
+      x: touch.clientX,
+      y: touch.clientY,
+      area: radiusX * radiusY,
+      startedAt: prev?.startedAt ?? now,
+    });
+  }
+  navTouches.clear();
+  next.forEach((point, id) => navTouches.set(id, point));
 }
 
 function touchPair() {
-  return [...navTouches.values()].filter((p) => !p.blocked).slice(0, 2);
+  return selectNavigationPair([...navTouches.values()], {
+    gestureActive: !!touchGesture,
+    activeIds: touchGesture?.touchIds,
+  });
 }
 
 function beginTouchNavigation(wrap) {
@@ -126,6 +141,7 @@ function beginTouchNavigation(wrap) {
   const cx = (pts[0].x + pts[1].x) / 2 - rect.left;
   const cy = (pts[0].y + pts[1].y) / 2 - rect.top;
   touchGesture = {
+    touchIds: [pts[0].id, pts[1].id],
     startDistance: Math.max(24, Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y)),
     startZoom: view.zoom,
     startScrollLeft: wrap.scrollLeft,
@@ -133,18 +149,15 @@ function beginTouchNavigation(wrap) {
     startCenterX: cx,
     startCenterY: cy,
     zoomDirty: false,
+    pending: null,
   };
+  document.body.classList.add('touch-navigating');
 }
 
-function updateTouchNavigation(wrap) {
-  const pts = touchPair();
-  if (pts.length < 2) return;
-  if (!touchGesture) beginTouchNavigation(wrap);
-  if (!touchGesture) return;
-  const rect = wrap.getBoundingClientRect();
-  const cx = (pts[0].x + pts[1].x) / 2 - rect.left;
-  const cy = (pts[0].y + pts[1].y) / 2 - rect.top;
-  const distance = Math.max(24, Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y));
+function applyTouchNavigation(wrap) {
+  if (!touchGesture?.pending) return;
+  const { cx, cy, distance } = touchGesture.pending;
+  touchGesture.pending = null;
   const zoom = clamp(Math.round(touchGesture.startZoom * distance / touchGesture.startDistance * 100) / 100, ZOOM_MIN, ZOOM_MAX);
   const ratio = zoom / touchGesture.startZoom;
   if (Math.abs(zoom - view.zoom) >= 0.01) {
@@ -157,21 +170,48 @@ function updateTouchNavigation(wrap) {
   wrap.scrollTop = (touchGesture.startScrollTop + touchGesture.startCenterY) * ratio - cy;
 }
 
+function updateTouchNavigation(wrap) {
+  const pts = touchPair();
+  if (pts.length < 2) return;
+  if (!touchGesture) beginTouchNavigation(wrap);
+  if (!touchGesture) return;
+  const rect = wrap.getBoundingClientRect();
+  const cx = (pts[0].x + pts[1].x) / 2 - rect.left;
+  const cy = (pts[0].y + pts[1].y) / 2 - rect.top;
+  const distance = Math.max(24, Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y));
+  touchGesture.pending = { cx, cy, distance };
+  if (!touchNavFrame) {
+    touchNavFrame = requestAnimationFrame(() => {
+      touchNavFrame = 0;
+      applyTouchNavigation(wrap);
+    });
+  }
+}
+
 function finishTouchNavigation(wrap, cancel = false) {
+  if (touchNavFrame) {
+    cancelAnimationFrame(touchNavFrame);
+    touchNavFrame = 0;
+  }
+  if (!cancel) applyTouchNavigation(wrap);
   if (touchGesture?.zoomDirty) {
     if (!cancel) localStorage.setItem('np-zoom', String(view.zoom));
     reinitCanvases();
   }
-  navTouches.clear();
   touchGesture = null;
+  document.body.classList.remove('touch-navigating');
+}
+
+function resetTouchNavigation(wrap, cancel = false) {
+  finishTouchNavigation(wrap, cancel);
+  navTouches.clear();
 }
 
 function penStarted(e) {
   if (e.pointerType !== 'pen') return;
   input.detectedPen = true;
   input.activePen = e.pointerId;
-  input.lastPenAt = performance.now();
-  finishTouchNavigation($('#page-surface-wrap'), true);
+  resetTouchNavigation($('#page-surface-wrap'), true);
   if (!input.explicitMode && input.mode !== 'pencil') setInputMode('pencil');
   updateInputModeUI();
 }
@@ -179,7 +219,6 @@ function penStarted(e) {
 function penFinished(e) {
   if (e.pointerType !== 'pen' || input.activePen !== e.pointerId) return;
   input.activePen = null;
-  input.lastPenAt = performance.now();
 }
 
 async function api(path, opts) {
@@ -364,6 +403,16 @@ function pageCssW() {
 
 function slotFor(idx) { return $('#pages-col').querySelector(`.page-slot[data-idx="${idx}"]`); }
 
+function centerActivePageHorizontally() {
+  const wrap = $('#page-surface-wrap');
+  const slot = slotFor(state.currentPageIdx);
+  if (!wrap || !slot) return;
+  const wrapRect = wrap.getBoundingClientRect();
+  const slotRect = slot.getBoundingClientRect();
+  const delta = (slotRect.left + slotRect.right - wrapRect.left - wrapRect.right) / 2;
+  if (Math.abs(delta) > 0.5) wrap.scrollLeft += delta;
+}
+
 function detachSurface() {
   const surf = $('#page-surface');
   if (surf.parentElement && surf.parentElement.classList.contains('page-slot')) {
@@ -426,6 +475,7 @@ function renderSlots() {
     col.appendChild(slot);
   }
   mountSurface(state.currentPageIdx);
+  requestAnimationFrame(centerActivePageHorizontally);
   if (view.flip === 'v') observePreviews();
 }
 
@@ -563,10 +613,6 @@ async function openBook(book) {
   renderSlots();
   await activatePage(target, { scroll: true, force: true });
   renderPageStrip();
-  if (input.hasTouch && input.mode === 'pencil' && !sessionStorage.getItem('np-pencil-hint')) {
-    sessionStorage.setItem('np-pencil-hint', '1');
-    toast('Pencil 防误触已开启 · 单指/手掌忽略，双指移动缩放', 3200);
-  }
 }
 
 async function backToShelf() {
@@ -860,7 +906,6 @@ function onDown(e) {
 }
 function onMove(e) {
   if (e.pointerId !== activePointerId) return;
-  if (e.pointerType === 'pen') input.lastPenAt = performance.now();
   if (state.tool === 'eraser') {
     if (state.erasing) {
       const samples = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [];
@@ -1630,7 +1675,7 @@ function bindToolbar() {
   $('#tool-highlighter').addEventListener('click', () => setTool('highlighter'));
   $('#tool-eraser').addEventListener('click', () => setTool('eraser'));
   $('#tool-select').addEventListener('click', () => setTool('select'));
-  $('#btn-input-mode').addEventListener('click', () => setInputMode(input.mode === 'pencil' ? 'touch' : 'pencil', { persist: true, announce: true }));
+  $('#btn-input-mode').addEventListener('click', () => setInputMode(input.mode === 'pencil' ? 'touch' : 'pencil', { persist: true }));
   $('#btn-style').addEventListener('click', (e) => { e.stopPropagation(); togglePopover('#pop-style', '#btn-style', renderStylePopover); });
   $('#btn-insert').addEventListener('click', (e) => { e.stopPropagation(); togglePopover('#pop-insert', '#btn-insert', renderInsertMenu); });
   $('#btn-paper').addEventListener('click', (e) => { e.stopPropagation(); togglePopover('#pop-paper', '#btn-paper', renderPaperPopover); });
@@ -1667,36 +1712,48 @@ function bindToolbar() {
   wrap.addEventListener('pointerdown', (e) => {
     if (e.pointerType !== 'touch' || e.target.closest('.np-item') || isEditableTarget(e.target)) return;
     det.down(e.pointerId, e.clientX, e.clientY, performance.now());
-    if (input.mode !== 'pencil') return;
-    e.preventDefault();
-    const blocked = isPalmContact(e) || input.activePen !== null || performance.now() - input.lastPenAt < 180;
-    navTouches.set(e.pointerId, { x: e.clientX, y: e.clientY, blocked });
-    try { wrap.setPointerCapture(e.pointerId); } catch {}
-    if (touchPair().length === 2) beginTouchNavigation(wrap);
   });
   wrap.addEventListener('pointermove', (e) => {
     if (e.pointerType !== 'touch') return;
     det.move(e.pointerId, e.clientX, e.clientY, performance.now());
-    if (input.mode !== 'pencil' || isEditableTarget(e.target)) return;
-    e.preventDefault();
-    const pt = navTouches.get(e.pointerId);
-    if (!pt) return;
-    pt.x = e.clientX; pt.y = e.clientY;
-    if (!pt.blocked && touchPair().length >= 2) updateTouchNavigation(wrap);
   });
   wrap.addEventListener('pointerup', (e) => {
     if (e.pointerType !== 'touch') return;
     det.up(e.pointerId, performance.now());
-    if (input.mode !== 'pencil') return;
-    e.preventDefault();
-    navTouches.delete(e.pointerId);
-    if (touchGesture && touchPair().length < 2) finishTouchNavigation(wrap);
   });
   wrap.addEventListener('pointercancel', (e) => {
     if (e.pointerType !== 'touch') return;
     det.cancel();
-    if (input.mode === 'pencil') finishTouchNavigation(wrap, true);
   });
+
+  // iPad Safari 的 TouchEvent 多指序列比跨 pointer capture 更稳定；Pointer Events 专注 Pencil，
+  // Touch Events 专注手指导航。单触点永不移动页面，双指才进入自定义平移/缩放。
+  wrap.addEventListener('touchstart', (e) => {
+    if (input.mode !== 'pencil' || e.target.closest('.np-item') || isEditableTarget(e.target)) return;
+    e.preventDefault();
+    if (input.activePen !== null) { resetTouchNavigation(wrap, true); return; }
+    syncNavigationTouches(e.touches);
+    if (!touchGesture && touchPair().length === 2) beginTouchNavigation(wrap);
+  }, { passive: false });
+  wrap.addEventListener('touchmove', (e) => {
+    if (input.mode !== 'pencil' || isEditableTarget(e.target)) return;
+    e.preventDefault();
+    if (input.activePen !== null) { resetTouchNavigation(wrap, true); return; }
+    syncNavigationTouches(e.touches);
+    if (touchPair().length === 2) updateTouchNavigation(wrap);
+  }, { passive: false });
+  wrap.addEventListener('touchend', (e) => {
+    if (input.mode !== 'pencil') return;
+    e.preventDefault();
+    syncNavigationTouches(e.touches);
+    if (touchGesture && touchPair().length < 2) finishTouchNavigation(wrap);
+    if (navTouches.size === 0) navTouches.clear();
+  }, { passive: false });
+  wrap.addEventListener('touchcancel', (e) => {
+    if (input.mode !== 'pencil') return;
+    e.preventDefault();
+    resetTouchNavigation(wrap, true);
+  }, { passive: false });
   ['gesturestart', 'gesturechange', 'gestureend'].forEach((type) => wrap.addEventListener(type, (e) => {
     if (input.mode === 'pencil') e.preventDefault();
   }, { passive: false }));

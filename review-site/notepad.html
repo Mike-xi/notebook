@@ -101,6 +101,8 @@
 
   #page-surface-wrap{flex:1 1 auto;overflow-y:auto;overflow-x:auto;padding:16px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   #pages-col{display:flex;flex-direction:column;align-items:center;gap:22px;width:max-content;min-width:100%}
+  /* Pencil 模式保留一圈可滚动的“工作台”，即使页面正好适配屏幕也能双指挪动纸张。 */
+  body.pencil-mode #pages-col{box-sizing:content-box;min-height:calc(100% + 48px);padding:64px 72px 140px}
   .page-slot{position:relative;aspect-ratio:1240/1754;box-shadow:0 4px 22px var(--shadow);border-radius:6px;overflow:hidden;background:#fffdf8;flex:0 0 auto}
   .page-slot .slot-preview{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
   .page-slot .slot-num{position:absolute;right:8px;bottom:6px;font-size:11px;color:#8a857c;background:rgba(255,253,248,.8);border-radius:4px;padding:0 5px;pointer-events:none}
@@ -110,6 +112,8 @@
   #ink-canvas{z-index:3;pointer-events:none}
   #live-canvas{z-index:4;touch-action:manipulation;cursor:crosshair}
   body.pencil-mode #page-surface-wrap,body.pencil-mode #live-canvas{touch-action:none}
+  body.pencil-mode #page-surface-wrap{overscroll-behavior:none}
+  body.touch-navigating #live-canvas{cursor:grabbing}
   body.tool-select #live-canvas{pointer-events:none}
 
   /* items 层：逻辑坐标 1240x1754，用 transform scale 适配显示宽度 */
@@ -336,6 +340,6 @@
 
   <script src="/assets/icons.js?v=20260712c"></script>
   <script src="/assets/md.js?v=20260712c"></script>
-  <script type="module" src="/assets/notepad.js?v=20260715pencil"></script>
+  <script type="module" src="/assets/notepad.js?v=20260715pencil2"></script>
 </body>
 </html>
