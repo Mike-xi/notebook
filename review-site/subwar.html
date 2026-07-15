@@ -114,17 +114,17 @@
   #stickKnob{ position:absolute; left:50%; top:50%; width:46px; height:46px; margin:-23px; border-radius:50%;
     border:1px solid rgba(160,225,255,.62); background:rgba(40,125,180,.72); box-shadow:0 0 18px rgba(70,180,240,.3); }
   #movePad small{ position:absolute; left:0; right:0; bottom:-2px; text-align:center; color:var(--dim); font-size:9px; letter-spacing:.16em; }
-  #actionPad{ right:max(16px,env(safe-area-inset-right)); width:154px; height:142px; }
+  #actionPad{ right:max(16px,env(safe-area-inset-right)); width:170px; height:184px; }
   .touch-btn{ position:absolute; appearance:none; border:1px solid rgba(135,210,255,.38); color:var(--txt);
     background:rgba(6,25,42,.78); backdrop-filter:blur(6px); box-shadow:0 5px 18px rgba(0,0,0,.25); touch-action:none; }
   .touch-btn:active,.touch-btn.pressed{ transform:scale(.94); background:rgba(40,115,170,.85); }
-  #diveBtn,#surfaceBtn{ width:52px; height:40px; border-radius:13px; right:94px; font-size:11px; }
-  #surfaceBtn{ top:10px; } #diveBtn{ top:58px; }
-  #fireBtn{ right:0; top:21px; width:82px; height:82px; border-radius:50%; border-color:rgba(255,190,80,.62);
+  #diveBtn,#surfaceBtn,#floodBtn,#drainBtn{ width:60px; height:34px; border-radius:11px; right:110px; font-size:10px; }
+  #surfaceBtn{ top:2px; } #diveBtn{ top:42px; } #floodBtn{ top:82px; } #drainBtn{ top:122px; }
+  #fireBtn{ right:0; top:28px; width:82px; height:82px; border-radius:50%; border-color:rgba(255,190,80,.62);
     background:conic-gradient(rgba(232,182,76,.9) var(--ready,100%),rgba(18,38,52,.78) 0);
     color:#07131d; font-weight:800; letter-spacing:.08em; box-shadow:0 0 24px rgba(232,182,76,.24); }
   #fireBtn span{ display:block; font-size:19px; } #fireBtn small{ display:block; font-size:9px; }
-  #lockBtn{ right:19px; bottom:0; width:62px; height:31px; border-radius:999px; color:#bdeaff; font-size:10px; letter-spacing:.08em; }
+  #lockBtn{ right:10px; bottom:0; width:62px; height:31px; border-radius:999px; color:#bdeaff; font-size:10px; letter-spacing:.08em; }
   body.mobile #touchControls{ display:block; }
   body.mobile #hint{ display:none; }
   body.mobile #pauseBtn{ display:grid; }
@@ -177,6 +177,8 @@
   <div class="row"><span>船体</span><div class="bar" id="hpbar"><i></i></div><b id="hpv">6/6</b></div>
   <div class="row"><span>深度</span><div class="bar"><i id="zbar" style="background:linear-gradient(90deg,#2c6fd6,#6fd3ff)"></i></div><b id="zv">0.8 m</b></div>
   <div class="row"><span>航速</span><div class="bar"><i id="ubar" style="background:linear-gradient(90deg,#3fbf9f,#6fd3ff)"></i></div><b id="uv">0.0</b></div>
+  <div class="row"><span>俯仰</span><div class="bar"><i id="pitchbar" style="width:50%;background:linear-gradient(90deg,#e8b64c,#6fd3ff)"></i></div><b id="pitchv">0°</b></div>
+  <div class="row"><span>注水</span><div class="bar"><i id="ballastbar" style="width:50%;background:linear-gradient(90deg,#6fd3ff,#2c6fd6)"></i></div><b id="ballastv">50%</b></div>
   <div class="row"><span>鱼雷管</span><span class="tube ok" id="t0"></span><span class="tube ok" id="t1"></span><b id="ammo"></b></div>
 </div>
 
@@ -190,7 +192,7 @@
 <div id="leadDot" aria-hidden="true"></div>
 <div id="targetBox" aria-hidden="true" data-label="敌艇" data-meta=""></div>
 <div id="hitmarker" aria-hidden="true">×</div>
-<div id="hint" class="panel"><code>W/S</code> 油门 &nbsp;<code>A/D</code> 转向 &nbsp;<code>Q/E</code> 下潜/上浮 &nbsp;<code>空格</code> 鱼雷 &nbsp;<code>鼠标拖拽</code> 视角 · 滚轮缩放</div>
+<div id="hint" class="panel"><code>W/S</code> 推进 &nbsp;<code>A/D</code> 差速 &nbsp;<code>Q/E</code> 注排水 &nbsp;<code>R/F</code> 尾舵 &nbsp;<code>空格</code> 鱼雷 &nbsp;<code>鼠标拖拽</code> 视角</div>
 <div id="toast"></div>
 <div id="vig"></div>
 <button id="pauseBtn" class="panel" type="button" title="暂停 / P" aria-label="暂停游戏">Ⅱ</button>
@@ -201,8 +203,10 @@
     <div class="stick-base"><div id="stickKnob"></div></div><small>航速 · 转向</small>
   </div>
   <div id="actionPad" class="touch-cluster">
-    <button id="surfaceBtn" class="touch-btn" type="button" aria-label="上浮">上浮</button>
-    <button id="diveBtn" class="touch-btn" type="button" aria-label="下潜">下潜</button>
+    <button id="surfaceBtn" class="touch-btn" type="button" aria-label="尾舵艏上">R 艏上</button>
+    <button id="diveBtn" class="touch-btn" type="button" aria-label="尾舵艏下">F 艏下</button>
+    <button id="floodBtn" class="touch-btn" type="button" aria-label="注水下潜">Q 注水</button>
+    <button id="drainBtn" class="touch-btn" type="button" aria-label="排水上浮">E 排水</button>
     <button id="fireBtn" class="touch-btn" type="button" aria-label="发射鱼雷"><span>◎</span><small>鱼雷</small></button>
     <button id="lockBtn" class="touch-btn" type="button" aria-label="切换锁定目标">锁定</button>
   </div>
@@ -213,16 +217,17 @@
     <h1>深海猎杀 <em>SUB&nbsp;HUNT</em></h1>
     <div class="sub">蛟人半潜艇 · 鱼雷改装型 —— 基于大创数字水池 3D 引擎</div>
     <div class="keys desktop-copy">
-      <code>W / S</code> 前进 / 倒车（油门渐进）<br>
-      <code>A / D</code> 左转 / 右转<br>
-      <code>Q / E</code> 下潜 / 上浮（鱼雷只能命中同深度目标）<br>
+      <code>W / S</code> 渐进推进 / 倒车（松开自动回中）<br>
+      <code>A / D</code> 左右桨差速转向（可原地回转）<br>
+      <code>Q / E</code> 注水下潜 / 排水上浮（配平保持）<br>
+      <code>R / F</code> 尾舵艏上 / 艏下（控制鱼雷发射俯仰）<br>
       <code>空格</code> 发射鱼雷（双管，轮换装填）<br>
-      <code>TAB / R</code> 切换目标 / 镜头回正<br>
+      <code>TAB / C</code> 切换目标 / 镜头回正<br>
       <code>鼠标</code> 拖拽旋转视角 · 滚轮缩放 · P 暂停
     </div>
     <div class="keys touch-copy" style="display:none">
       <code>左摇杆</code> 航速 / 转向<br>
-      <code>右侧按钮</code> 上浮 / 下潜 / 发射鱼雷<br>
+      <code>右侧按钮</code> 尾舵 / 注排水 / 发射鱼雷<br>
       <code>拖动水面</code> 旋转观察视角<br>
       <code>锁定</code> 切换攻击目标
     </div>
@@ -283,16 +288,16 @@ document.body.classList.toggle('mobile',MOBILE);
 const renderer=new THREE.WebGLRenderer({antialias:!MOBILE,powerPreference:'high-performance'});
 renderer.setSize(innerWidth,innerHeight); renderer.setPixelRatio(Math.min(devicePixelRatio,MOBILE?1.35:2));
 renderer.shadowMap.enabled=!MOBILE; renderer.outputEncoding=THREE.sRGBEncoding; renderer.toneMapping=THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure=1.08; $('c3d').appendChild(renderer.domElement);
+renderer.toneMappingExposure=0.82; $('c3d').appendChild(renderer.domElement);
 const scene=new THREE.Scene();
-const SKY_SHALLOW=new THREE.Color(0x5d8ba6), SKY_DEEP=new THREE.Color(0x061e2d);
-const FOG_SHALLOW=new THREE.Color(0x628ca4), FOG_DEEP=new THREE.Color(0x092b3e);
+const SKY_SHALLOW=new THREE.Color(0x315970), SKY_DEEP=new THREE.Color(0x020d17);
+const FOG_SHALLOW=new THREE.Color(0x365e70), FOG_DEEP=new THREE.Color(0x041725);
 scene.background=SKY_SHALLOW.clone();
 scene.fog=new THREE.FogExp2(FOG_SHALLOW.clone(),0.011);
 const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.05,600);
-scene.add(new THREE.AmbientLight(0xa9c7da,0.48));
-scene.add(new THREE.HemisphereLight(0xa8d4ee,0x10283a,0.42));
-const sun=new THREE.DirectionalLight(0xffefd8,0.92);
+scene.add(new THREE.AmbientLight(0x8fb5cc,0.34));
+scene.add(new THREE.HemisphereLight(0x8cc9e8,0x071a28,0.34));
+const sun=new THREE.DirectionalLight(0xffe7c8,0.78);
 sun.position.set(9+14,20,23+8); sun.castShadow=!MOBILE; sun.shadow.mapSize.set(MOBILE?1024:2048,MOBILE?1024:2048);
 sun.shadow.camera.left=-32; sun.shadow.camera.right=32; sun.shadow.camera.top=32; sun.shadow.camera.bottom=-32;
 sun.target.position.set(9,0,23); scene.add(sun.target); scene.add(sun);   // 阴影相机对准湖心，远端也有影
@@ -321,7 +326,7 @@ scene.add(particles);
 let waterGeo=null;
 (function buildRiver(){
   const {len,wid,dep}=LAKE;
-  const bed=new THREE.Mesh(new THREE.PlaneGeometry(wid,len), new THREE.MeshStandardMaterial({color:0x556052,roughness:1}));
+  const bed=new THREE.Mesh(new THREE.PlaneGeometry(wid,len), new THREE.MeshStandardMaterial({color:0x39463f,roughness:1}));
   bed.rotation.x=-Math.PI/2; bed.position.set(wid/2,-dep,len/2); bed.receiveShadow=true; scene.add(bed);
   const pebMat=new THREE.MeshStandardMaterial({color:0x6e7a70,roughness:0.95});
   for(let i=0;i<46;i++){ const p=new THREE.Mesh(new THREE.DodecahedronGeometry(0.05+Math.random()*0.09,0),pebMat); p.position.set(Math.random()*wid,-dep+0.04,Math.random()*len); p.rotation.set(Math.random()*3,Math.random()*3,0); scene.add(p); }
@@ -343,7 +348,7 @@ let waterGeo=null;
   const hillMat=new THREE.MeshStandardMaterial({color:0x486e42,roughness:1});
   for(let i=0;i<6;i++){ const sgn=i%2?-1:1, edge=i%2?0:wid; const h=new THREE.Mesh(new THREE.SphereGeometry(6+Math.random()*5,12,8),hillMat); h.position.set(edge+sgn*(14+Math.random()*6),-2.5,(i*8+4)%len); h.scale.y=0.55; scene.add(h); }
   waterGeo=new THREE.PlaneGeometry(wid,len,24,60);
-  const water=new THREE.Mesh(waterGeo,new THREE.MeshStandardMaterial({color:0x2e7fb8,transparent:true,opacity:0.55,metalness:0.1,roughness:0.55,side:THREE.DoubleSide}));
+  const water=new THREE.Mesh(waterGeo,new THREE.MeshStandardMaterial({color:0x155b83,transparent:true,opacity:0.68,metalness:0.14,roughness:0.48,side:THREE.DoubleSide}));
   water.rotation.x=-Math.PI/2; water.position.set(wid/2,0,len/2); scene.add(water);
   const deckMat=new THREE.MeshStandardMaterial({color:0x9aa4ac,roughness:0.85});
   const deck=new THREE.Mesh(new THREE.BoxGeometry(wid+4,0.22,1.7),deckMat);
@@ -409,7 +414,7 @@ function buildSubMesh(color,finColor){
     pg.add(spin); pg.position.set(side*0.06,-0.01,-SUB_L*0.42); g.add(pg); props.push(spin); });
   const rud=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.006,0.055),finMat); rud.position.set(0,0,-SUB_L*0.52); g.add(rud);
   const fin=new THREE.Mesh(new THREE.BoxGeometry(0.005,0.05,0.05),finMat); fin.position.set(0,0.045,-SUB_L*0.46); g.add(fin);
-  return {group:g, props};
+  return {group:g, props, rudder:rud};
 }
 
 /* ---------- 音效（WebAudio 合成，无外部资源） ---------- */
@@ -433,13 +438,15 @@ const AU={ ctx:null, on:!TEST,
 $('mute').onclick=()=>{ AU.on=!AU.on; $('mute').textContent=AU.on?'🔊':'🔇'; };
 
 /* ---------- 实体 ---------- */
-const U_MAX=1.25, U_REV=-0.4, YAW_MAX=1.5, Z_MIN=0.18, Z_MAX=LAKE.dep-0.35;
+const U_MAX=1.25, U_REV=-0.4, YAW_MAX=1.5, PITCH_MAX=24*Math.PI/180, Z_MIN=0.18, Z_MAX=LAKE.dep-0.35;
 function makeSub(color,finColor,x,y,z,psi){
   const mesh=buildSubMesh(color,finColor); scene.add(mesh.group);
-  return { x,y,z,psi, u:0, mesh, hp:2, maxHp:2, alive:true, sinkT:0, flashT:0 };
+  return { x,y,z,psi,theta:0,u:0,w:0,yawRate:0,left:0,right:0,delta:0,ballast:0.5,
+    mesh, hp:2, maxHp:2, alive:true, sinkT:0, flashT:0 };
 }
 function subPose(s,dt){
-  s.x+=Math.cos(s.psi)*s.u*dt; s.y+=Math.sin(s.psi)*s.u*dt;
+  const forward=s.u*Math.cos(s.theta||0);
+  s.x+=Math.cos(s.psi)*forward*dt; s.y+=Math.sin(s.psi)*forward*dt;
   // 边界软墙
   s.x=clamp(s.x,0.6,LAKE.len-0.6); s.y=clamp(s.y,0.6,LAKE.wid-0.6);
   // 障碍推离
@@ -452,8 +459,12 @@ function placeMesh(s,t,dt){
   if(s.alive){ g.position.y+= 0.012*Math.sin(1.1*t+s.x); }
   g.rotation.set(0,0,0);
   g.rotateY(s.psi);            // 与 /dc 演示一致：NED 航向 ψ 正向 = 绕 THREE Y 正转
+  g.rotateX(-(s.theta||0));     // 与 /dc 一致：正俯仰为艏上
   if(!s.alive){ g.rotateX(clamp(s.sinkT*0.5,0,0.9)); }
-  for(const p of s.mesh.props) p.rotation.z += (s.alive? (0.3+Math.abs(s.u))*0.6 : 0.02);
+  const l=Number.isFinite(s.left)?s.left:s.u/U_MAX, r=Number.isFinite(s.right)?s.right:s.u/U_MAX;
+  if(s.mesh.props[0]) s.mesh.props[0].rotation.z += s.alive?l*dt*18:0.02;
+  if(s.mesh.props[1]) s.mesh.props[1].rotation.z -= s.alive?r*dt*18:0.02;
+  if(s.mesh.rudder) s.mesh.rudder.rotation.x=s.delta||0;
   if(s.flashT>0){ s.flashT-=dt; const f=Math.sin(s.flashT*40)>0;
     s.mesh.group.traverse(m=>{ if(m.isMesh&&m.material.emissive) m.material.emissive.setHex(f?0x661111:0x000000); });
     if(s.flashT<=0) s.mesh.group.traverse(m=>{ if(m.isMesh&&m.material.emissive) m.material.emissive.setHex(0x000000); });
@@ -473,10 +484,12 @@ function makeTorpMesh(hostile){
   scene.add(g); return g;
 }
 function fireTorp(from,hostile){
-  const off=0.35;
-  const t={ x:from.x+Math.cos(from.psi)*off, y:from.y+Math.sin(from.psi)*off, z:from.z,
-    psi:from.psi, v:hostile?1.7:2.3, life:hostile?7:6, hostile, mesh:makeTorpMesh(hostile), trailAcc:0,
-    target:hostile?player:(lockTarget&&lockTarget.alive?lockTarget:null), turnRate:hostile?0.42:0.68 };
+  const off=0.35, theta=from.theta||0, flat=Math.cos(theta);
+  const t={ x:from.x+Math.cos(from.psi)*flat*off, y:from.y+Math.sin(from.psi)*flat*off,
+    z:clamp(from.z-Math.sin(theta)*off,0.08,LAKE.dep-0.08), psi:from.psi, theta,
+    v:hostile?1.7:2.3, life:hostile?7:6, hostile, mesh:makeTorpMesh(hostile), trailAcc:0,
+    target:hostile?player:(lockTarget&&lockTarget.alive?lockTarget:null), turnRate:hostile?0.42:0.68,
+    pitchRate:hostile?0.24:0.34 };
   torps.push(t); AU.fire();
 }
 /* 气泡尾迹（对象池） */
@@ -602,21 +615,30 @@ function stepEnemy(e,dt){
     const away=Math.atan2(e.y-o.y,e.x-o.x); tgtPsi=wrap(tgtPsi*0.4+away*0.6); } }
   e.psi+=clamp(wrap(tgtPsi-e.psi),-1,1)*YAW_MAX*0.55*dt;
   e.u+=(tgtU-e.u)*dt*1.2;
+  e.theta+=(clamp((e.z-tgtZ)*0.34,-0.24,0.24)-e.theta)*dt*1.5;
   e.z+=clamp(tgtZ-e.z,-1,1)*0.28*dt; e.z=clamp(e.z,Z_MIN,Z_MAX);
+  e.left=e.right=clamp(e.u/U_MAX,-1,1);
   subPose(e,dt);
 }
 
 /* ---------- 输入 ---------- */
 const KEY={};
-const TOUCH={throttle:0,turn:0,depth:0,stickPointer:null};
-function clearInput(){ for(const k in KEY) KEY[k]=false; TOUCH.throttle=TOUCH.turn=TOUCH.depth=0; $('stickKnob').style.transform=''; }
+const TOUCH={throttle:0,turn:0,rudder:0,ballast:0,stickPointer:null};
+const CONTROL={surge:0,turn:0,rudder:0};
+const ramp=(v,tgt,rate,dt)=>{ const d=tgt-v,m=rate*dt; return v+clamp(d,-m,m); };
+function clearInput(){
+  for(const k in KEY) KEY[k]=false;
+  TOUCH.throttle=TOUCH.turn=TOUCH.rudder=TOUCH.ballast=0;
+  CONTROL.surge=CONTROL.turn=CONTROL.rudder=0;
+  $('stickKnob').style.transform='';
+}
 addEventListener('keydown',e=>{
   if(['Space','Tab','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
   KEY[e.code]=true;
   if(e.repeat) return;
   if(e.code==='Space') tryFire();
   if(e.code==='Tab') acquireTarget(true);
-  if(e.code==='KeyR'){ cam.yaw=0; cam.pitch=0.42; cam.dist=MOBILE?4.2:3.4; toast('镜头已回正','#8fe0ff'); }
+  if(e.code==='KeyC'){ cam.yaw=0; cam.pitch=0.42; cam.dist=MOBILE?4.2:3.4; toast('镜头已回正','#8fe0ff'); }
   if(e.code==='KeyP'||e.code==='Escape') togglePause();
   if(e.code==='Enter' && $('startOv').style.display!=='none') startGame();
 });
@@ -647,12 +669,13 @@ movePad.addEventListener('pointerdown',e=>{ e.preventDefault(); TOUCH.stickPoint
 movePad.addEventListener('pointermove',e=>{ if(e.pointerId===TOUCH.stickPointer) updateStick(e); });
 function releaseStick(e){ if(e.pointerId!==TOUCH.stickPointer)return; TOUCH.stickPointer=null; TOUCH.throttle=TOUCH.turn=0; stickKnob.style.transform=''; }
 movePad.addEventListener('pointerup',releaseStick); movePad.addEventListener('pointercancel',releaseStick);
-function bindDepth(btn,value){
-  const down=e=>{ e.preventDefault(); btn.setPointerCapture(e.pointerId); btn.classList.add('pressed'); TOUCH.depth=value; };
-  const up=()=>{ btn.classList.remove('pressed'); if(TOUCH.depth===value) TOUCH.depth=0; };
+function bindHold(btn,field,value){
+  const down=e=>{ e.preventDefault(); btn.setPointerCapture(e.pointerId); btn.classList.add('pressed'); TOUCH[field]=value; };
+  const up=()=>{ btn.classList.remove('pressed'); if(TOUCH[field]===value) TOUCH[field]=0; };
   btn.addEventListener('pointerdown',down); btn.addEventListener('pointerup',up); btn.addEventListener('pointercancel',up);
 }
-bindDepth($('diveBtn'),1); bindDepth($('surfaceBtn'),-1);
+bindHold($('surfaceBtn'),'rudder',1); bindHold($('diveBtn'),'rudder',-1);
+bindHold($('floodBtn'),'ballast',1); bindHold($('drainBtn'),'ballast',-1);
 $('fireBtn').addEventListener('pointerdown',e=>{ e.preventDefault(); tryFire(); });
 $('lockBtn').addEventListener('pointerdown',e=>{ e.preventDefault(); acquireTarget(true); });
 $('touchControls').addEventListener('contextmenu',e=>e.preventDefault());
@@ -684,7 +707,8 @@ function startGame(){
   for(const t of torps){ scene.remove(t.mesh); } torps.length=0;
   for(const b of booms){ b.parts.forEach(p=>scene.remove(p.m)); scene.remove(b.light); if(b.ring)scene.remove(b.ring); } booms.length=0;
   for(const b of bubbles){ b.on=false; b.mesh.visible=false; }
-  player.x=5; player.y=9; player.z=0.8; player.psi=0; player.u=0;
+  player.x=5; player.y=9; player.z=0.8; player.psi=0; player.theta=0; player.u=0; player.w=0;
+  player.yawRate=0; player.left=player.right=player.delta=0; player.ballast=0.5;
   player.hp=player.maxHp=6; player.alive=true; player.sinkT=0;
   wave=0; kills=0; gameT=0; enemySeq=0; waveDelay=0; autoLockT=0; lockTarget=null; lockCursor=-1;
   RUN.on=true; RUN.over=false; RUN.paused=false; clearInput();
@@ -751,6 +775,11 @@ function drawHUD(){
   $('zv').textContent=player.z.toFixed(1)+' m';
   $('ubar').style.width=(Math.abs(player.u)/U_MAX*100)+'%';
   $('uv').textContent=player.u.toFixed(1);
+  const pitchDeg=player.theta*180/Math.PI;
+  $('pitchbar').style.width=(50+pitchDeg/48*100)+'%';
+  $('pitchv').textContent=(pitchDeg>0.4?'↑':pitchDeg<-0.4?'↓':'')+Math.abs(pitchDeg).toFixed(0)+'°';
+  $('ballastbar').style.width=(player.ballast*100)+'%';
+  $('ballastv').textContent=Math.round(player.ballast*100)+'%';
   $('t0').className='tube'+(tubes[0]<=0?' ok':'');
   $('t1').className='tube'+(tubes[1]<=0?' ok':'');
   const nextTube=Math.min(tubes[0],tubes[1]);
@@ -772,7 +801,8 @@ function updateCombatHud(){
   const active=RUN.on&&!RUN.over&&player.alive;
   const ret=$('reticle'), box=$('targetBox'), lead=$('leadDot');
   if(active){
-    const ahead={x:player.x+Math.cos(player.psi)*4,y:player.y+Math.sin(player.psi)*4,z:player.z};
+    const flat=Math.cos(player.theta), ahead={x:player.x+Math.cos(player.psi)*flat*4,
+      y:player.y+Math.sin(player.psi)*flat*4,z:player.z-Math.sin(player.theta)*4};
     placeHudPoint(ret,ahead);
   } else ret.style.opacity=0;
   if(active&&lockTarget&&lockTarget.alive){
@@ -806,13 +836,28 @@ function loop(now){
     if(player.alive){
       const thr=clamp((KEY.KeyW||KEY.ArrowUp?1:0)+(KEY.KeyS||KEY.ArrowDown?-1:0)+TOUCH.throttle,-1,1);
       const trn=clamp((KEY.KeyA||KEY.ArrowLeft?-1:0)+(KEY.KeyD||KEY.ArrowRight?1:0)+TOUCH.turn,-1,1);
-      const dz =clamp((KEY.KeyQ?1:0)+(KEY.KeyE?-1:0)+TOUCH.depth,-1,1);
-      // 油门（学水池演示手感）：W 渐进推杆；松开滑行减速；S 在前进时先急制动，停稳后才倒车
-      if(thr>0)           player.u += (U_MAX-player.u)*dt*1.6;
-      else if(thr<0)      player.u += ((player.u>0.08? 0:U_REV)-player.u)*dt*(player.u>0.08?4.5:1.6);
-      else                player.u += (0-player.u)*dt*1.1;
-      player.psi += trn*YAW_MAX*(0.45+0.55*Math.min(1,Math.abs(player.u)/0.5))*dt;
-      player.z = clamp(player.z+dz*0.45*dt, Z_MIN, Z_MAX);
+      const rud=clamp((KEY.KeyR?1:0)+(KEY.KeyF?-1:0)+TOUCH.rudder,-1,1);
+      const bal=clamp((KEY.KeyQ?1:0)+(KEY.KeyE?-1:0)+TOUCH.ballast,-1,1);
+      // 与 /dc 交互仿真一致：虚拟摇杆按住渐进、松开回中；Q/E 改变并保持注水配平
+      CONTROL.surge=ramp(CONTROL.surge,thr,thr?2.2:3.0,dt);
+      CONTROL.turn=ramp(CONTROL.turn,trn,trn?2.8:4.0,dt);
+      CONTROL.rudder=ramp(CONTROL.rudder,rud,rud?1.6:2.4,dt);
+      player.ballast=clamp(player.ballast+bal*0.8*dt,0,1);
+      let nL=CONTROL.surge+0.55*CONTROL.turn, nR=CONTROL.surge-0.55*CONTROL.turn;
+      const mix=Math.max(1,Math.abs(nL),Math.abs(nR)); nL=nL/mix*0.85; nR=nR/mix*0.85;
+      player.left+=(nL-player.left)*Math.min(1,dt/0.15); player.right+=(nR-player.right)*Math.min(1,dt/0.15);
+      const surgeCmd=(player.left+player.right)*0.5;
+      const uTarget=surgeCmd>=0?surgeCmd*(U_MAX/0.85):surgeCmd*(Math.abs(U_REV)/0.85);
+      player.u+=(uTarget-player.u)*dt*(Math.abs(surgeCmd)>0.02?1.7:1.05);
+      const yawTarget=(player.left-player.right)/1.1*YAW_MAX*(0.55+0.45*clamp(Math.abs(player.u)/U_MAX,0,1));
+      player.yawRate+=(yawTarget-player.yawRate)*dt*3.2; player.psi+=player.yawRate*dt;
+      player.delta=CONTROL.rudder*Math.PI/2;
+      const pitchAuthority=clamp(Math.abs(player.u)/0.35,0,1), pitchTarget=CONTROL.rudder*PITCH_MAX*pitchAuthority;
+      player.theta+=(pitchTarget-player.theta)*dt*(rud?1.55:1.9);
+      const wTarget=(player.ballast-0.5)*0.9;
+      player.w+=(wTarget-player.w)*dt*1.25;
+      player.z=clamp(player.z+(-Math.sin(player.theta)*player.u+player.w)*dt,Z_MIN,Z_MAX);
+      if(player.z===Z_MIN||player.z===Z_MAX) player.w*=0.35;
       subPose(player,dt);
       if(Math.abs(player.u)>0.5 && Math.random()<dt*6) spawnBubble(player.x-Math.cos(player.psi)*0.3, player.y-Math.sin(player.psi)*0.3, player.z);
     } else { player.sinkT+=dt; player.z=Math.min(LAKE.dep-0.12,player.z+0.3*dt); }
@@ -829,15 +874,19 @@ function loop(now){
     // 鱼雷
     for(let i=torps.length-1;i>=0;i--){ const tp=torps[i];
       if(tp.target&&tp.target.alive){
-        const desired=Math.atan2(tp.target.y-tp.y,tp.target.x-tp.x), maxTurn=tp.turnRate*dt;
+        const dx=tp.target.x-tp.x,dy=tp.target.y-tp.y,horiz=Math.hypot(dx,dy);
+        const desired=Math.atan2(dy,dx), maxTurn=tp.turnRate*dt;
         tp.psi+=clamp(wrap(desired-tp.psi),-maxTurn,maxTurn);
-        tp.z+=clamp(tp.target.z-tp.z,-0.42*dt,0.42*dt);
+        const desiredTheta=Math.atan2(tp.z-tp.target.z,Math.max(0.01,horiz)), maxPitch=tp.pitchRate*dt;
+        tp.theta+=clamp(desiredTheta-tp.theta,-maxPitch,maxPitch);
       }
-      tp.x+=Math.cos(tp.psi)*tp.v*dt; tp.y+=Math.sin(tp.psi)*tp.v*dt; tp.life-=dt;
+      const flat=Math.cos(tp.theta);
+      tp.x+=Math.cos(tp.psi)*flat*tp.v*dt; tp.y+=Math.sin(tp.psi)*flat*tp.v*dt;
+      tp.z-=Math.sin(tp.theta)*tp.v*dt; tp.life-=dt;
       tp.trailAcc+=dt; if(tp.trailAcc>0.05){ tp.trailAcc=0; spawnBubble(tp.x,tp.y,tp.z); }
       tp.mesh.position.copy(N2T(tp.x,tp.y,tp.z));
-      tp.mesh.rotation.set(0,tp.psi,0);
-      let dead=tp.life<=0 || tp.x<0.3||tp.x>LAKE.len-0.3||tp.y<0.3||tp.y>LAKE.wid-0.3;
+      tp.mesh.rotation.set(0,0,0); tp.mesh.rotateY(tp.psi); tp.mesh.rotateX(-tp.theta);
+      let dead=tp.life<=0 || tp.x<0.3||tp.x>LAKE.len-0.3||tp.y<0.3||tp.y>LAKE.wid-0.3||tp.z<0.06||tp.z>LAKE.dep-0.06;
       if(!dead) for(const o of OBST){ if(Math.hypot(tp.x-o.x,tp.y-o.y)<o.r+0.08){ dead=true; explode(tp.x,tp.y,tp.z,false); break; } }
       if(!dead){
         const targets=tp.hostile?[player]:enemies;
@@ -875,7 +924,7 @@ function loop(now){
   const underwater=clamp(-camera.position.y/1.6,0,1);
   scene.background.lerpColors(SKY_SHALLOW,SKY_DEEP,underwater);
   scene.fog.color.lerpColors(FOG_SHALLOW,FOG_DEEP,underwater);
-  scene.fog.density=0.011+underwater*0.025;
+  scene.fog.density=0.014+underwater*0.032;
   particles.rotation.y+=dt*0.002;
 
   drawSonar(RUN.paused?0:dt); drawHUD(); updateCombatHud();
@@ -884,7 +933,7 @@ function loop(now){
 requestAnimationFrame(loop);
 
 if(TEST){ startGame(); }
-window.__sub={ player, enemies, torps, fireTorp, startGame, damage, togglePause, acquireTarget, TOUCH, LAKE,
+window.__sub={ player, enemies, torps, fireTorp, startGame, damage, togglePause, acquireTarget, TOUCH, CONTROL, LAKE,
   get target(){return lockTarget;}, get mobile(){return MOBILE;}, get wave(){return wave;}, get kills(){return kills;}, RUN };
 </script>
 </body>
