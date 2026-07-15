@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>手写笔记</title>
 <script>
   // 跟随站点主题（与 xiangqi/gomoku 等自包含页同一套习惯）
@@ -21,10 +21,14 @@
   html,body{margin:0;height:100%}
   [hidden]{display:none!important}
   body{
-    background:var(--bg); color:var(--fg); height:100vh; overflow:hidden;
+    background:var(--bg); color:var(--fg); height:100vh; height:100dvh; overflow:hidden;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
     -webkit-font-smoothing:antialiased;
   }
+  #page-view,#page-surface-wrap,#pages-col,.page-slot,.page-surface,.page-surface canvas{
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+  }
+  input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
   button{font:inherit}
   .icon-btn{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;border:1px solid transparent;background:transparent;color:var(--fg);cursor:pointer;flex:0 0 auto}
   .icon-btn:hover{background:var(--chip)}
@@ -63,6 +67,9 @@
   #toolbar .sep{width:1px;align-self:stretch;background:var(--line);margin:4px 6px}
   #book-title{font-weight:700;font-size:14.5px;margin-right:4px;max-width:20vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .tool-group{display:flex;gap:2px}
+  #btn-input-mode{width:auto;min-width:84px;padding:0 10px;gap:6px;border-color:var(--line);font-size:12px;font-weight:700}
+  #btn-input-mode .input-mode-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);box-shadow:0 0 0 3px color-mix(in srgb,var(--muted) 14%,transparent)}
+  #btn-input-mode.on .input-mode-dot{background:#29a35a;box-shadow:0 0 0 3px rgba(41,163,90,.16)}
   #pager{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin:0 4px}
   #pager button{background:none;border:none;color:var(--fg);font-size:19px;cursor:pointer;padding:2px 4px;border-radius:6px}
   #pager button:hover{background:var(--chip)}
@@ -92,16 +99,18 @@
   .menu-opt .ic{color:var(--muted)}
   .menu-opt.on .ic{color:var(--accent)}
 
-  #page-surface-wrap{flex:1 1 auto;overflow-y:auto;overflow-x:auto;padding:16px}
+  #page-surface-wrap{flex:1 1 auto;overflow-y:auto;overflow-x:auto;padding:16px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   #pages-col{display:flex;flex-direction:column;align-items:center;gap:22px;width:max-content;min-width:100%}
   .page-slot{position:relative;aspect-ratio:1240/1754;box-shadow:0 4px 22px var(--shadow);border-radius:6px;overflow:hidden;background:#fffdf8;flex:0 0 auto}
   .page-slot .slot-preview{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
   .page-slot .slot-num{position:absolute;right:8px;bottom:6px;font-size:11px;color:#8a857c;background:rgba(255,253,248,.8);border-radius:4px;padding:0 5px;pointer-events:none}
   .page-surface{position:absolute;inset:0;background:#fffdf8}
   .page-surface canvas{position:absolute;inset:0;width:100%;height:100%}
-  /* 手指在页面上要能滚动（浏览器原生 pan），笔/鼠标由 pointer 事件接管 */
-  #ink-canvas{touch-action:manipulation;z-index:3}
-  body.tool-select #ink-canvas{pointer-events:none}
+  /* 已提交墨迹与正在书写的墨迹分层：移动时只重画 live-canvas，避免整页笔迹越写越卡。 */
+  #ink-canvas{z-index:3;pointer-events:none}
+  #live-canvas{z-index:4;touch-action:manipulation;cursor:crosshair}
+  body.pencil-mode #page-surface-wrap,body.pencil-mode #live-canvas{touch-action:none}
+  body.tool-select #live-canvas{pointer-events:none}
 
   /* items 层：逻辑坐标 1240x1754，用 transform scale 适配显示宽度 */
   #items-layer{position:absolute;left:0;top:0;width:1240px;height:1754px;transform-origin:0 0;z-index:2;pointer-events:none}
@@ -192,6 +201,21 @@
 
   .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#111;color:#fff;padding:8px 16px;border-radius:999px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60;max-width:86vw}
   .toast.show{opacity:.92}
+
+  @media (max-width:900px){
+    #toolbar{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;gap:3px;padding:8px max(8px,env(safe-area-inset-right)) 8px max(8px,env(safe-area-inset-left));scrollbar-width:none;overscroll-behavior-x:contain}
+    #toolbar::-webkit-scrollbar{display:none}
+    #toolbar .icon-btn{width:44px;height:44px;border-radius:12px}
+    #toolbar .sep{margin:5px 3px}
+    #book-title{display:none}
+    #btn-input-mode{width:auto!important;min-width:82px!important;padding:0 10px!important}
+    #page-surface-wrap{padding:12px 10px max(18px,env(safe-area-inset-bottom))}
+    #page-strip{padding-bottom:max(10px,env(safe-area-inset-bottom))}
+    .popover{top:60px;position:fixed;max-height:calc(100dvh - 80px);overflow-y:auto}
+    #zoom-ctl{flex:0 0 auto}
+    #pager{flex:0 0 auto}
+    .spacer{min-width:2px}
+  }
 </style>
 </head>
 <body>
@@ -219,6 +243,7 @@
         <button class="icon-btn" id="tool-eraser" title="橡皮"><span class="ic" data-icon="eraser" data-icon-size="18"></span></button>
         <button class="icon-btn" id="tool-select" title="选择/移动（图片与文本）"><span class="ic" data-icon="cursor" data-icon-size="18"></span></button>
       </div>
+      <button class="icon-btn" id="btn-input-mode" title="Pencil 防误触" aria-label="Pencil 防误触" aria-pressed="false"><span class="input-mode-dot"></span><span id="input-mode-label">Pencil</span></button>
       <button class="icon-btn" id="btn-style" title="颜色/粗细"><span id="cur-color"></span></button>
       <div class="sep"></div>
       <button class="icon-btn" id="btn-undo" title="撤销"><span class="ic" data-icon="undo" data-icon-size="18"></span></button>
@@ -269,6 +294,7 @@
       <canvas id="bg-canvas"></canvas>
       <div id="items-layer"></div>
       <canvas id="ink-canvas"></canvas>
+      <canvas id="live-canvas"></canvas>
     </div>
 
     <div id="page-strip" hidden></div>
@@ -310,6 +336,6 @@
 
   <script src="/assets/icons.js?v=20260712c"></script>
   <script src="/assets/md.js?v=20260712c"></script>
-  <script type="module" src="/assets/notepad.js?v=20260712c"></script>
+  <script type="module" src="/assets/notepad.js?v=20260715pencil"></script>
 </body>
 </html>

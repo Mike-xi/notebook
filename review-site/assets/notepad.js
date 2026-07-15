@@ -1,5 +1,6 @@
-// 手写笔记 v3：书架 + 分页 Canvas 笔记（仿 GoodNotes）。
-// - 压感笔迹：perfect-freehand；触控笔/鼠标画，手指滚动/手势（palm rejection）
+// 手写笔记 v4：书架 + 分页 Canvas 笔记（仿 GoodNotes）。
+// - Pencil 优先输入：pen 压感、合并事件高频采样、手掌拒绝、双指移动/缩放
+// - 活动笔迹独立 Canvas + rAF 合成，书写时不再反复重画整页历史笔迹
 // - 页面元素 items：图片（拖动/角柄或双指捏合缩放/裁切）与 Markdown 文本块
 // - 视图：竖直滚动（默认，多页纵向堆叠、滚动自动切页）/ 水平翻页 两种模式；−/+ 缩放
 // - 新增页插入到当前页之后；缩略图条可拖拽换序；双指轻点=撤销、三指=重做
@@ -27,6 +28,7 @@ const PDFJS_WORKER = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.7.76/build/pdf.w
 const JSPDF_URL = 'https://esm.sh/jspdf@2.5.2';
 
 const $ = (sel) => document.querySelector(sel);
+const clamp = (n, min, max) => Math.min(Math.max(n, min), max);
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const icon = (name, size) => (window.NBIcon ? window.NBIcon(name, { size }) : '');
 const uid = () => 'it' + Math.random().toString(36).slice(2, 10);
@@ -59,6 +61,126 @@ const view = {
   flip: localStorage.getItem('np-flip') === 'h' ? 'h' : 'v',       // v=竖直滚动 h=水平翻页
   zoom: Math.min(Math.max(parseFloat(localStorage.getItem('np-zoom')) || 1, ZOOM_MIN), ZOOM_MAX),
 };
+
+// iPadOS 13.4+ 会把 Apple Pencil 暴露为 pointerType=pen。Pencil 模式下，单指/手掌不再交给
+// Safari 做选择或滚动，只有两个明确的指尖接触才用于移动和缩放页面。
+const savedInputMode = localStorage.getItem('np-input-mode');
+const isIPad = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+const input = {
+  hasTouch: navigator.maxTouchPoints > 0,
+  isIPad,
+  mode: savedInputMode === 'pencil' || savedInputMode === 'touch' ? savedInputMode : (isIPad ? 'pencil' : 'touch'),
+  explicitMode: savedInputMode === 'pencil' || savedInputMode === 'touch',
+  activePen: null,
+  lastPenAt: -Infinity,
+  detectedPen: false,
+};
+const navTouches = new Map();
+let touchGesture = null;
+
+function isEditableTarget(target) {
+  return !!(target?.closest && target.closest('textarea,input,[contenteditable="true"]'));
+}
+
+function updateInputModeUI() {
+  document.body.classList.toggle('pencil-mode', input.mode === 'pencil');
+  document.body.classList.toggle('touch-device', input.hasTouch);
+  const btn = $('#btn-input-mode');
+  if (!btn) return;
+  const pencil = input.mode === 'pencil';
+  btn.classList.toggle('on', pencil);
+  btn.setAttribute('aria-pressed', String(pencil));
+  btn.title = pencil
+    ? 'Pencil 防误触已开启：单指/手掌忽略，双指移动与缩放'
+    : '手指浏览：单指滚动；点此开启 Pencil 防误触';
+  btn.setAttribute('aria-label', btn.title);
+  $('#input-mode-label').textContent = pencil ? 'Pencil' : '触控';
+}
+
+function setInputMode(mode, { persist = false, announce = false } = {}) {
+  input.mode = mode === 'pencil' ? 'pencil' : 'touch';
+  if (persist) {
+    input.explicitMode = true;
+    localStorage.setItem('np-input-mode', input.mode);
+  }
+  finishTouchNavigation($('#page-surface-wrap'), true);
+  updateInputModeUI();
+  if (announce) toast(input.mode === 'pencil'
+    ? 'Pencil 防误触已开启 · 单指/手掌忽略，双指移动缩放'
+    : '手指浏览已开启 · 单指可滚动页面', 2800);
+}
+
+function isPalmContact(e) {
+  // Pointer Events 的 width/height 是接触椭圆的 CSS 像素尺寸；Safari 能提供时可先排除大面积手掌。
+  return Math.max(Number(e.width) || 0, Number(e.height) || 0) >= 38;
+}
+
+function touchPair() {
+  return [...navTouches.values()].filter((p) => !p.blocked).slice(0, 2);
+}
+
+function beginTouchNavigation(wrap) {
+  const pts = touchPair();
+  if (pts.length < 2) return;
+  const rect = wrap.getBoundingClientRect();
+  const cx = (pts[0].x + pts[1].x) / 2 - rect.left;
+  const cy = (pts[0].y + pts[1].y) / 2 - rect.top;
+  touchGesture = {
+    startDistance: Math.max(24, Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y)),
+    startZoom: view.zoom,
+    startScrollLeft: wrap.scrollLeft,
+    startScrollTop: wrap.scrollTop,
+    startCenterX: cx,
+    startCenterY: cy,
+    zoomDirty: false,
+  };
+}
+
+function updateTouchNavigation(wrap) {
+  const pts = touchPair();
+  if (pts.length < 2) return;
+  if (!touchGesture) beginTouchNavigation(wrap);
+  if (!touchGesture) return;
+  const rect = wrap.getBoundingClientRect();
+  const cx = (pts[0].x + pts[1].x) / 2 - rect.left;
+  const cy = (pts[0].y + pts[1].y) / 2 - rect.top;
+  const distance = Math.max(24, Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y));
+  const zoom = clamp(Math.round(touchGesture.startZoom * distance / touchGesture.startDistance * 100) / 100, ZOOM_MIN, ZOOM_MAX);
+  const ratio = zoom / touchGesture.startZoom;
+  if (Math.abs(zoom - view.zoom) >= 0.01) {
+    view.zoom = zoom;
+    $('#zoom-label').textContent = Math.round(view.zoom * 100) + '%';
+    applyWidths();
+    touchGesture.zoomDirty = true;
+  }
+  wrap.scrollLeft = (touchGesture.startScrollLeft + touchGesture.startCenterX) * ratio - cx;
+  wrap.scrollTop = (touchGesture.startScrollTop + touchGesture.startCenterY) * ratio - cy;
+}
+
+function finishTouchNavigation(wrap, cancel = false) {
+  if (touchGesture?.zoomDirty) {
+    if (!cancel) localStorage.setItem('np-zoom', String(view.zoom));
+    reinitCanvases();
+  }
+  navTouches.clear();
+  touchGesture = null;
+}
+
+function penStarted(e) {
+  if (e.pointerType !== 'pen') return;
+  input.detectedPen = true;
+  input.activePen = e.pointerId;
+  input.lastPenAt = performance.now();
+  finishTouchNavigation($('#page-surface-wrap'), true);
+  if (!input.explicitMode && input.mode !== 'pencil') setInputMode('pencil');
+  updateInputModeUI();
+}
+
+function penFinished(e) {
+  if (e.pointerType !== 'pen' || input.activePen !== e.pointerId) return;
+  input.activePen = null;
+  input.lastPenAt = performance.now();
+}
 
 async function api(path, opts) {
   const r = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts));
@@ -356,13 +478,15 @@ function zoomTo(z) {
 
 // 画布物理分辨率随缩放提高，放大后笔迹依然锐利
 function canvasFactor() {
-  return Math.min((window.devicePixelRatio || 1) * Math.max(1, view.zoom), 3);
+  // 旧实现放大到 3× 时单张 A4 Canvas 会占用约 78MB；iPad 上三层画布很容易触发内存回收和掉帧。
+  return Math.min((window.devicePixelRatio || 1) * Math.max(1, Math.min(view.zoom, 1.25)), 2);
 }
 function reinitCanvases() {
   const f = canvasFactor();
   bgCtx = setupCanvas($('#bg-canvas'), f);
   inkCtx = setupCanvas($('#ink-canvas'), f);
-  if (state.currentPageId) { drawPaperTo(bgCtx, state.paper); redrawInk(); }
+  liveCtx = setupCanvas($('#live-canvas'), Math.min(f, 1.5));
+  if (state.currentPageId) { drawPaperTo(bgCtx, state.paper); redrawInk(); redrawLive(); }
 }
 
 // 激活某页为「编辑中」页面。scroll=false 用于滚动驱动的激活（避免抢滚动）。
@@ -439,6 +563,10 @@ async function openBook(book) {
   renderSlots();
   await activatePage(target, { scroll: true, force: true });
   renderPageStrip();
+  if (input.hasTouch && input.mode === 'pencil' && !sessionStorage.getItem('np-pencil-hint')) {
+    sessionStorage.setItem('np-pencil-hint', '1');
+    toast('Pencil 防误触已开启 · 单指/手掌忽略，双指移动缩放', 3200);
+  }
 }
 
 async function backToShelf() {
@@ -610,7 +738,7 @@ function openAddPageModal() {
 
 /* ------------------------------ 画布 ------------------------------ */
 
-let bgCtx, inkCtx;
+let bgCtx, inkCtx, liveCtx;
 function setupCanvas(cv, factor) {
   const f = factor || (window.devicePixelRatio || 1);
   cv.width = Math.round(PAGE_W * f);
@@ -621,8 +749,14 @@ function setupCanvas(cv, factor) {
 }
 
 function strokeOptions(s) {
-  if (s.tool === 'highlighter') return { size: s.size * 2.4, thinning: 0.12, smoothing: 0.5, streamline: 0.5, simulatePressure: s.simulated };
-  return { size: s.size, thinning: 0.65, smoothing: 0.5, streamline: 0.5, simulatePressure: s.simulated };
+  if (s.tool === 'highlighter') return {
+    size: s.size * 2.6, thinning: 0, smoothing: 0.72, streamline: 0.28, simulatePressure: false,
+    start: { cap: true }, end: { cap: true },
+  };
+  return {
+    size: s.size, thinning: 0.56, smoothing: 0.68, streamline: 0.32, simulatePressure: s.simulated,
+    start: { cap: true }, end: { cap: true },
+  };
 }
 
 function paintStroke(ctx, s, scale = 1) {
@@ -642,24 +776,47 @@ function paintStroke(ctx, s, scale = 1) {
 function redrawInk() {
   inkCtx.clearRect(0, 0, PAGE_W, PAGE_H);
   for (const s of state.strokes) paintStroke(inkCtx, s);
-  if (state.liveStroke) paintStroke(inkCtx, state.liveStroke);
+}
+
+function redrawLive() {
+  if (!liveCtx) return;
+  liveCtx.clearRect(0, 0, PAGE_W, PAGE_H);
+  if (state.liveStroke) paintStroke(liveCtx, state.liveStroke);
 }
 
 function toLocal(e) {
-  const rect = $('#ink-canvas').getBoundingClientRect();
+  const rect = $('#live-canvas').getBoundingClientRect();
   const x = (e.clientX - rect.left) * (PAGE_W / rect.width);
   const y = (e.clientY - rect.top) * (PAGE_H / rect.height);
-  const pressure = e.pressure > 0 ? e.pressure : 0.5;
+  const rawPressure = e.pressure > 0 ? e.pressure : (e.pointerType === 'pen' ? 0.14 : 0.5);
+  const pressure = clamp(Math.pow(rawPressure, 0.86), 0.05, 1);
   return { x, y, pressure };
 }
 
+function pointSegmentDistanceSquared(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  if (dx === 0 && dy === 0) return (px - ax) ** 2 + (py - ay) ** 2;
+  const t = clamp(((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy), 0, 1);
+  return (px - (ax + t * dx)) ** 2 + (py - (ay + t * dy)) ** 2;
+}
+
+function strokeHit(s, pt) {
+  const radius = ERASE_R + Math.max(2, Number(s.size) || 0) * (s.tool === 'highlighter' ? 1.2 : 0.45);
+  if (s.pts.length === 1) return (s.pts[0][0] - pt.x) ** 2 + (s.pts[0][1] - pt.y) ** 2 <= radius * radius;
+  for (let i = 1; i < s.pts.length; i++) {
+    if (pointSegmentDistanceSquared(pt.x, pt.y, s.pts[i - 1][0], s.pts[i - 1][1], s.pts[i][0], s.pts[i][1]) <= radius * radius) return true;
+  }
+  return false;
+}
+
+let eraseBatch = null;
 function eraseAt(pt) {
   let hit = false;
   for (let i = state.strokes.length - 1; i >= 0; i--) {
     const s = state.strokes[i];
-    if (s.pts.some((p) => (p[0] - pt.x) ** 2 + (p[1] - pt.y) ** 2 < ERASE_R * ERASE_R)) {
+    if (strokeHit(s, pt)) {
       state.strokes.splice(i, 1);
-      pushOp({ type: 'erase', stroke: s, index: i });
+      if (eraseBatch) eraseBatch.push({ stroke: s, index: i });
       hit = true;
     }
   }
@@ -667,33 +824,68 @@ function eraseAt(pt) {
 }
 
 let activePointerId = null;
+let liveFrame = 0;
+function scheduleLiveRedraw() {
+  if (liveFrame) return;
+  liveFrame = requestAnimationFrame(() => { liveFrame = 0; redrawLive(); });
+}
+
+function appendPointerSamples(e) {
+  if (!state.liveStroke) return;
+  let samples = [e];
+  try {
+    const coalesced = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : null;
+    if (coalesced?.length) samples = [...coalesced, e];
+  } catch {}
+  for (const sample of samples) {
+    const pt = toLocal(sample);
+    const last = state.liveStroke.pts[state.liveStroke.pts.length - 1];
+    if (last && (last[0] - pt.x) ** 2 + (last[1] - pt.y) ** 2 < 0.025 && Math.abs(last[2] - pt.pressure) < 0.002) continue;
+    state.liveStroke.pts.push([pt.x, pt.y, pt.pressure]);
+  }
+}
+
 function onDown(e) {
   if (e.pointerType === 'touch') return; // 手指仅滚动/手势，不画（palm rejection）
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
   e.preventDefault();
-  const ink = $('#ink-canvas');
+  penStarted(e);
+  const ink = $('#live-canvas');
   try { ink.setPointerCapture(e.pointerId); } catch {} // 合成指针可能拒绝捕获，不影响绘制
   activePointerId = e.pointerId;
   const pt = toLocal(e);
-  if (state.tool === 'eraser') { state.erasing = true; eraseAt(pt); return; }
+  if (state.tool === 'eraser') { state.erasing = true; eraseBatch = []; eraseAt(pt); return; }
   state.liveStroke = { tool: state.tool, color: state.color, size: state.size, simulated: e.pointerType === 'mouse', pts: [[pt.x, pt.y, pt.pressure]] };
+  redrawLive();
 }
 function onMove(e) {
   if (e.pointerId !== activePointerId) return;
-  const pt = toLocal(e);
-  if (state.tool === 'eraser') { if (state.erasing) eraseAt(pt); return; }
+  if (e.pointerType === 'pen') input.lastPenAt = performance.now();
+  if (state.tool === 'eraser') {
+    if (state.erasing) {
+      const samples = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [];
+      (samples?.length ? samples : [e]).forEach((sample) => eraseAt(toLocal(sample)));
+    }
+    return;
+  }
   if (!state.liveStroke) return;
-  state.liveStroke.pts.push([pt.x, pt.y, pt.pressure]);
-  redrawInk();
+  appendPointerSamples(e);
+  scheduleLiveRedraw();
 }
 function onUp(e) {
   if (e.pointerId !== activePointerId) return;
   activePointerId = null;
+  penFinished(e);
   state.erasing = false;
+  if (eraseBatch?.length) pushOp({ type: 'erase-batch', strokes: eraseBatch });
+  eraseBatch = null;
   if (state.liveStroke && state.liveStroke.pts.length >= 1) {
     state.strokes.push(state.liveStroke);
     pushOp({ type: 'add', stroke: state.liveStroke });
   }
   state.liveStroke = null;
+  if (liveFrame) { cancelAnimationFrame(liveFrame); liveFrame = 0; }
+  redrawLive();
   redrawInk();
 }
 
@@ -715,6 +907,14 @@ function applyOp(op, dir) {
   } else if (op.type === 'erase') {
     if (dir === 'undo') state.strokes.splice(Math.min(op.index, state.strokes.length), 0, op.stroke);
     else { const i = state.strokes.indexOf(op.stroke); if (i >= 0) state.strokes.splice(i, 1); }
+    redrawInk();
+  } else if (op.type === 'erase-batch') {
+    if (dir === 'undo') {
+      [...op.strokes].sort((a, b) => a.index - b.index)
+        .forEach(({ stroke, index }) => state.strokes.splice(Math.min(index, state.strokes.length), 0, stroke));
+    } else {
+      op.strokes.forEach(({ stroke }) => { const i = state.strokes.indexOf(stroke); if (i >= 0) state.strokes.splice(i, 1); });
+    }
     redrawInk();
   } else if (op.type === 'item-add') {
     if (dir === 'undo') { const i = state.items.indexOf(op.item); if (i >= 0) state.items.splice(i, 1); }
@@ -1430,6 +1630,7 @@ function bindToolbar() {
   $('#tool-highlighter').addEventListener('click', () => setTool('highlighter'));
   $('#tool-eraser').addEventListener('click', () => setTool('eraser'));
   $('#tool-select').addEventListener('click', () => setTool('select'));
+  $('#btn-input-mode').addEventListener('click', () => setInputMode(input.mode === 'pencil' ? 'touch' : 'pencil', { persist: true, announce: true }));
   $('#btn-style').addEventListener('click', (e) => { e.stopPropagation(); togglePopover('#pop-style', '#btn-style', renderStylePopover); });
   $('#btn-insert').addEventListener('click', (e) => { e.stopPropagation(); togglePopover('#pop-insert', '#btn-insert', renderInsertMenu); });
   $('#btn-paper').addEventListener('click', (e) => { e.stopPropagation(); togglePopover('#pop-paper', '#btn-paper', renderPaperPopover); });
@@ -1453,22 +1654,55 @@ function bindToolbar() {
   $('#zoom-out').addEventListener('click', () => zoomTo(view.zoom - ZOOM_STEP));
   $('#zoom-label').addEventListener('click', () => zoomTo(1));
 
-  const ink = $('#ink-canvas');
+  const ink = $('#live-canvas');
   ink.addEventListener('pointerdown', onDown);
   ink.addEventListener('pointermove', onMove);
   ink.addEventListener('pointerup', onUp);
   ink.addEventListener('pointercancel', onUp);
+  ink.addEventListener('lostpointercapture', onUp);
 
   // 双指轻点=撤销 / 三指轻点=重做（GoodNotes 手势；滚动会产生位移自动不触发）
   const det = createMultiTapDetector({ onTwoFingerTap: doUndo, onThreeFingerTap: doRedo });
   const wrap = $('#page-surface-wrap');
   wrap.addEventListener('pointerdown', (e) => {
-    if (e.pointerType !== 'touch' || e.target.closest('.np-item')) return;
+    if (e.pointerType !== 'touch' || e.target.closest('.np-item') || isEditableTarget(e.target)) return;
     det.down(e.pointerId, e.clientX, e.clientY, performance.now());
+    if (input.mode !== 'pencil') return;
+    e.preventDefault();
+    const blocked = isPalmContact(e) || input.activePen !== null || performance.now() - input.lastPenAt < 180;
+    navTouches.set(e.pointerId, { x: e.clientX, y: e.clientY, blocked });
+    try { wrap.setPointerCapture(e.pointerId); } catch {}
+    if (touchPair().length === 2) beginTouchNavigation(wrap);
   });
-  wrap.addEventListener('pointermove', (e) => { if (e.pointerType === 'touch') det.move(e.pointerId, e.clientX, e.clientY, performance.now()); });
-  wrap.addEventListener('pointerup', (e) => { if (e.pointerType === 'touch') det.up(e.pointerId, performance.now()); });
-  wrap.addEventListener('pointercancel', () => det.cancel());
+  wrap.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'touch') return;
+    det.move(e.pointerId, e.clientX, e.clientY, performance.now());
+    if (input.mode !== 'pencil' || isEditableTarget(e.target)) return;
+    e.preventDefault();
+    const pt = navTouches.get(e.pointerId);
+    if (!pt) return;
+    pt.x = e.clientX; pt.y = e.clientY;
+    if (!pt.blocked && touchPair().length >= 2) updateTouchNavigation(wrap);
+  });
+  wrap.addEventListener('pointerup', (e) => {
+    if (e.pointerType !== 'touch') return;
+    det.up(e.pointerId, performance.now());
+    if (input.mode !== 'pencil') return;
+    e.preventDefault();
+    navTouches.delete(e.pointerId);
+    if (touchGesture && touchPair().length < 2) finishTouchNavigation(wrap);
+  });
+  wrap.addEventListener('pointercancel', (e) => {
+    if (e.pointerType !== 'touch') return;
+    det.cancel();
+    if (input.mode === 'pencil') finishTouchNavigation(wrap, true);
+  });
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach((type) => wrap.addEventListener(type, (e) => {
+    if (input.mode === 'pencil') e.preventDefault();
+  }, { passive: false }));
+  ['selectstart', 'contextmenu', 'dragstart'].forEach((type) => wrap.addEventListener(type, (e) => {
+    if (!isEditableTarget(e.target)) e.preventDefault();
+  }));
   wrap.addEventListener('scroll', onWrapScroll, { passive: true });
 
   // items 层交互（事件委托到 layer；点按钮走 click）
@@ -1551,8 +1785,10 @@ function bindToolbar() {
 async function init() {
   bgCtx = setupCanvas($('#bg-canvas'), canvasFactor());
   inkCtx = setupCanvas($('#ink-canvas'), canvasFactor());
+  liveCtx = setupCanvas($('#live-canvas'), Math.min(canvasFactor(), 1.5));
   $('#cur-color').style.background = state.color;
   $('#zoom-label').textContent = Math.round(view.zoom * 100) + '%';
+  updateInputModeUI();
   setTool('pen');
   bindToolbar();
   if (localStorage.getItem('np-strip') === '1') toggleStrip(true);
@@ -1562,8 +1798,8 @@ async function init() {
 init();
 
 window.__notepad = {
-  state, view, doUndo, doRedo, flushSave, openBook, openPage, addPage, movePage, duplicatePage,
+  state, view, input, doUndo, doRedo, flushSave, openBook, openPage, addPage, movePage, duplicatePage,
   addTextItem, deleteItem, startCrop, commitCrop, setTool, composePage,
   enterZen, exitZen, toggleStrip, insertImageFile, importPdfFile, exportPdf,
-  zoomTo, renderSlots, activatePage, pagesChanged,
+  zoomTo, renderSlots, activatePage, pagesChanged, setInputMode,
 };
