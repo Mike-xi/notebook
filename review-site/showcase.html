@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>XI · 深海航志 — 船海 × 代码</title>
+<meta name="description" content="一个船舶与海洋工程本科生的作品集：把数字水池、声纳与麻将桌搬进浏览器。">
+<link rel="icon" href="/assets/favicon-xi.png">
+<style>
+:root{
+  --bg0:#020609; --bg1:#04101d; --bg2:#061a2e;
+  --ink:#e9f5fb; --dim:#8aa3b4; --faint:#51707f;
+  --cy:#41e0ff; --cy2:#7cf7d4; --amber:#ffb454;
+  --line:rgba(120,200,235,.14);
+  --serif:"Noto Serif SC","Songti SC",SimSun,Georgia,serif;
+  --sans:"PingFang SC","Microsoft YaHei",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+html,body{overscroll-behavior-y:none}
+body{
+  background:var(--bg0); color:var(--ink); font-family:var(--sans);
+  -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  line-height:1.6;
+}
+::selection{background:rgba(65,224,255,.28)}
+a{color:inherit;text-decoration:none}
+img{max-width:100%;display:block}
+
+/* ---------- film grain ---------- */
+#grain{position:fixed;inset:-50%;width:200%;height:200%;pointer-events:none;z-index:60;opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation:grain 8s steps(10) infinite}
+@keyframes grain{0%,100%{transform:translate(0,0)}10%{transform:translate(-2%,1%)}30%{transform:translate(1%,-2%)}50%{transform:translate(-1%,2%)}70%{transform:translate(2%,1%)}90%{transform:translate(-2%,-1%)}}
+
+/* ---------- plankton canvas ---------- */
+#plankton{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+
+/* ---------- loader ---------- */
+#loader{position:fixed;inset:0;z-index:100;background:var(--bg0);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:26px;transition:opacity .7s ease,visibility .7s}
+#loader.off{opacity:0;visibility:hidden}
+.ping{width:92px;height:92px;position:relative}
+.ping i{position:absolute;inset:0;border:1.5px solid var(--cy);border-radius:50%;opacity:0;animation:ping 1.8s cubic-bezier(.2,.6,.35,1) infinite}
+.ping i:nth-child(2){animation-delay:.6s}.ping i:nth-child(3){animation-delay:1.2s}
+.ping b{position:absolute;left:50%;top:50%;width:7px;height:7px;margin:-3.5px;background:var(--cy);border-radius:50%;box-shadow:0 0 18px var(--cy)}
+@keyframes ping{0%{transform:scale(.12);opacity:.9}80%{opacity:.08}100%{transform:scale(1.15);opacity:0}}
+#loader p{letter-spacing:.55em;text-indent:.55em;font-size:12px;color:var(--dim);text-transform:uppercase}
+
+/* ---------- depth gauge ---------- */
+#gauge{position:fixed;right:22px;top:50%;transform:translateY(-50%);z-index:50;display:flex;align-items:center;gap:10px;pointer-events:none}
+#gauge .rail{width:1px;height:210px;background:linear-gradient(var(--line),rgba(120,200,235,.4),var(--line));position:relative}
+#gauge .rail::before,#gauge .rail::after{content:"";position:absolute;left:-3px;width:7px;height:1px;background:rgba(120,200,235,.4)}
+#gauge .rail::before{top:0}#gauge .rail::after{bottom:0}
+#gauge .dot{position:absolute;left:-2.5px;top:0;width:6px;height:6px;border-radius:50%;background:var(--cy);box-shadow:0 0 12px var(--cy)}
+#gauge .read{font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums;letter-spacing:.12em;writing-mode:vertical-rl;text-orientation:mixed}
+@media(max-width:900px){#gauge{display:none}}
+
+/* ---------- topbar ---------- */
+header{position:fixed;top:0;left:0;right:0;z-index:70;display:flex;align-items:center;justify-content:space-between;
+  padding:18px clamp(20px,4.5vw,64px);
+  background:linear-gradient(rgba(2,6,9,.72),transparent);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.logo{font-family:var(--serif);font-weight:700;font-size:21px;letter-spacing:.08em}
+.logo em{color:var(--cy);font-style:normal}
+nav{display:flex;gap:30px;font-size:13px;color:var(--dim);letter-spacing:.14em}
+nav a{transition:color .25s}nav a:hover{color:var(--cy)}
+@media(max-width:760px){nav{display:none}}
+.back-home{font-size:12px;color:var(--dim);border:1px solid var(--line);padding:8px 16px;border-radius:99px;letter-spacing:.1em;transition:.25s}
+.back-home:hover{color:var(--cy);border-color:rgba(65,224,255,.5)}
+
+/* ---------- generic section shell ---------- */
+section{position:relative;z-index:2}
+.shell{max-width:1280px;margin:0 auto;padding:0 clamp(20px,4.5vw,64px)}
+.eyebrow{display:flex;align-items:center;gap:14px;font-size:12px;letter-spacing:.42em;text-transform:uppercase;color:var(--cy);margin-bottom:26px}
+.eyebrow::before{content:"";width:44px;height:1px;background:var(--cy);opacity:.6}
+.sec-title{font-family:var(--serif);font-weight:700;font-size:clamp(34px,5vw,64px);line-height:1.18;letter-spacing:.01em}
+.sec-title .thin{color:var(--dim);font-weight:400}
+
+/* ---------- HERO ---------- */
+#hero{min-height:100svh;display:flex;flex-direction:column;justify-content:center;overflow:hidden;
+  background:
+   radial-gradient(120% 90% at 50% -30%,rgba(64,160,220,.20),transparent 55%),
+   linear-gradient(#07203a 0%,#04121f 46%,var(--bg0) 100%)}
+#hero .shell{position:relative;padding-top:120px;padding-bottom:150px;width:100%}
+.giant{position:absolute;right:-1.5vw;top:6svh;font-family:var(--serif);font-weight:900;font-size:clamp(160px,30vw,430px);line-height:.8;
+  color:transparent;-webkit-text-stroke:1px rgba(110,200,240,.13);user-select:none;pointer-events:none;letter-spacing:-.02em}
+.hero-kicker{font-size:12px;letter-spacing:.5em;text-transform:uppercase;color:var(--cy);margin-bottom:34px;display:flex;align-items:center;gap:16px}
+.hero-kicker::before{content:"";width:56px;height:1px;background:var(--cy)}
+h1{font-family:var(--serif);font-weight:900;font-size:clamp(44px,7.2vw,104px);line-height:1.14;letter-spacing:.01em;max-width:12em}
+h1 em{font-style:normal;background:linear-gradient(100deg,var(--cy) 10%,var(--cy2) 55%,#bfe9ff 90%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero-sub{margin-top:34px;font-size:clamp(15px,1.4vw,18px);color:var(--dim);max-width:34em}
+.hero-sub b{color:var(--ink);font-weight:600}
+.hero-cta{margin-top:52px;display:flex;gap:18px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:15px 30px;border-radius:99px;font-size:14px;letter-spacing:.12em;transition:.3s;border:1px solid transparent}
+.btn.solid{background:var(--cy);color:#02222e;font-weight:700;box-shadow:0 0 34px rgba(65,224,255,.35)}
+.btn.solid:hover{transform:translateY(-2px);box-shadow:0 6px 44px rgba(65,224,255,.5)}
+.btn.ghost{border-color:var(--line);color:var(--dim)}
+.btn.ghost:hover{color:var(--cy);border-color:rgba(65,224,255,.5)}
+/* sub svg */
+#subwrap{position:absolute;right:clamp(0px,6vw,120px);top:16svh;width:clamp(300px,36vw,560px);opacity:.95;pointer-events:none}
+#subwrap svg{overflow:visible;width:100%}
+.bob{animation:bob 7s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0) rotate(-.6deg)}50%{transform:translateY(16px) rotate(.8deg)}}
+.sonar circle{transform-origin:center;transform-box:fill-box;animation:sonar 4.2s cubic-bezier(.2,.55,.35,1) infinite;opacity:0}
+.sonar circle:nth-child(2){animation-delay:1.4s}.sonar circle:nth-child(3){animation-delay:2.8s}
+@keyframes sonar{0%{transform:scale(.08);opacity:.75}85%{opacity:.05}100%{transform:scale(1);opacity:0}}
+.prop{transform-origin:center;transform-box:fill-box;animation:prop 1.1s linear infinite}
+@keyframes prop{to{transform:rotate(360deg)}}
+/* waves */
+.waves{position:absolute;left:0;right:0;bottom:-4px;height:210px;pointer-events:none;z-index:1}
+.wave{position:absolute;bottom:0;left:0;width:200%;height:100%;fill:rgba(24,72,110,.35);animation:drift 16s linear infinite}
+.wave.w2{fill:rgba(10,40,66,.55);animation-duration:11s;animation-direction:reverse;bottom:-26px}
+.wave.w3{fill:rgba(3,16,28,.92);animation-duration:23s;bottom:-52px}
+@keyframes drift{to{transform:translateX(-50%)}}
+/* bubbles */
+.bubbles{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.bubbles span{position:absolute;bottom:-30px;border:1px solid rgba(140,220,250,.35);border-radius:50%;animation:rise linear infinite}
+@keyframes rise{0%{transform:translateY(0) translateX(0);opacity:0}8%{opacity:.7}100%{transform:translateY(-110svh) translateX(24px);opacity:0}}
+/* scroll cue */
+.cue{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:10px;color:var(--faint);font-size:11px;letter-spacing:.4em;text-transform:uppercase;z-index:3}
+.cue i{width:1px;height:44px;background:linear-gradient(var(--cy),transparent);display:block;animation:cue 1.8s ease-in-out infinite}
+@keyframes cue{0%{transform:scaleY(0);transform-origin:top}45%{transform:scaleY(1);transform-origin:top}55%{transform:scaleY(1);transform-origin:bottom}100%{transform:scaleY(0);transform-origin:bottom}}
+@media(max-width:900px){#subwrap{position:relative;right:auto;top:auto;width:min(78vw,420px);margin:44px auto 0;opacity:.85}.giant{font-size:44vw;top:2svh}}
+
+/* ---------- marquee ---------- */
+.marquee{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:20px 0;overflow:hidden;background:rgba(6,20,34,.5);position:relative;z-index:2}
+.marquee .track{display:flex;gap:0;width:max-content;animation:mq 36s linear infinite}
+.marquee span{white-space:nowrap;font-size:14px;letter-spacing:.34em;text-transform:uppercase;color:var(--faint);padding:0 28px;display:flex;align-items:center;gap:28px}
+.marquee span::after{content:"◇";color:var(--cy);opacity:.55;font-size:10px}
+@keyframes mq{to{transform:translateX(-50%)}}
+
+/* ---------- about ---------- */
+#about{padding:clamp(110px,15vw,190px) 0 60px;background:linear-gradient(var(--bg0),var(--bg1))}
+.statement{font-family:var(--serif);font-weight:700;font-size:clamp(28px,4.3vw,56px);line-height:1.5;max-width:22em}
+.statement .ln{display:block;overflow:hidden}
+.statement .hl{color:var(--cy)}
+.statement .mut{color:var(--dim);font-weight:400}
+.about-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:clamp(30px,6vw,90px);margin-top:clamp(50px,7vw,90px);align-items:start}
+.about-p{color:var(--dim);font-size:15.5px;max-width:36em}
+.about-p+.about-p{margin-top:1.2em}
+.about-p b{color:var(--ink);font-weight:600}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line)}
+.stat{background:var(--bg1);padding:30px 26px}
+.stat .n{font-family:var(--serif);font-size:clamp(38px,4vw,54px);font-weight:900;color:var(--cy);line-height:1;font-variant-numeric:tabular-nums}
+.stat .n s{text-decoration:none;font-size:.55em;vertical-align:.34em;margin-left:2px}
+.stat .l{margin-top:10px;font-size:12.5px;color:var(--dim);letter-spacing:.1em}
+@media(max-width:900px){.about-grid{grid-template-columns:1fr}}
+
+/* ---------- flagship ---------- */
+#flagship{padding:clamp(110px,14vw,180px) 0;background:var(--bg1);position:relative;overflow:hidden}
+#flagship::before{content:"";position:absolute;inset:0;
+  background-image:linear-gradient(rgba(90,180,230,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(90,180,230,.05) 1px,transparent 1px);
+  background-size:56px 56px;mask-image:radial-gradient(75% 75% at 50% 45%,#000 30%,transparent 100%)}
+.flag-grid{display:grid;grid-template-columns:.92fr 1.08fr;gap:clamp(34px,5.5vw,80px);align-items:center;position:relative}
+.flag-copy .sec-title{margin-bottom:26px}
+.flag-copy p{color:var(--dim);font-size:15.5px;max-width:32em}
+.flag-copy p b{color:var(--ink)}
+.route{margin:34px 0 8px;width:100%;max-width:430px}
+.route .path{fill:none;stroke:rgba(120,210,245,.35);stroke-width:1.4;stroke-dasharray:7 7}
+.route .auv{offset-path:path("M8 66 C 90 8, 160 118, 236 60 S 380 30, 418 76");animation:cruise 9s linear infinite}
+.route .auv2{offset-path:path("M8 66 C 90 8, 160 118, 236 60 S 380 30, 418 76");animation:cruise 9s linear infinite;animation-delay:-1.15s;opacity:.55}
+.route .auv3{offset-path:path("M8 66 C 90 8, 160 118, 236 60 S 380 30, 418 76");animation:cruise 9s linear infinite;animation-delay:-2.3s;opacity:.3}
+@keyframes cruise{to{offset-distance:100%}}
+.flag-shot{position:relative;border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 30px 90px rgba(0,10,20,.6)}
+.flag-shot::after{content:"";position:absolute;inset:0;background:linear-gradient(160deg,rgba(65,224,255,.1),transparent 40%)}
+.flag-shot img{width:100%;transform:scale(1.02)}
+.flag-tags{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+.tag{font-size:12px;color:var(--dim);border:1px solid var(--line);padding:6px 14px;border-radius:99px;letter-spacing:.08em}
+.flag-cta{margin-top:38px}
+@media(max-width:960px){.flag-grid{grid-template-columns:1fr}}
+
+/* ---------- fleet ---------- */
+#fleet{background:linear-gradient(var(--bg1),var(--bg0));position:relative}
+#fleet .head{padding:clamp(100px,12vw,150px) 0 46px}
+.fleet-viewport{overflow:hidden}
+.no-gsap .fleet-viewport,body.mobile-fleet .fleet-viewport{overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:26px}
+#fleet-track{display:flex;gap:clamp(18px,2.4vw,34px);padding:0 clamp(20px,4.5vw,64px) clamp(90px,10vw,140px);width:max-content}
+.card{width:clamp(300px,30vw,430px);flex-shrink:0;scroll-snap-align:center;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:rgba(8,22,36,.65);backdrop-filter:blur(4px);transition:border-color .35s,transform .35s;position:relative}
+.card:hover{border-color:rgba(65,224,255,.45);transform:translateY(-6px)}
+.card .im{position:relative;aspect-ratio:16/10;overflow:hidden}
+.card .im img{width:100%;height:100%;object-fit:cover;transition:transform .8s cubic-bezier(.2,.7,.2,1)}
+.card:hover .im img{transform:scale(1.07)}
+.card .im::after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 55%,rgba(4,14,24,.85));pointer-events:none}
+.card .idx{position:absolute;top:14px;left:16px;font-family:var(--serif);font-weight:900;font-size:15px;color:rgba(233,245,251,.9);letter-spacing:.1em;text-shadow:0 1px 8px rgba(0,0,0,.6);z-index:2}
+.card .bd{padding:20px 22px 24px}
+.card h3{font-family:var(--serif);font-size:21px;font-weight:700;display:flex;align-items:baseline;gap:10px}
+.card h3 small{font-size:11px;color:var(--cy);letter-spacing:.2em;font-family:var(--sans);text-transform:uppercase}
+.card p{margin-top:8px;font-size:13.5px;color:var(--dim);line-height:1.65}
+.card .go{margin-top:16px;font-size:12.5px;color:var(--cy);letter-spacing:.16em;display:inline-flex;align-items:center;gap:8px}
+.card .go i{transition:transform .3s;font-style:normal}
+.card:hover .go i{transform:translateX(6px)}
+
+/* ---------- timeline ---------- */
+#log{padding:clamp(110px,14vw,180px) 0;background:linear-gradient(var(--bg0),#010409)}
+.tl{margin-top:clamp(50px,6vw,80px);position:relative;padding-left:34px}
+.tl::before{content:"";position:absolute;left:8px;top:6px;bottom:6px;width:1px;background:linear-gradient(var(--cy),rgba(65,224,255,.06))}
+.tl .item{position:relative;padding-bottom:clamp(38px,5vw,58px);max-width:44em}
+.tl .item::before{content:"";position:absolute;left:-30px;top:8px;width:9px;height:9px;border-radius:50%;background:var(--bg0);border:1.5px solid var(--cy);box-shadow:0 0 14px rgba(65,224,255,.55)}
+.tl time{font-size:12px;letter-spacing:.3em;color:var(--cy);text-transform:uppercase}
+.tl h3{font-family:var(--serif);font-size:clamp(20px,2.2vw,26px);margin:10px 0 8px;font-weight:700}
+.tl p{color:var(--dim);font-size:14.5px}
+
+/* ---------- footer ---------- */
+footer{border-top:1px solid var(--line);padding:70px 0 110px;background:#010409;position:relative;overflow:hidden}
+.foot-grid{display:flex;justify-content:space-between;gap:30px;flex-wrap:wrap;align-items:flex-end}
+.foot-big{font-family:var(--serif);font-weight:900;font-size:clamp(38px,6vw,84px);line-height:1.15}
+.foot-big em{font-style:normal;color:var(--cy)}
+.foot-links{display:flex;gap:26px;font-size:13px;color:var(--dim);letter-spacing:.1em}
+.foot-links a:hover{color:var(--cy)}
+.foot-note{margin-top:34px;font-size:12px;color:var(--faint);letter-spacing:.14em}
+.seafloor{position:absolute;bottom:0;left:0;right:0;height:60px;pointer-events:none;opacity:.5}
+</style>
+</head>
+<body>
+
+<div id="loader" aria-hidden="true">
+  <div class="ping"><i></i><i></i><i></i><b></b></div>
+  <p>Sonar Calibrating</p>
+</div>
+
+<canvas id="plankton"></canvas>
+<div id="grain"></div>
+
+<div id="gauge" aria-hidden="true">
+  <span class="read" id="gauge-read">0 M · 海面</span>
+  <div class="rail"><span class="dot" id="gauge-dot"></span></div>
+</div>
+
+<header>
+  <a class="logo" href="#hero">XI<em>.</em></a>
+  <nav>
+    <a href="#about">关于</a>
+    <a href="#flagship">大创</a>
+    <a href="#fleet">舰队</a>
+    <a href="#log">航志</a>
+  </nav>
+  <a class="back-home" href="/">‹ 返回复习站</a>
+</header>
+
+<!-- ================= HERO ================= -->
+<section id="hero">
+  <div class="giant">XI</div>
+  <div class="bubbles" id="bubbles"></div>
+
+  <div id="subwrap" class="bob">
+    <svg viewBox="0 0 560 280" fill="none">
+      <defs>
+        <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="3.2" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <!-- sonar rings from sail top -->
+      <g class="sonar" stroke="#41e0ff" stroke-width="1">
+        <circle cx="292" cy="52" r="86"/>
+        <circle cx="292" cy="52" r="86"/>
+        <circle cx="292" cy="52" r="86"/>
+      </g>
+      <g stroke="#5ce4ff" stroke-width="2" filter="url(#glow)" class="draw">
+        <!-- hull -->
+        <path d="M60 170 C 100 118, 200 100, 300 100 C 400 100, 470 122, 505 152 C 516 162, 516 178, 505 188 C 470 218, 400 240, 300 240 C 200 240, 100 222, 60 170 Z"/>
+        <!-- sail -->
+        <path d="M262 100 L 268 58 L 316 58 L 322 100"/>
+        <!-- periscope -->
+        <path d="M284 58 L 284 34 L 302 34"/>
+        <!-- bow plane -->
+        <path d="M96 152 L 52 138 M96 188 L 52 202"/>
+        <!-- stern planes -->
+        <path d="M492 140 L 530 118 M492 200 L 530 222"/>
+        <!-- portholes -->
+        <circle cx="190" cy="168" r="9"/><circle cx="238" cy="168" r="9"/><circle cx="286" cy="168" r="9"/>
+        <!-- waterline detail -->
+        <path d="M120 208 C 200 232, 380 232, 460 204" opacity=".45" stroke-dasharray="4 8"/>
+      </g>
+      <!-- propeller -->
+      <g class="prop" stroke="#5ce4ff" stroke-width="2" filter="url(#glow)">
+        <path d="M517 170 L 517 142 M517 170 L 541 184 M517 170 L 493 184"/>
+        <circle cx="517" cy="170" r="5" fill="#0a2233"/>
+      </g>
+      <!-- torpedo streak -->
+      <g opacity=".7">
+        <line x1="30" y1="176" x2="-70" y2="176" stroke="url(#tg)" stroke-width="2">
+          <animate attributeName="x1" values="60;-140" dur="2.6s" repeatCount="indefinite"/>
+          <animate attributeName="x2" values="30;-180" dur="2.6s" repeatCount="indefinite"/>
+        </line>
+        <linearGradient id="tg" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#41e0ff" stop-opacity="0"/><stop offset="1" stop-color="#41e0ff" stop-opacity=".8"/>
+        </linearGradient>
+      </g>
+    </svg>
+  </div>
+
+  <div class="shell">
+    <div class="hero-kicker">Naval Architecture × Web Engineering</div>
+    <h1 class="hero-h1">在船院学造船，<br><em>在浏览器里造世界。</em></h1>
+    <p class="hero-sub">上海交通大学 · 船舶与海洋工程本科生。白天是流体与结构，晚上把<b>数字水池、声纳、麻将桌和一整支游戏舰队</b>部署到边缘节点上——这里是它们的锚地。</p>
+    <div class="hero-cta">
+      <a class="btn solid" href="#fleet">下潜看看 ↓</a>
+      <a class="btn ghost" href="https://sjtu.ccwu.cc" target="_blank" rel="noopener">复习站 sjtu.ccwu.cc ↗</a>
+    </div>
+  </div>
+
+  <svg class="waves" preserveAspectRatio="none" viewBox="0 0 1440 210" aria-hidden="true">
+    <path class="wave" d="M0,96 C240,150 480,42 720,96 C960,150 1200,42 1440,96 C1680,150 1920,42 2160,96 C2400,150 2640,42 2880,96 L2880,210 L0,210 Z"/>
+    <path class="wave w2" d="M0,110 C240,160 480,60 720,110 C960,160 1200,60 1440,110 C1680,160 1920,60 2160,110 C2400,160 2640,60 2880,110 L2880,210 L0,210 Z"/>
+    <path class="wave w3" d="M0,128 C240,172 480,84 720,128 C960,172 1200,84 1440,128 C1680,172 1920,84 2160,128 C2400,172 2640,84 2880,128 L2880,210 L0,210 Z"/>
+  </svg>
+  <div class="cue">Dive<i></i></div>
+</section>
+
+<!-- ================= MARQUEE ================= -->
+<div class="marquee" aria-hidden="true">
+  <div class="track" id="mq-track">
+    <span>Three.js</span><span>Rapier 物理</span><span>Python</span><span>Cloudflare Workers</span><span>D1 · R2 · Durable Objects</span><span>Workers AI</span><span>Pyodide</span><span>WebRTC</span><span>流体静力学</span><span>编队控制</span><span>声纳</span><span>Alpha-Beta 博弈</span><span>数据可视化</span><span>LaTeX</span>
+  </div>
+</div>
+
+<!-- ================= ABOUT ================= -->
+<section id="about">
+  <div class="shell">
+    <div class="eyebrow">About · 潜航员档案</div>
+    <div class="statement" id="statement">
+      <span class="ln">造船是百年的浪漫，</span>
+      <span class="ln">代码是<span class="hl">即刻的潮汐</span>。</span>
+      <span class="ln mut">我恰好两样都想要。</span>
+    </div>
+    <div class="about-grid">
+      <div class="about-copy">
+        <p class="about-p">我是 <b>XI</b>，船建学院 2501 班。这一年里，我把一个密码保护的复习笔记站，慢慢养成了一艘装着<b>词典、云盘、手写笔记、留言板和二十多个在线模块</b>的母舰——全部跑在 Cloudflare 的边缘网络上。</p>
+        <p class="about-p">我喜欢把课堂里的东西「造」出来：大学物理长成了 <b>Rapier 刚体投篮馆</b>，大创项目长成了<b>能在浏览器里跑装机同款 Python 算法的数字水池</b>，而船海人的浪漫，长成了一场深海鱼雷战。</p>
+        <p class="about-p">牌桌上的规则也是工程：<b>四川麻将和斗地主的引擎是自己写的</b>，带单元测试，支持联机——朋友们在寝室开黑时，不会知道背后是 D1 数据库在算番。</p>
+      </div>
+      <div class="stats" id="stats">
+        <div class="stat"><div class="n" data-n="10">0<s>+</s></div><div class="l">已上线项目</div></div>
+        <div class="stat"><div class="n" data-n="25">0<s>+</s></div><div class="l">站内在线模块</div></div>
+        <div class="stat"><div class="n" data-n="2">0</div><div class="l">自研牌类引擎</div></div>
+        <div class="stat"><div class="n" data-n="1">0</div><div class="l">在研大创 · IPP32027</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FLAGSHIP ================= -->
+<section id="flagship">
+  <div class="shell">
+    <div class="eyebrow">Flagship · 旗舰 / 大创项目</div>
+    <div class="flag-grid">
+      <div class="flag-copy">
+        <h2 class="sec-title">蛟人 JIAOREN<br><span class="thin">水下半潜式机器人</span></h2>
+        <p>自主巡航与多机协同的综合演示平台：<b>数字水池物理仿真、传感器仿真与三维渲染</b>，感知融合 → 制导决策 → 运动控制 → 图论一致性编队全链路，装机同款 Python 算法经 Pyodide 直接在浏览器在线运行。</p>
+        <svg class="route" viewBox="0 0 430 132" aria-hidden="true">
+          <path class="path" d="M8 66 C 90 8, 160 118, 236 60 S 380 30, 418 76"/>
+          <circle class="auv" r="5" fill="#41e0ff" style="filter:drop-shadow(0 0 8px #41e0ff)"/>
+          <circle class="auv2" r="3.6" fill="#7cf7d4"/>
+          <circle class="auv3" r="2.6" fill="#7cf7d4"/>
+        </svg>
+        <div class="flag-tags">
+          <span class="tag">交互仿真</span><span class="tag">综合巡航</span><span class="tag">一致性编队</span><span class="tag">96-Run 实验矩阵</span><span class="tag">Pyodide</span>
+        </div>
+        <div class="flag-cta"><a class="btn solid" href="/dc/" target="_blank" rel="noopener">进入综合演示 →</a></div>
+      </div>
+      <a class="flag-shot" href="/dc/" target="_blank" rel="noopener" id="flagshot">
+        <img src="/assets/showcase/dc.jpg" alt="蛟人水下机器人综合演示平台截图" loading="lazy">
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FLEET ================= -->
+<section id="fleet">
+  <div class="shell head">
+    <div class="eyebrow">Fleet · 已下水舰队</div>
+    <h2 class="sec-title">每一个项目，<span class="thin">都是一次下水仪式。</span></h2>
+  </div>
+  <div class="fleet-viewport" id="fleet-viewport">
+    <div id="fleet-track">
+
+      <a class="card" href="/subwar.html" target="_blank" rel="noopener">
+        <div class="im"><span class="idx">01</span><img src="/assets/showcase/subwar.jpg" alt="深海猎杀游戏截图" loading="lazy"></div>
+        <div class="bd"><h3>深海猎杀 <small>Sub Hunt</small></h3>
+        <p>半潜艇 vs AI 敌艇的鱼雷对战：差速转向、注水变深、声纳地图、波次进攻——3D 场景与艇体直接沿用大创数字水池引擎。</p>
+        <span class="go">出击 <i>→</i></span></div>
+      </a>
+
+      <a class="card" href="/macheng.html" target="_blank" rel="noopener">
+        <div class="im"><span class="idx">02</span><img src="/assets/showcase/macheng.jpg" alt="麻城一中 Minecraft 漫游截图" loading="lazy"></div>
+        <div class="bd"><h3>麻城一中 <small>Voxel Campus</small></h3>
+        <p>按卫星图和实拍照片，用 Minecraft 体素风复刻的母校：教学楼、连廊、田径场全收录，第一人称漫游 + 飞行 + 传送 + 小地图。</p>
+        <span class="go">回母校 <i>→</i></span></div>
+      </a>
+
+      <a class="card" href="/notes/basketball.html" target="_blank" rel="noopener">
+        <div class="im"><span class="idx">03</span><img src="/assets/showcase/basketball.jpg" alt="3D 投篮物理模拟器截图" loading="lazy"></div>
+        <div class="bd"><h3>3D 投篮模拟器 <small>Physics</small></h3>
+        <p>把大学物理的抛体运动做成第三人称投篮馆：Rapier 真实刚体、恢复系数、出手速度与仰角实时可视化。</p>
+        <span class="go">进馆 <i>→</i></span></div>
+      </a>
+
+      <a class="card" href="/notes/noname-cf.html" target="_blank" rel="noopener">
+        <div class="im"><span class="idx">04</span><img src="/assets/showcase/noname.jpg" alt="三国杀无名杀截图" loading="lazy"></div>
+        <div class="bd"><h3>三国杀 <small>Noname</small></h3>
+        <p>无名杀 Web 版双部署（Vercel + CF Pages），首屏从 171s 优化到 20s；自建 Cloudflare Worker + Durable Objects 中继，宿舍里也能稳联机。</p>
+        <span class="go">开局 <i>→</i></span></div>
+      </a>
+
+      <a class="card" href="/notes/sichuan-majiang.html" target="_blank" rel="noopener">
+        <div class="im"><span class="idx">05</span><img src="/assets/showcase/majiang.jpg" alt="四川麻将对局截图" loading="lazy"></div>
+        <div class="bd"><h3>国标麻将 <small>SCMJ Engine</small></h3>
+        <p>四川血战到底 / 长沙麻将双玩法，自研 scmj-engine 单机联机共用：定缺、算番、血战结算，全部服务端校验。</p>
+        <span class="go">上桌 <i>→</i></span></div>
+      </a>
+
+      <a class="card" href="/notes/poker.html" target="_blank" rel="noopener">
+        <div class="im"><span class="idx">06</span><img src="/assets/showcase/poker.jpg" alt="斗地主对局截图" loading="lazy"></div>
+        <div class="bd"><h3>扑克牌四合一 <small>Poker Engine</small></h3>
+        <p>斗地主（联机开房 + 聊天表情）、蜘蛛纸牌、克朗代克、21 点。自研 poker-engine 带 48 个单元测试，离线也能整局对战。</p>
+        <span class="go">发牌 <i>→</i></span></div>
+      </a>
+
+      <a class="card" href="/notes/cube.html" target="_blank" rel="noopener">
+        <div class="im"><span class="idx">07</span><img src="/assets/showcase/cube.jpg" alt="3D 魔方截图" loading="lazy"></div>
+        <div class="bd"><h3>魔方 3D <small>Rubik's Cube</small></h3>
+        <p>Three.js 手写转层与拖拽判定，打乱 / 计时 / 步数，一键还原动画就是把历史操作倒放一遍。</p>
+        <span class="go">拧一把 <i>→</i></span></div>
+      </a>
+
+      <a class="card" href="https://osiris-five-delta.vercel.app/" target="_blank" rel="noopener">
+        <div class="im"><span class="idx">08</span><img src="/assets/showcase/osiris.jpg" alt="OSIRIS 情报大屏截图" loading="lazy"></div>
+        <div class="bd"><h3>OSIRIS 情报大屏 <small>OSINT</small></h3>
+        <p>全球开源情报指挥台：实时航班、船舶、地震、CCTV 与新闻情报层，一块永远在线的态势大屏。</p>
+        <span class="go">开屏 <i>→</i></span></div>
+      </a>
+
+      <a class="card" href="/apple.html" target="_blank" rel="noopener">
+        <div class="im"><span class="idx">09</span><img src="/assets/showcase/apple.jpg" alt="苹果比价站截图" loading="lazy"></div>
+        <div class="bd"><h3>苹果比价 <small>Price Radar</small></h3>
+        <p>每日定时抓取 iPhone / Mac / Watch 全系价格，走势可视化，AI 预算顾问告诉你「买什么、什么时候出手最划算」。</p>
+        <span class="go">比价 <i>→</i></span></div>
+      </a>
+
+    </div>
+  </div>
+</section>
+
+<!-- ================= LOG ================= -->
+<section id="log">
+  <div class="shell">
+    <div class="eyebrow">Logbook · 航海日志</div>
+    <h2 class="sec-title">航迹回放<span class="thin"> / 2025 → 2026</span></h2>
+    <div class="tl">
+      <div class="item">
+        <time>2025 · 秋</time>
+        <h3>启航 · 入学船建学院</h3>
+        <p>成为船舶与海洋工程 2501 班的一员。第一次意识到：船和网页，都是「结构 + 流体 + 美学」的产物。</p>
+      </div>
+      <div class="item">
+        <time>2026 · 初夏</time>
+        <h3>母舰下水 · 复习站整站重做</h3>
+        <p>sjtu.ccwu.cc 完成 NotebookLM 风格整站重做：Xi 品牌、统一图标系统、AI 对话与全文检索，云盘、英汉词典、留言板陆续加装。</p>
+      </div>
+      <div class="item">
+        <time>2026 · 六月</time>
+        <h3>舰队集结 · 游戏井喷</h3>
+        <p>五子棋、狼人杀、象棋、麻将、扑克接连下水；无名杀完成双部署与自建联机中继——每一个都能和朋友开房同玩。</p>
+      </div>
+      <div class="item">
+        <time>2026 · 七月</time>
+        <h3>深潜 · 蛟人综合演示上线</h3>
+        <p>大创项目的数字水池、综合巡航与图论编队三场景合体上线 /dc；同一套引擎顺手长出了「深海猎杀」；手写笔记支持 Apple Pencil 压感。</p>
+      </div>
+      <div class="item">
+        <time>2026 · ???</time>
+        <h3>下一站 · 更深处</h3>
+        <p>海图上还有大片没点亮的区域。带着物理、算法和一点点执念，继续下潜。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FOOTER ================= -->
+<footer>
+  <div class="shell">
+    <div class="foot-grid">
+      <div class="foot-big">与其仰望，<br>不如<em>下潜</em>。</div>
+      <div class="foot-links">
+        <a href="https://sjtu.ccwu.cc" target="_blank" rel="noopener">复习站</a>
+        <a href="/dc/" target="_blank" rel="noopener">蛟人 /dc</a>
+        <a href="/subwar.html" target="_blank" rel="noopener">深海猎杀</a>
+        <a href="#hero">回到海面 ↑</a>
+      </div>
+    </div>
+    <p class="foot-note">© 2026 XI · 船舶与海洋工程 · 本页由 SVG 与热爱驱动 · 深度 −3200 M</p>
+  </div>
+  <svg class="seafloor" viewBox="0 0 1440 60" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0,42 C120,26 260,52 400,38 C540,24 700,54 860,40 C1020,26 1180,52 1300,40 C1360,34 1400,38 1440,34 L1440,60 L0,60 Z" fill="#02090f"/>
+  </svg>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+<script>
+(function(){
+  'use strict';
+  var q=function(s){return document.querySelector(s)}, qa=function(s){return Array.prototype.slice.call(document.querySelectorAll(s))};
+
+  /* loader */
+  window.addEventListener('load',function(){ setTimeout(function(){ var l=q('#loader'); l.classList.add('off'); setTimeout(function(){l.remove()},800); },900); });
+  setTimeout(function(){ var l=q('#loader'); if(l){ l.classList.add('off'); setTimeout(function(){ if(l.parentNode) l.remove(); },800);} },3500);
+
+  /* bubbles */
+  (function(){
+    var wrap=q('#bubbles'); if(!wrap) return;
+    for(var i=0;i<22;i++){
+      var s=document.createElement('span'), sz=4+Math.random()*14;
+      s.style.width=s.style.height=sz+'px';
+      s.style.left=(Math.random()*100)+'%';
+      s.style.animationDuration=(9+Math.random()*14)+'s';
+      s.style.animationDelay=(-Math.random()*20)+'s';
+      wrap.appendChild(s);
+    }
+  })();
+
+  /* marquee: duplicate content for seamless loop */
+  (function(){ var t=q('#mq-track'); if(t) t.innerHTML+=t.innerHTML; })();
+
+  /* plankton particles */
+  (function(){
+    var cv=q('#plankton'), cx=cv.getContext('2d'), W,H,ps=[];
+    function fit(){ W=cv.width=innerWidth; H=cv.height=innerHeight; }
+    fit(); addEventListener('resize',fit);
+    for(var i=0;i<64;i++) ps.push({x:Math.random(),y:Math.random(),r:.4+Math.random()*1.6,v:.02+Math.random()*.08,ph:Math.random()*6.28,hue:Math.random()<.75?190:160});
+    var reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    (function tick(t){
+      cx.clearRect(0,0,W,H);
+      var depth=Math.min(1,(scrollY||0)/(document.body.scrollHeight-innerHeight||1));
+      for(var i=0;i<ps.length;i++){
+        var p=ps[i];
+        p.y-=p.v/H*2; p.x+=Math.sin(t/2600+p.ph)*.00012;
+        if(p.y<-.02){p.y=1.02;p.x=Math.random();}
+        var a=(.18+.5*Math.abs(Math.sin(t/1400+p.ph)))*(0.35+depth*.65);
+        cx.beginPath(); cx.arc(p.x*W,p.y*H,p.r,0,6.283);
+        cx.fillStyle='hsla('+p.hue+',90%,70%,'+a.toFixed(3)+')'; cx.fill();
+      }
+      if(!reduced) requestAnimationFrame(tick);
+    })(0);
+  })();
+
+  /* depth gauge */
+  (function(){
+    var dot=q('#gauge-dot'), read=q('#gauge-read'), MAXD=3200;
+    function upd(){
+      var max=document.body.scrollHeight-innerHeight, p=max>0?Math.min(1,scrollY/max):0;
+      dot.style.top=(p*204)+'px';
+      var m=Math.round(p*MAXD), zone=m<40?'海面':(m<800?'透光层':(m<2000?'暮光层':'深渊层'));
+      read.textContent='−'+m+' M · '+zone;
+    }
+    addEventListener('scroll',upd,{passive:true}); upd();
+  })();
+
+  /* submarine draw-on */
+  (function(){
+    qa('.draw path, .draw circle').forEach(function(el,i){
+      try{
+        var len=el.getTotalLength();
+        el.style.strokeDasharray=len; el.style.strokeDashoffset=len;
+        el.style.transition='stroke-dashoffset 1.6s cubic-bezier(.4,0,.2,1) '+(0.25+i*0.14)+'s';
+        requestAnimationFrame(function(){requestAnimationFrame(function(){el.style.strokeDashoffset=0;});});
+      }catch(e){}
+    });
+  })();
+
+  /* card tilt */
+  qa('.card').forEach(function(c){
+    c.addEventListener('mousemove',function(e){
+      var r=c.getBoundingClientRect(), x=(e.clientX-r.left)/r.width-.5, y=(e.clientY-r.top)/r.height-.5;
+      c.style.transform='translateY(-6px) perspective(900px) rotateY('+(x*5)+'deg) rotateX('+(-y*4)+'deg)';
+    });
+    c.addEventListener('mouseleave',function(){ c.style.transform=''; });
+  });
+
+  /* ---------- GSAP scroll choreography ---------- */
+  if(!window.gsap || !window.ScrollTrigger){ document.documentElement.classList.add('no-gsap'); document.body.classList.add('mobile-fleet'); return; }
+  gsap.registerPlugin(ScrollTrigger);
+
+  /* hero entrance */
+  gsap.from('.hero-kicker, .hero-h1, .hero-sub, .hero-cta',{y:46,opacity:0,duration:1.1,stagger:.14,ease:'power3.out',delay:1.0});
+  gsap.from('.giant',{opacity:0,x:80,duration:1.6,ease:'power2.out',delay:1.2});
+  gsap.to('.giant',{yPercent:34,ease:'none',scrollTrigger:{trigger:'#hero',start:'top top',end:'bottom top',scrub:true}});
+  gsap.to('#subwrap',{yPercent:-26,ease:'none',scrollTrigger:{trigger:'#hero',start:'top top',end:'bottom top',scrub:true}});
+
+  /* statement lines */
+  qa('#statement .ln').forEach(function(ln,i){
+    gsap.from(ln,{yPercent:110,duration:.9,ease:'power3.out',scrollTrigger:{trigger:ln,start:'top 86%'},delay:i*.08});
+  });
+
+  /* section reveals */
+  qa('.eyebrow, .about-p, .flag-copy, .tl .item, .foot-big').forEach(function(el){
+    gsap.from(el,{y:44,opacity:0,duration:.9,ease:'power3.out',scrollTrigger:{trigger:el,start:'top 88%'}});
+  });
+  gsap.from('#flagshot',{y:80,opacity:0,scale:.96,duration:1.1,ease:'power3.out',scrollTrigger:{trigger:'#flagshot',start:'top 85%'}});
+
+  /* stats counters */
+  qa('.stat .n').forEach(function(el){
+    var target=+el.getAttribute('data-n'), obj={v:0}, suffix=el.querySelector('s');
+    gsap.to(obj,{v:target,duration:1.6,ease:'power2.out',
+      scrollTrigger:{trigger:el,start:'top 88%'},
+      onUpdate:function(){ el.childNodes[0].nodeValue=Math.round(obj.v); }});
+  });
+
+  /* fleet horizontal scroll (desktop) */
+  var track=q('#fleet-track');
+  function fleetSetup(){
+    if(innerWidth<900){ document.body.classList.add('mobile-fleet'); return; }
+    var dist=function(){ return track.scrollWidth-innerWidth; };
+    gsap.to(track,{x:function(){return -dist();},ease:'none',
+      scrollTrigger:{trigger:'#fleet',start:'top top',end:function(){return '+='+dist();},scrub:1,pin:true,anticipatePin:1,invalidateOnRefresh:true}});
+    gsap.from(qa('.card').slice(0,3),{y:70,opacity:0,stagger:.12,duration:.9,ease:'power3.out',scrollTrigger:{trigger:'#fleet',start:'top 70%'}});
+  }
+  fleetSetup();
+})();
+</script>
+</body>
+</html>

@@ -69,6 +69,18 @@
     "tags": ["大创", "水下机器人", "编队控制", "ILOS", "Python"]
   },
   {
+    "file": "showcase",
+    "title": "深海航志 · 个人作品集",
+    "subject": "Portfolio",
+    "description": "深海主题的个人展示页：SVG 声纳/潜艇动画 + 滚动叙事 + 横向项目舰队画廊，收录站内外 10+ 已上线项目实机截图",
+    "icon": "🌊",
+    "color": "#0e7490",
+    "kind": "html",
+    "category": "explore",
+    "link": "/showcase.html",
+    "tags": ["作品集", "SVG动画", "GSAP", "深海", "展示页"]
+  },
+  {
     "file": "osiris.html",
     "title": "OSIRIS 全球情报大屏",
     "subject": "OSINT",
