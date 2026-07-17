@@ -1,0 +1,6 @@
+*.webp -text
+*.png -text
+*.jpg -text
+*.pdf -text
+*.sqlite -text
+*.ms14 -text
