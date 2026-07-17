@@ -1,0 +1,28 @@
+{
+  "generated": [
+    "python.webp",
+    "probability.webp",
+    "physics.webp",
+    "dict.webp",
+    "apple.webp",
+    "osiris.webp",
+    "basketball.webp",
+    "cube.webp",
+    "macheng.webp",
+    "g2048.webp",
+    "minesweeper.webp",
+    "pvz2.webp",
+    "gomoku.webp",
+    "werewolf.webp",
+    "xiangqi.webp",
+    "majiang.webp",
+    "sichuan-majiang.webp",
+    "poker.webp",
+    "noname-cf.webp",
+    "drive.webp",
+    "board.webp",
+    "xipan.webp",
+    "xinote.webp"
+  ],
+  "method": "imagegen-or-procedural"
+}

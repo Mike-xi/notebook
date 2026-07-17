@@ -1,0 +1,588 @@
+/* ============================================================
+   高级前端（Premium UI）：液态玻璃 + Dock 顶栏 + 全息课程卡 + CardSwap
+   所有规则由 :root[data-ui="premium"] 门控，经典模式零影响。
+   DOM 重组与动效引擎在 premium.js；设置里「界面风格」切换（刷新生效）。
+   ============================================================ */
+
+/* ---------- 液态玻璃 tokens ---------- */
+:root[data-ui="premium"] {
+  --lg-bg: color-mix(in srgb, var(--surface-container-lowest) 58%, transparent);
+  --lg-bg-strong: color-mix(in srgb, var(--surface-container-lowest) 78%, transparent);
+  --lg-border: color-mix(in srgb, var(--on-surface) 13%, transparent);
+  --lg-highlight: rgba(255, 255, 255, 0.5);
+  --lg-highlight-weak: rgba(255, 255, 255, 0.18);
+  --lg-shadow: 0 12px 32px rgba(20, 10, 50, 0.16), 0 2px 8px rgba(20, 10, 50, 0.08);
+  --lg-blur: blur(22px) saturate(1.65);
+}
+:root[data-ui="premium"][data-theme="dark"] {
+  --lg-bg: color-mix(in srgb, var(--surface-container-low) 55%, transparent);
+  --lg-bg-strong: color-mix(in srgb, var(--surface-container-low) 80%, transparent);
+  --lg-border: rgba(255, 255, 255, 0.10);
+  --lg-highlight: rgba(255, 255, 255, 0.22);
+  --lg-highlight-weak: rgba(255, 255, 255, 0.07);
+  --lg-shadow: 0 12px 36px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+/* 玻璃面板配方：模糊折射 + 顶缘高光 + 细描边。premium.js 不加类，
+   直接对既有元素套用（下方各选择器复用这一组声明）。 */
+:root[data-ui="premium"] .dock-panel,
+:root[data-ui="premium"] .create-menu,
+:root[data-ui="premium"] .settings-menu,
+:root[data-ui="premium"] .home-tabs,
+:root[data-ui="premium"] #omni-panel,
+:root[data-ui="premium"] .modal,
+:root[data-ui="premium"] .about-card {
+  background: var(--lg-bg);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  border: 1px solid var(--lg-border);
+  box-shadow:
+    inset 0 1px 0 var(--lg-highlight),
+    inset 0 -1px 0 var(--lg-highlight-weak),
+    var(--lg-shadow);
+}
+:root[data-ui="premium"] .modal,
+:root[data-ui="premium"] .about-card,
+:root[data-ui="premium"] #omni-panel,
+:root[data-ui="premium"] .create-menu,
+:root[data-ui="premium"] .settings-menu {
+  background: var(--lg-bg-strong);
+}
+:root[data-ui="premium"] .modal-overlay {
+  background: rgba(10, 8, 18, 0.35);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+/* ---------- 极光背景 ---------- */
+:root[data-ui="premium"] { background: var(--surface); }
+:root[data-ui="premium"] body.home { background: transparent; position: relative; }
+:root[data-ui="premium"] body.home::before {
+  content: '';
+  position: fixed;
+  inset: -12%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(52vw 38vh at 16% 4%, color-mix(in srgb, var(--primary) 16%, transparent), transparent 68%),
+    radial-gradient(48vw 40vh at 88% 10%, rgba(0, 190, 255, 0.09), transparent 70%),
+    radial-gradient(60vw 46vh at 55% 102%, rgba(168, 90, 255, 0.10), transparent 70%);
+  filter: blur(46px);
+}
+:root[data-ui="premium"][data-theme="dark"] body.home::before {
+  background:
+    radial-gradient(52vw 38vh at 16% 4%, rgba(120, 80, 255, 0.17), transparent 68%),
+    radial-gradient(48vw 40vh at 88% 10%, rgba(0, 229, 255, 0.10), transparent 70%),
+    radial-gradient(60vw 46vh at 55% 102%, rgba(200, 80, 255, 0.12), transparent 70%);
+}
+
+/* ---------- Dock 顶栏 ----------
+   premium.js 把 .topbar-right 里的控件搬进居中的 .dock-panel，
+   并在最前面插入四个分类 proxy 按钮；brand logo 保持原样固定在左侧。 */
+:root[data-ui="premium"] .topbar.dockbar {
+  position: sticky;
+  top: 10px;
+  z-index: 80;
+  max-width: none;
+  padding: 6px 24px;
+  display: block;
+}
+:root[data-ui="premium"] .dockbar .brand {
+  position: absolute;
+  left: 26px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+}
+:root[data-ui="premium"] .dockbar .topbar-right { display: contents; }
+
+:root[data-ui="premium"] .dock-panel {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+  width: fit-content;
+  margin: 0 auto;
+  padding: 8px 10px;
+  border-radius: 22px;
+  height: 62px;
+  overflow: visible;
+}
+
+/* Dock 单元：统一方圆玻璃瓦片；放大变换由 JS 写 transform */
+:root[data-ui="premium"] .dock-item {
+  position: relative;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  border: 1px solid var(--lg-border);
+  background: color-mix(in srgb, var(--surface-container-lowest) 40%, transparent);
+  color: var(--on-surface);
+  transform-origin: bottom center;
+  will-change: transform;
+  cursor: pointer;
+  transition: background-color var(--transition), border-color var(--transition);
+}
+:root[data-ui="premium"] .dock-item:hover {
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--lg-border));
+}
+:root[data-ui="premium"] .dock-sep {
+  flex: none;
+  width: 1px;
+  align-self: stretch;
+  margin: 6px 4px;
+  background: var(--lg-border);
+}
+
+/* 悬停标签气泡（对应 React Bits DockLabel） */
+:root[data-ui="premium"] .dock-item::after {
+  content: attr(data-label);
+  position: absolute;
+  left: 50%;
+  top: -34px;
+  transform: translate(-50%, 6px);
+  padding: 4px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--on-surface);
+  background: var(--lg-bg-strong);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  border: 1px solid var(--lg-border);
+  box-shadow: inset 0 1px 0 var(--lg-highlight-weak), 0 4px 14px rgba(0,0,0,.18);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+:root[data-ui="premium"] .dock-item:hover::after,
+:root[data-ui="premium"] .dock-item:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+/* 展开中的搜索框不需要气泡遮挡输入 */
+:root[data-ui="premium"] .search-wrap.dock-item.expanded::after { display: none; }
+
+/* 分类 proxy 按钮：图标瓦片 + 激活小圆点 */
+:root[data-ui="premium"] .dock-tab { padding: 0; font: inherit; }
+:root[data-ui="premium"] .dock-tab .ic { line-height: 0; }
+:root[data-ui="premium"] .dock-tab.active {
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 50%, transparent);
+  color: var(--primary);
+}
+:root[data-ui="premium"] .dock-tab.active::before {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--primary);
+}
+/* 拖卡分类投放：沿用经典模式的 drop-target 语义 */
+:root[data-ui="premium"] .dock-tab.drop-target {
+  background: var(--primary);
+  color: var(--on-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+/* 顶栏原控件重塑为 dock 瓦片。
+   注意 #omni-btn 自己就是瓦片（.pill-btn.dock-item），而 #create-btn 是
+   .create-wrap 瓦片的内层按钮——两种情况分开写，避免宽度互相污染。 */
+:root[data-ui="premium"] .dock-panel .pill-btn.dock-item {
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 14px;
+}
+:root[data-ui="premium"] .create-wrap.dock-item .pill-btn {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  border-radius: inherit;
+  justify-content: center;
+}
+:root[data-ui="premium"] .dock-panel .pill-label,
+:root[data-ui="premium"] .dock-panel .pill-caret { display: none; }
+:root[data-ui="premium"] .create-wrap.dock-item .pill-primary {
+  background: transparent;
+  color: inherit;
+  filter: none;
+}
+:root[data-ui="premium"] .create-wrap.dock-item {
+  background: color-mix(in srgb, var(--primary) 26%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 55%, transparent);
+  color: var(--primary);
+}
+:root[data-ui="premium"] .settings-wrap.dock-item .settings-btn {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  border-radius: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 搜索瓦片：默认只见放大镜，点击横向展开成玻璃输入条 */
+:root[data-ui="premium"] .search-wrap.dock-item {
+  max-width: none;
+  overflow: hidden;
+  transition: width 260ms cubic-bezier(0.3, 0.9, 0.3, 1), background-color var(--transition), border-color var(--transition);
+}
+:root[data-ui="premium"] .search-wrap.dock-item .search-icon {
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transition: left 260ms cubic-bezier(0.3, 0.9, 0.3, 1), transform 260ms cubic-bezier(0.3, 0.9, 0.3, 1);
+}
+:root[data-ui="premium"] .search-wrap.dock-item #search {
+  opacity: 0;
+  pointer-events: none;
+  border: none;
+  background: transparent;
+  padding: 0 14px 0 40px;
+  height: 100%;
+  font-size: 14px;
+  transition: opacity 180ms ease 80ms;
+}
+:root[data-ui="premium"] .search-wrap.dock-item.expanded { width: 280px; cursor: text; }
+:root[data-ui="premium"] .search-wrap.dock-item.expanded .search-icon { left: 14px; transform: translateY(-50%); }
+:root[data-ui="premium"] .search-wrap.dock-item.expanded #search { opacity: 1; pointer-events: auto; box-shadow: none; }
+
+/* dock 下拉菜单挂在瓦片正下方 */
+:root[data-ui="premium"] .dock-item .create-menu,
+:root[data-ui="premium"] .dock-item .settings-menu {
+  top: calc(100% + 14px);
+  right: 50%;
+  transform: translateX(50%);
+}
+
+/* 经典分类条在桌面端由 dock 接管 */
+:root[data-ui="premium"] .home-tabs { display: none; }
+
+/* ---------- 课程卡：封面 + 3D 倾斜 + 全息光泽 ---------- */
+/* 经典模式不渲染封面（该规则不在 premium 门控内，作为全局默认） */
+.nb-card-cover { display: none; }
+
+:root[data-ui="premium"] .card-grid .nb-card {
+  padding: 0;
+  min-height: 0;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--accent, var(--primary)) 10%, var(--surface-container-lowest));
+  transform: perspective(760px) rotateX(var(--ry, 0deg)) rotateY(var(--rx, 0deg)) translateY(var(--lift, 0px));
+  transform-style: preserve-3d;
+  transition: box-shadow 260ms ease, border-color 260ms ease;
+}
+:root[data-ui="premium"] .card-grid .nb-card:hover {
+  border-color: color-mix(in srgb, var(--accent, var(--primary)) 55%, transparent);
+  box-shadow:
+    0 24px 48px -16px color-mix(in srgb, var(--accent, var(--primary)) 42%, transparent),
+    0 6px 18px rgba(0, 0, 0, 0.18);
+}
+
+:root[data-ui="premium"] .nb-card-cover {
+  display: block;
+  position: relative;
+  height: 118px;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--accent, var(--primary)) 46%, #221c38) 0%,
+      color-mix(in srgb, var(--accent, var(--primary)) 14%, #16121f) 100%);
+}
+:root[data-ui="premium"] .nb-card-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+:root[data-ui="premium"] .nb-card-cover.noimg img { display: none; }
+/* 无图退底时补一道极光高光，避免纯渐变太平 */
+:root[data-ui="premium"] .nb-card-cover.noimg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120px 70px at 78% 30%, color-mix(in srgb, var(--accent, var(--primary)) 55%, transparent), transparent 75%),
+    radial-gradient(90px 60px at 20% 85%, rgba(255, 255, 255, 0.10), transparent 70%);
+  filter: blur(2px);
+}
+/* 全息彩虹条：跟随指针横移（--px 由倾斜引擎写入） */
+:root[data-ui="premium"] .nb-card-cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg,
+    transparent 30%,
+    rgba(255, 90, 120, 0.20) 42%,
+    rgba(255, 220, 100, 0.18) 48%,
+    rgba(90, 255, 180, 0.18) 54%,
+    rgba(90, 170, 255, 0.20) 60%,
+    transparent 72%);
+  background-size: 260% 100%;
+  background-position-x: calc(100% - var(--px, 50%));
+  mix-blend-mode: color-dodge;
+  opacity: var(--holo, 0);
+  transition: opacity 320ms ease;
+  pointer-events: none;
+}
+
+/* 图标浮在封面左下角的玻璃小方块上 */
+:root[data-ui="premium"] .card-grid .nb-card-icon {
+  position: absolute;
+  top: 118px;
+  left: 16px;
+  transform: translateY(-50%);
+  z-index: 3;
+  margin: 0;
+  font-size: 26px;
+  width: 46px;
+  height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  background: var(--lg-bg-strong);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  border: 1px solid var(--lg-border);
+  box-shadow: inset 0 1px 0 var(--lg-highlight-weak), 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+:root[data-ui="premium"] .card-grid .nb-card-body {
+  margin-top: 0;
+  padding: 30px 18px 18px;
+}
+/* 指针追随眩光层 */
+:root[data-ui="premium"] .card-grid .nb-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  background: radial-gradient(220px circle at var(--px, 50%) var(--py, 50%),
+    rgba(255, 255, 255, 0.22), transparent 60%);
+  opacity: var(--holo, 0);
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  transition: opacity 320ms ease;
+}
+/* 管理控件浮于封面之上 */
+:root[data-ui="premium"] .nb-card .nb-del,
+:root[data-ui="premium"] .nb-card .nb-edit,
+:root[data-ui="premium"] .nb-card .nb-drag { z-index: 4; }
+
+/* ---------- Recent 区：CardSwap 卡堆英雄区 ---------- */
+:root[data-ui="premium"] #recent-section.hero-swap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 460px);
+  align-items: center;
+  gap: 24px;
+  min-height: 300px;
+  margin: 6px 0 14px;
+  overflow: visible;
+}
+:root[data-ui="premium"] .hero-swap .section-title { display: none; }
+:root[data-ui="premium"] .hero-copy h2 {
+  font-size: clamp(26px, 3.4vw, 38px);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  background: linear-gradient(120deg, var(--on-surface), color-mix(in srgb, var(--primary) 75%, var(--on-surface)));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+:root[data-ui="premium"] .hero-copy p {
+  margin: 10px 0 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--on-surface-variant);
+  max-width: 46ch;
+}
+
+:root[data-ui="premium"] .swap-stage {
+  position: relative;
+  height: 300px;
+  perspective: 900px;
+  overflow: visible;
+}
+:root[data-ui="premium"] .swap-stage .nb-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(340px, 88%);
+  margin: 0;
+  padding: 0;
+  border-radius: 18px;
+  min-height: 0;
+  backface-visibility: hidden;
+  will-change: transform;
+  /* 卡堆内不吃网格倾斜变换，slot transform 全由 JS 写 */
+  transition: none;
+  box-shadow: 0 18px 44px -14px color-mix(in srgb, var(--accent, var(--primary)) 40%, rgba(0,0,0,.4));
+}
+:root[data-ui="premium"] .swap-stage .nb-card .nb-card-meta { -webkit-line-clamp: 1; }
+
+/* ---------- 全屏翻阅模式（点击卡堆进入）---------- */
+#deck-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: color-mix(in srgb, var(--surface) 52%, transparent);
+  -webkit-backdrop-filter: blur(26px) saturate(1.4);
+  backdrop-filter: blur(26px) saturate(1.4);
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+#deck-overlay.open { opacity: 1; }
+
+.deck-stage {
+  position: absolute;
+  inset: 0;
+  perspective: 1100px;
+  overflow: hidden;
+}
+/* 翻阅模式里的卡片：复用 .nb-card 结构，克隆自主网格 */
+.deck-stage .nb-card {
+  position: absolute;
+  left: 46%;
+  top: 52%;
+  width: min(400px, 84vw);
+  padding: 0;
+  min-height: 0;
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--accent, var(--primary)) 10%, var(--surface-container-lowest));
+  border: 1px solid color-mix(in srgb, var(--accent, var(--primary)) 30%, transparent);
+  color: var(--on-surface);
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+  box-shadow: 0 22px 52px -16px color-mix(in srgb, var(--accent, var(--primary)) 45%, rgba(0, 0, 0, 0.45));
+}
+:root[data-ui="premium"] .deck-stage .nb-card-cover { height: 150px; }
+.deck-stage .nb-card-icon {
+  position: absolute;
+  top: 150px;
+  left: 16px;
+  transform: translateY(-50%);
+  z-index: 3;
+  margin: 0;
+  font-size: 26px;
+  width: 46px;
+  height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  background: var(--lg-bg-strong);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  border: 1px solid var(--lg-border);
+}
+.deck-stage .nb-card-body { margin-top: 0; padding: 30px 20px 20px; }
+
+.deck-close {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  z-index: 320;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  border: 1px solid var(--lg-border);
+  background: var(--lg-bg-strong);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  color: var(--on-surface);
+}
+.deck-close:hover { background: color-mix(in srgb, var(--primary) 16%, var(--lg-bg-strong)); }
+
+.deck-counter {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 320;
+  padding: 9px 18px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--lg-border);
+  background: var(--lg-bg-strong);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  font-size: 13px;
+  color: var(--on-surface-variant);
+  white-space: nowrap;
+}
+.deck-counter b { color: var(--on-surface); font-weight: 650; }
+
+:root[data-ui="premium"] .swap-stage { cursor: pointer; }
+
+@media (max-width: 700px) {
+  .deck-stage .nb-card { left: 50%; width: min(320px, 86vw); }
+  .deck-counter { bottom: 16px; font-size: 12px; padding: 8px 14px; }
+}
+
+/* ---------- 杂项 ---------- */
+:root[data-ui="premium"] .section-title { margin-top: 34px; }
+:root[data-ui="premium"] .seg [data-ui-set] { min-width: 64px; }
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 700px) {
+  /* 小屏：dock 收窄，分类瓦片让位给经典分类条（触屏没有 hover 放大） */
+  :root[data-ui="premium"] .dock-tab, :root[data-ui="premium"] .dock-sep { display: none; }
+  :root[data-ui="premium"] .home-tabs {
+    display: flex;
+    padding: 6px;
+    border-radius: 18px;
+    width: fit-content;
+  }
+  :root[data-ui="premium"] .dockbar .brand { position: static; transform: none; display: inline-flex; margin-bottom: 8px; }
+  :root[data-ui="premium"] .topbar.dockbar { position: static; padding: 14px 16px 4px; text-align: center; }
+  :root[data-ui="premium"] .dock-panel { height: 58px; }
+  :root[data-ui="premium"] .search-wrap.dock-item.expanded { width: min(72vw, 280px); }
+  :root[data-ui="premium"] #recent-section.hero-swap {
+    grid-template-columns: 1fr;
+    min-height: 0;
+    gap: 8px;
+  }
+  /* 卡堆上探的部分（越叠越高）预留出空隙，别压到 hero 文案 */
+  :root[data-ui="premium"] .swap-stage { height: 260px; margin-top: 46px; }
+  :root[data-ui="premium"] .swap-stage .nb-card { width: min(290px, 80%); }
+  :root[data-ui="premium"] .dock-item .create-menu,
+  :root[data-ui="premium"] .dock-item .settings-menu {
+    position: fixed;
+    top: auto;
+    right: 12px;
+    left: 12px;
+    transform: none;
+    margin-top: 8px;
+    width: auto;
+  }
+}
+
+/* ---------- 无障碍：减少动效 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  :root[data-ui="premium"] .card-grid .nb-card { transform: none !important; }
+  :root[data-ui="premium"] .nb-card-cover::after,
+  :root[data-ui="premium"] .card-grid .nb-card::after { display: none; }
+}

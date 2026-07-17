@@ -7,9 +7,12 @@
   <script>
     // 首屏前定主题，避免浅/深闪烁；完整逻辑在 theme.js
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
+    // 界面风格（高级/经典）同样首屏前定，避免 Dock/经典顶栏互闪；完整逻辑在 premium.js
+    (function(){try{var u=localStorage.getItem('nb-ui-level');document.documentElement.dataset.ui=(u==='classic')?'classic':'premium';}catch(e){document.documentElement.dataset.ui='premium';}})();
   </script>
   <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613d">
   <link rel="stylesheet" href="/assets/style.css?v=20260616b">
+  <link rel="stylesheet" href="/assets/premium.css?v=20260717a">
 </head>
 <body class="home">
   <header class="topbar">
@@ -45,6 +48,13 @@
           <span class="ic" data-icon="gear" data-icon-size="20"></span>
         </button>
         <div class="settings-menu" id="settings-menu" hidden role="menu">
+          <div class="sm-section">
+            <span class="sm-label">界面风格</span>
+            <div class="seg" role="group" aria-label="界面风格">
+              <button class="seg-btn" data-ui-set="premium" aria-pressed="false" title="液态玻璃 Dock、全息卡片、动态卡堆">高级</button>
+              <button class="seg-btn" data-ui-set="classic" aria-pressed="false" title="原版 Material You 界面">经典</button>
+            </div>
+          </div>
           <div class="sm-section">
             <span class="sm-label">外观</span>
             <div class="seg" role="group" aria-label="主题">
@@ -227,6 +237,7 @@
   <script src="/assets/icons.js?v=20260616a"></script>
   <script src="/assets/theme.js?v=20260608a"></script>
   <script src="/assets/md.js?v=20260608d"></script>
-  <script src="/assets/app.js?v=20260620d"></script>
+  <script src="/assets/app.js?v=20260717a"></script>
+  <script src="/assets/premium.js?v=20260717a"></script>
 </body>
 </html>

@@ -137,7 +137,9 @@ function applyFilters() {
     card.style.display = show ? '' : 'none';
     if (show) visible++;
   });
-  document.getElementById('recent-section').hidden = !(hasRecent && activeTab === 'all' && !searchQ);
+  // 经典模式沿用「仅 All 分类显示」；高级模式 Recent 是卡堆英雄区，除搜索外常驻
+  const premiumUI = document.documentElement.dataset.ui === 'premium';
+  document.getElementById('recent-section').hidden = !(hasRecent && !searchQ && (premiumUI || activeTab === 'all'));
   const empty = document.getElementById('empty-hint');
   if (totalCourses === 0) {
     empty.hidden = false;
@@ -1012,12 +1014,18 @@ function cardHTML(c, deletable = false) {
   // 普通课程进阅读器；link 卡（云盘）直接跳到目标页面
   const href = c.link ? c.link : `/reader.html?file=${encodeURIComponent(c.file)}`;
 
+  // 封面图（仅高级界面显示，经典模式 CSS 隐藏）：/assets/covers/<file去扩展名>.webp，
+  // 加载失败退回卡片自带的 accent 渐变底
+  const coverSlug = String(c.file || '').replace(/\.[a-z0-9]+$/i, '');
+  const coverBlock = `<div class="nb-card-cover" aria-hidden="true"><img src="/assets/covers/${escapeAttr(coverSlug)}.webp" alt="" loading="lazy" onerror="this.parentElement.classList.add('noimg')"></div>`;
+
   return `
     <a class="nb-card" href="${escapeAttr(href)}"
        style="--accent: ${c.color || '#6750A4'}"
        data-file="${escapeAttr(c.file)}"
        data-category="${escapeAttr(c.category || 'learn')}"
        data-search="${escapeAttr(searchText)}">
+      ${coverBlock}
       ${dragHandle}${delBtn}${editBtn}
       ${iconHTML}
       <div class="nb-card-body">
