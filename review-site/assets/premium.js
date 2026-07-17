@@ -92,6 +92,33 @@
     });
 
     topbar.appendChild(panel);
+
+    // 下拉菜单挂到 body：玻璃面板的 backdrop-filter 会劫持子级 fixed 定位
+    // 的包含块（手机端菜单曾被困在瓦片里变成窄条），脱离后由 JS 按锚点定位。
+    // 事件监听随节点走，app.js 的开合/外点关闭逻辑不受影响。
+    [
+      [document.getElementById('settings-menu'), document.getElementById('settings-btn')],
+      [document.getElementById('create-menu'), document.getElementById('create-btn')],
+    ].forEach(function (pair) {
+      var menu = pair[0], anchor = pair[1];
+      if (!menu || !anchor) return;
+      menu.classList.add('dock-menu-detached');
+      document.body.appendChild(menu);
+      new MutationObserver(function () {
+        if (menu.hidden) return;
+        if (matchMedia('(max-width: 700px)').matches) {
+          menu.style.top = '';
+          menu.style.right = '';
+          menu.style.left = '';
+        } else {
+          var r = anchor.getBoundingClientRect();
+          menu.style.top = (r.bottom + 14) + 'px';
+          menu.style.right = Math.max(12, window.innerWidth - r.right) + 'px';
+          menu.style.left = 'auto';
+        }
+      }).observe(menu, { attributes: true, attributeFilter: ['hidden'] });
+    });
+
     wireSearchExpand(panel);
     if (canHover && !reduceMotion) magnify(panel);
     return panel;
@@ -113,10 +140,13 @@
     });
   }
 
-  // 鼠标邻近放大：三角衰减目标值 + rAF 弹簧插值（对应 Dock 的 spring 手感）
+  // 鼠标邻近放大：三角衰减目标值 + rAF 弹簧插值（对应 Dock 的 spring 手感）。
+  // 除缩放外还带「推开」：邻近瓦片按彼此的膨胀量横向让位，杜绝相互交叠。
+  // will-change 只在这里（桌面 hover 场景）由 JS 设置，settle 归位后清掉，
+  // 避免劫持子级 fixed 菜单的包含块（见 premium.css 注释）。
   function magnify(panel) {
-    var MAG = 0.42;       // 最大放大比例增量
-    var DIST = 150;       // 影响半径 px
+    var MAG = 0.32;       // 最大放大比例增量
+    var DIST = 140;       // 影响半径 px
     var items = Array.prototype.filter.call(panel.children, function (el) {
       return el.classList.contains('dock-item');
     });
@@ -146,8 +176,23 @@
         s.cur += (s.tgt - s.cur) * 0.28;
         if (Math.abs(s.tgt - s.cur) > 0.002) settled = false;
         else s.cur = s.tgt;
-        el.style.transform = s.cur === 1 ? '' :
-          'translateY(' + (-(s.cur - 1) * 12).toFixed(2) + 'px) scale(' + s.cur.toFixed(3) + ')';
+      });
+      items.forEach(function (el, i) {
+        var s = state[i];
+        // 推开量：所有其他瓦片膨胀宽度的一半，按方向叠加
+        var push = 0;
+        items.forEach(function (other, j) {
+          if (j === i) return;
+          var grow = (state[j].cur - 1) * other.offsetWidth * 0.55;
+          push += i > j ? grow : -grow;
+        });
+        if (s.cur === 1 && Math.abs(push) < 0.3) {
+          el.style.transform = '';
+          el.style.willChange = '';
+        } else {
+          el.style.transform = 'translate(' + push.toFixed(2) + 'px, ' + (-(s.cur - 1) * 12).toFixed(2) + 'px) scale(' + s.cur.toFixed(3) + ')';
+          el.style.willChange = 'transform';
+        }
       });
       if (settled) { running = false; return; }
       requestAnimationFrame(frame);
@@ -217,6 +262,61 @@
       ['--px', '--py', '--rx', '--ry', '--lift', '--holo'].forEach(function (v) { el.style.removeProperty(v); });
     }
   }
+
+  // ---------- 程序化封面：没有预生成 webp 的课程（动态上传）现场画一张 ----------
+  // 风格对齐 AI 封面：深底 + 课程主色光斑 + 半透明绸带；种子取文件名，稳定不闪变。
+  function paintCovers(root) {
+    (root || document).querySelectorAll('.nb-card-cover.noimg img').forEach(function (img) {
+      var cover = img.parentElement;
+      var card = img.closest('.nb-card');
+      if (!card || cover.dataset.painted) return;
+      cover.dataset.painted = '1';
+      var accent = (card.style.getPropertyValue('--accent') || '#6750A4').trim();
+      var seed = 7, key = card.dataset.file || '';
+      for (var i = 0; i < key.length; i++) seed = (seed * 31 + key.charCodeAt(i)) >>> 0;
+      var rnd = function () { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+
+      var W = 512, H = 288;
+      var cv = document.createElement('canvas');
+      cv.width = W; cv.height = H;
+      var ctx = cv.getContext('2d');
+      var bg = ctx.createLinearGradient(0, 0, W, H);
+      bg.addColorStop(0, '#1a1524');
+      bg.addColorStop(1, '#120e1a');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+      ctx.filter = 'blur(36px)';
+      var hues = [accent, accent, 'rgba(120,160,255,0.9)', 'rgba(210,120,255,0.85)'];
+      for (var b = 0; b < 4; b++) {
+        ctx.globalAlpha = 0.26 + rnd() * 0.22;
+        ctx.fillStyle = hues[b];
+        ctx.beginPath();
+        ctx.ellipse(rnd() * W, rnd() * H, 60 + rnd() * 110, 45 + rnd() * 70, rnd() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.filter = 'blur(10px)';
+      ctx.strokeStyle = '#ffffff';
+      for (var r = 0; r < 2; r++) {
+        ctx.globalAlpha = 0.10 + rnd() * 0.08;
+        ctx.lineWidth = 20 + rnd() * 26;
+        ctx.beginPath();
+        ctx.moveTo(-40, rnd() * H);
+        ctx.bezierCurveTo(W * 0.3, rnd() * H, W * 0.65, rnd() * H, W + 40, rnd() * H);
+        ctx.stroke();
+      }
+      ctx.filter = 'none';
+      ctx.globalAlpha = 1;
+      img.src = cv.toDataURL('image/png');
+      cover.classList.remove('noimg');
+    });
+  }
+  // 封面 404 随时可能发生（含以后异步重渲染），捕获阶段统一接住补画
+  document.addEventListener('error', function (e) {
+    var t = e.target;
+    if (t && t.tagName === 'IMG' && t.closest && t.closest('.nb-card-cover')) {
+      setTimeout(function () { paintCovers(t.closest('.card-grid, .swap-stage, .deck-stage') || document); }, 0);
+    }
+  }, true);
 
   // ---------- 全屏翻阅模式：点击卡堆进入，滚轮/拖动翻卡，点击进入课程 ----------
   var openDeck = (function () {
@@ -334,13 +434,15 @@
       setTimeout(function () { overlay.hidden = true; stage.innerHTML = ''; cards = []; }, 230);
     }
 
-    return function open(startFile) {
+    return function open(startFile, tab) {
       if (!overlay) build();
-      // 从主网格克隆全部课程卡（含封面/进度），剔除管理控件与网格倾斜残留
+      // 从主网格克隆课程卡（含封面/进度），按当前分类过滤，剔除管理控件与倾斜残留
+      paintCovers(document.getElementById('courses'));
       stage.innerHTML = '';
       cards = [];
       var startIdx = 0;
       document.querySelectorAll('#courses .nb-card').forEach(function (orig) {
+        if (tab && tab !== 'all' && (orig.dataset.category || 'learn') !== tab) return;
         var c = orig.cloneNode(true);
         c.querySelectorAll('.nb-del, .nb-edit, .nb-drag').forEach(function (b) { b.remove(); });
         c.style.display = '';
@@ -391,40 +493,81 @@
       el.style.zIndex = String(cards.length - i);
     }
 
+    function activeTab() {
+      var t = document.querySelector('.home-tabs .tab.active');
+      return (t && t.dataset.tab) || 'learn';
+    }
+
+    // 问候语：Claude 首页式的一句话，随分类/进入时刻变化
+    function greetingText(frontTitle) {
+      var h = new Date().getHours();
+      var hi = h < 5 ? '夜深了' : h < 11 ? '早上好' : h < 14 ? '中午好' : h < 18 ? '下午好' : '晚上好';
+      var t = '《' + frontTitle + '》';
+      var pool = [
+        hi + '，Xi。接着看' + t + '？',
+        'Hello, Xi — 从' + t + '继续？',
+        hi + '，Xi。' + t + '就差一口气了',
+        '欢迎回来。今天先翻两页' + t + '？',
+        hi + '。' + t + '在等你收尾',
+      ];
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+
+    // 逐字入场（React Bits SplitText 移植：无 GSAP，CSS transition + 逐字 delay）
+    function renderGreeting(frontCard) {
+      var copy = section.querySelector('.hero-copy');
+      if (!copy) {
+        copy = document.createElement('div');
+        copy.className = 'hero-copy';
+        copy.innerHTML = '<h2></h2><p>点击卡堆展开本分类全部课程，滚轮翻阅、点击进入。</p>';
+        section.insertBefore(copy, stage);
+      }
+      var h2 = copy.querySelector('h2');
+      var titleEl = frontCard && frontCard.querySelector('.nb-card-title');
+      var text = greetingText(((titleEl && titleEl.textContent) || '笔记').trim());
+      h2.classList.remove('st-in');
+      h2.innerHTML = '';
+      Array.from(text).forEach(function (ch, i) {
+        var sp = document.createElement('span');
+        sp.className = 'st-ch';
+        sp.textContent = ch === ' ' ? ' ' : ch;
+        sp.style.transitionDelay = (i * 32) + 'ms, ' + (i * 32) + 'ms';
+        h2.appendChild(sp);
+      });
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { h2.classList.add('st-in'); });
+      });
+    }
+
     function setup() {
-      cards = Array.prototype.slice.call(stage.querySelectorAll('.nb-card'), 0, 4);
-      if (cards.length < 2) { teardownHero(); return; }
+      paintCovers(section);
+      var tab = activeTab();
+      var all = Array.prototype.slice.call(stage.querySelectorAll('.nb-card'));
+      var mine = all.filter(function (c) {
+        return tab === 'all' || (c.dataset.category || 'learn') === tab;
+      });
+      all.forEach(function (c) { c.style.display = mine.indexOf(c) === -1 ? 'none' : ''; });
+      cards = mine.slice(0, 4);
+      stop();
+      if (!cards.length) { section.style.display = 'none'; return; }
+      section.style.display = '';
       section.classList.add('hero-swap');
       stage.classList.remove('card-grid');
       stage.classList.add('swap-stage');
-      if (!section.querySelector('.hero-copy')) {
-        var copy = document.createElement('div');
-        copy.className = 'hero-copy';
-        copy.innerHTML = '<h2>接着上次，继续读</h2>' +
-          '<p>最近打开的课程都在这叠卡片里，自动轮换。点击卡堆展开全部课程，滚轮翻阅、点击进入。</p>';
-        section.insertBefore(copy, stage);
-      }
-      // 点卡堆 → 全屏翻阅模式（拦截卡片自身的 <a> 跳转），从当前最前那张开始
+      renderGreeting(cards[0]);
+      // 点卡堆 → 全屏翻阅当前分类（拦截卡片自身的 <a> 跳转）
       if (!stage.__deckWired) {
         stage.__deckWired = true;
         stage.addEventListener('click', function (e) {
           e.preventDefault();
           e.stopPropagation();
           var front = cards[order[0]];
-          openDeck(front ? front.dataset.file : null);
+          openDeck(front ? front.dataset.file : null, activeTab());
         }, true);
       }
       order = cards.map(function (_, i) { return i; });
       cards.forEach(place);
-      restart();
-    }
-    function teardownHero() {
-      section.classList.remove('hero-swap');
-      stage.classList.add('card-grid');
-      stage.classList.remove('swap-stage');
-      var copy = section.querySelector('.hero-copy');
-      if (copy) copy.remove();
-      stop();
+      if (cards.length >= 2) restart();
     }
 
     function swap() {
@@ -469,12 +612,20 @@
       if (timer) { clearInterval(timer); timer = null; }
     }
     stage.addEventListener('mouseenter', stop);
-    stage.addEventListener('mouseleave', function () { if (section.classList.contains('hero-swap')) restart(); });
+    stage.addEventListener('mouseleave', function () {
+      if (section.classList.contains('hero-swap') && cards.length >= 2) restart();
+    });
 
     // app.js 异步渲染/以后重渲染 Recent 时（innerHTML 替换）重建卡堆
     new MutationObserver(function (muts) {
       if (muts.some(function (m) { return m.type === 'childList'; })) setup();
     }).observe(stage, { childList: true });
+    // 切分类 → 重建为当前分类的卡堆 + 换一句问候
+    var tabsBar = document.getElementById('home-tabs');
+    if (tabsBar) {
+      new MutationObserver(function () { setup(); })
+        .observe(tabsBar, { attributes: true, subtree: true, attributeFilter: ['class'] });
+    }
     setup();
   }
 

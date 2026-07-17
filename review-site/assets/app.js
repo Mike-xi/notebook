@@ -72,11 +72,13 @@ async function loadAndRender() {
   const progressMap = {};
   for (const p of progress) progressMap[p.file] = p;
 
-  // 最近阅读（按 updated_at 排序，取前 4）
+  // 最近阅读（按 updated_at 排序）：经典模式取前 4；
+  // 高级模式多取一些，卡堆按分类过滤后每类才有得堆
+  const recentLimit = document.documentElement.dataset.ui === 'premium' ? 12 : 4;
   const recent = progress
     .filter((p) => p.updated_at)
     .sort((a, b) => b.updated_at - a.updated_at)
-    .slice(0, 4)
+    .slice(0, recentLimit)
     .map((p) => ({ ...courses.find((c) => c.file === p.file), ...p }))
     .filter((c) => c.title);
 

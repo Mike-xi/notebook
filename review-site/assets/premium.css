@@ -97,19 +97,23 @@
 :root[data-ui="premium"] .dockbar .topbar-right { display: contents; }
 
 :root[data-ui="premium"] .dock-panel {
+  position: relative;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 8px;
+  gap: 12px;
   width: fit-content;
   margin: 0 auto;
-  padding: 8px 10px;
+  padding: 8px 12px;
   border-radius: 22px;
   height: 62px;
   overflow: visible;
 }
 
-/* Dock 单元：统一方圆玻璃瓦片；放大变换由 JS 写 transform */
+/* Dock 单元：统一方圆玻璃瓦片；放大/推开变换由 JS 写 transform。
+   注意不能挂 will-change: transform —— 它会把子级 position:fixed 的
+   包含块劫持成瓦片本身（手机端菜单曾因此变成 46px 窄条），由 JS 在
+   桌面放大引擎里按需设置。 */
 :root[data-ui="premium"] .dock-item {
   position: relative;
   flex: none;
@@ -123,7 +127,6 @@
   background: color-mix(in srgb, var(--surface-container-lowest) 40%, transparent);
   color: var(--on-surface);
   transform-origin: bottom center;
-  will-change: transform;
   cursor: pointer;
   transition: background-color var(--transition), border-color var(--transition);
 }
@@ -217,15 +220,11 @@
 }
 :root[data-ui="premium"] .dock-panel .pill-label,
 :root[data-ui="premium"] .dock-panel .pill-caret { display: none; }
+/* 创建瓦片与其他瓦片同色（不常亮），悬停时才提色 */
 :root[data-ui="premium"] .create-wrap.dock-item .pill-primary {
   background: transparent;
   color: inherit;
   filter: none;
-}
-:root[data-ui="premium"] .create-wrap.dock-item {
-  background: color-mix(in srgb, var(--primary) 26%, transparent);
-  border-color: color-mix(in srgb, var(--primary) 55%, transparent);
-  color: var(--primary);
 }
 :root[data-ui="premium"] .settings-wrap.dock-item .settings-btn {
   width: 100%;
@@ -264,12 +263,13 @@
 :root[data-ui="premium"] .search-wrap.dock-item.expanded .search-icon { left: 14px; transform: translateY(-50%); }
 :root[data-ui="premium"] .search-wrap.dock-item.expanded #search { opacity: 1; pointer-events: auto; box-shadow: none; }
 
-/* dock 下拉菜单挂在瓦片正下方 */
-:root[data-ui="premium"] .dock-item .create-menu,
-:root[data-ui="premium"] .dock-item .settings-menu {
-  top: calc(100% + 14px);
-  right: 50%;
-  transform: translateX(50%);
+/* dock 下拉菜单：premium.js 把它们挂到 body（.dock-menu-detached），
+   fixed 定位、坐标由 JS 按锚点瓦片计算写 inline。
+   不要用 transform 定位：基础样式的 settings-pop 开场动画会临时接管
+   transform，导致菜单先出现在错位处、动画结束再跳回。 */
+:root[data-ui="premium"] .dock-menu-detached {
+  position: fixed;
+  z-index: 130;
 }
 
 /* 经典分类条在桌面端由 dock 接管 */
@@ -437,6 +437,50 @@
   box-shadow: 0 18px 44px -14px color-mix(in srgb, var(--accent, var(--primary)) 40%, rgba(0,0,0,.4));
 }
 :root[data-ui="premium"] .swap-stage .nb-card .nb-card-meta { -webkit-line-clamp: 1; }
+/* 堆内卡片的封面/图标/正文与主网格卡完全同规格，左右留白对齐 */
+:root[data-ui="premium"] .swap-stage .nb-card-body {
+  margin-top: 0;
+  padding: 30px 18px 18px;
+}
+:root[data-ui="premium"] .swap-stage .nb-card-icon {
+  position: absolute;
+  top: 118px;
+  left: 16px;
+  transform: translateY(-50%);
+  z-index: 3;
+  margin: 0;
+  font-size: 26px;
+  width: 46px;
+  height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  background: var(--lg-bg-strong);
+  -webkit-backdrop-filter: var(--lg-blur);
+  backdrop-filter: var(--lg-blur);
+  border: 1px solid var(--lg-border);
+  box-shadow: inset 0 1px 0 var(--lg-highlight-weak), 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+/* 问候语逐字入场（SplitText 移植：无 GSAP，纯 CSS transition + 逐字 delay） */
+:root[data-ui="premium"] .hero-copy h2 .st-ch {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(0.6em);
+  transition: opacity 0.55s ease, transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+  background: linear-gradient(120deg, var(--on-surface), color-mix(in srgb, var(--primary) 75%, var(--on-surface)));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+:root[data-ui="premium"] .hero-copy h2.st-in .st-ch {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-ui="premium"] .hero-copy h2 .st-ch { opacity: 1; transform: none; transition: none; }
+}
 
 /* ---------- 全屏翻阅模式（点击卡堆进入）---------- */
 #deck-overlay {
@@ -568,16 +612,21 @@
   /* 卡堆上探的部分（越叠越高）预留出空隙，别压到 hero 文案 */
   :root[data-ui="premium"] .swap-stage { height: 260px; margin-top: 46px; }
   :root[data-ui="premium"] .swap-stage .nb-card { width: min(290px, 80%); }
-  :root[data-ui="premium"] .dock-item .create-menu,
-  :root[data-ui="premium"] .dock-item .settings-menu {
-    position: fixed;
-    top: auto;
+  /* 小屏菜单改为全宽玻璃面板（已脱离 dock 挂在 body 下，fixed 相对视口） */
+  :root[data-ui="premium"] .dock-menu-detached {
+    top: 84px;
     right: 12px;
     left: 12px;
-    transform: none;
-    margin-top: 8px;
     width: auto;
+    max-height: calc(100vh - 108px);
+    overflow-y: auto;
+    transform-origin: top center;
   }
+}
+
+/* 触屏没有 hover：关掉悬停气泡标签，避免残影 */
+@media (hover: none) {
+  :root[data-ui="premium"] .dock-item::after { display: none; }
 }
 
 /* ---------- 无障碍：减少动效 ---------- */
