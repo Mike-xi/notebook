@@ -409,7 +409,7 @@
         st.visibility = op <= 0 ? 'hidden' : 'visible';
       }
       counter.innerHTML = '<b>' + (Math.min(cards.length, Math.max(1, Math.round(pos) + 1))) + '</b> / ' + cards.length +
-        ' · 滚轮翻阅 · 点击进入 · Esc 退出';
+        ' · scroll · click to open · Esc';
     }
 
     function frame() {
@@ -498,40 +498,46 @@
       return (t && t.dataset.tab) || 'learn';
     }
 
-    // 问候语：Claude 首页式的一句话，随分类/进入时刻变化
-    function greetingText(frontTitle) {
+    // 问候语：Claude 首页式的一句英文，课程名保持原文；fresh = 该分类
+    // 最近没读过、卡堆用分类课程兜底时的措辞
+    function greetingText(frontTitle, fresh) {
       var h = new Date().getHours();
-      var hi = h < 5 ? '夜深了' : h < 11 ? '早上好' : h < 14 ? '中午好' : h < 18 ? '下午好' : '晚上好';
+      var hi = h < 5 ? 'Up late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
       var t = '《' + frontTitle + '》';
-      var pool = [
-        hi + '，Xi。接着看' + t + '？',
-        'Hello, Xi — 从' + t + '继续？',
-        hi + '，Xi。' + t + '就差一口气了',
-        '欢迎回来。今天先翻两页' + t + '？',
-        hi + '。' + t + '在等你收尾',
+      var pool = fresh ? [
+        hi + ', Xi — how about ' + t + '?',
+        'Something new today? Try ' + t + '.',
+        hi + ', Xi. ' + t + ' looks fun.',
+        'Hello, Xi — maybe start with ' + t + '?',
+      ] : [
+        hi + ', Xi — pick up ' + t + '?',
+        'Welcome back. ' + t + ' is waiting.',
+        hi + ', Xi. A few more pages of ' + t + '?',
+        'Hello, Xi — continue with ' + t + '?',
+        hi + '. ' + t + ' is almost done.',
       ];
       return pool[Math.floor(Math.random() * pool.length)];
     }
 
     // 逐字入场（React Bits SplitText 移植：无 GSAP，CSS transition + 逐字 delay）
-    function renderGreeting(frontCard) {
+    function renderGreeting(frontCard, fresh) {
       var copy = section.querySelector('.hero-copy');
       if (!copy) {
         copy = document.createElement('div');
         copy.className = 'hero-copy';
-        copy.innerHTML = '<h2></h2><p>点击卡堆展开本分类全部课程，滚轮翻阅、点击进入。</p>';
+        copy.innerHTML = '<h2></h2>';
         section.insertBefore(copy, stage);
       }
       var h2 = copy.querySelector('h2');
       var titleEl = frontCard && frontCard.querySelector('.nb-card-title');
-      var text = greetingText(((titleEl && titleEl.textContent) || '笔记').trim());
+      var text = greetingText(((titleEl && titleEl.textContent) || 'your notes').trim(), fresh);
       h2.classList.remove('st-in');
       h2.innerHTML = '';
       Array.from(text).forEach(function (ch, i) {
         var sp = document.createElement('span');
         sp.className = 'st-ch';
         sp.textContent = ch === ' ' ? ' ' : ch;
-        sp.style.transitionDelay = (i * 32) + 'ms, ' + (i * 32) + 'ms';
+        sp.style.transitionDelay = (i * 55) + 'ms, ' + (i * 55) + 'ms';
         h2.appendChild(sp);
       });
       requestAnimationFrame(function () {
@@ -542,19 +548,39 @@
     function setup() {
       paintCovers(section);
       var tab = activeTab();
+      stop();
+      // 清掉上一轮的分类兜底克隆
+      stage.querySelectorAll('.nb-card[data-fallback]').forEach(function (c) { c.remove(); });
       var all = Array.prototype.slice.call(stage.querySelectorAll('.nb-card'));
       var mine = all.filter(function (c) {
         return tab === 'all' || (c.dataset.category || 'learn') === tab;
       });
-      all.forEach(function (c) { c.style.display = mine.indexOf(c) === -1 ? 'none' : ''; });
       cards = mine.slice(0, 4);
-      stop();
+      // 超出 4 张的同类卡也要藏，否则会无 slot 变换裸露在原地（曾经的"错位卡"）
+      all.forEach(function (c) { c.style.display = cards.indexOf(c) === -1 ? 'none' : ''; });
+      // 该分类最近没读过 → 从主网格克隆该分类课程兜底，保持卡堆常驻
+      var fresh = false;
+      if (!cards.length) {
+        fresh = true;
+        var pool = document.querySelectorAll('#courses .nb-card');
+        for (var i = 0; i < pool.length && cards.length < 4; i++) {
+          var o = pool[i];
+          if (tab !== 'all' && (o.dataset.category || 'learn') !== tab) continue;
+          var c = o.cloneNode(true);
+          c.querySelectorAll('.nb-del, .nb-edit, .nb-drag').forEach(function (b) { b.remove(); });
+          c.style.display = '';
+          ['--px', '--py', '--rx', '--ry', '--lift', '--holo'].forEach(function (v) { c.style.removeProperty(v); });
+          c.setAttribute('data-fallback', '1');
+          stage.appendChild(c);
+          cards.push(c);
+        }
+      }
       if (!cards.length) { section.style.display = 'none'; return; }
       section.style.display = '';
       section.classList.add('hero-swap');
       stage.classList.remove('card-grid');
       stage.classList.add('swap-stage');
-      renderGreeting(cards[0]);
+      renderGreeting(cards[0], fresh);
       // 点卡堆 → 全屏翻阅当前分类（拦截卡片自身的 <a> 跳转）
       if (!stage.__deckWired) {
         stage.__deckWired = true;
@@ -570,6 +596,7 @@
       if (cards.length >= 2) restart();
     }
 
+    var swapTimers = [];
     function swap() {
       if (swapping || document.hidden || order.length < 2 || reduceMotion) return;
       swapping = true;
@@ -581,27 +608,27 @@
       el.style.transform = slotTransform(0, 520);
 
       // ② 其余卡依次晋位（弹簧曲线）
-      setTimeout(function () {
+      swapTimers.push(setTimeout(function () {
         rest.forEach(function (idx, i) {
           var c = cards[idx];
           c.style.transition = 'transform 0.65s ' + SPRING + ' ' + (i * 90) + 'ms';
           c.style.zIndex = String(cards.length - i);
           c.style.transform = slotTransform(i);
         });
-      }, 240);
+      }, 240));
 
       // ③ 坠落卡压到最底再弹回队尾槽位
-      setTimeout(function () {
+      swapTimers.push(setTimeout(function () {
         el.style.zIndex = '1';
         el.style.transition = 'transform 0.65s ' + SPRING;
         el.style.transform = slotTransform(cards.length - 1);
-      }, 430);
+      }, 430));
 
-      setTimeout(function () {
+      swapTimers.push(setTimeout(function () {
         cards.forEach(function (c) { c.style.transitionDelay = ''; });
         order = rest.concat(front);
         swapping = false;
-      }, 1250);
+      }, 1250));
     }
 
     function restart() {
@@ -610,15 +637,28 @@
     }
     function stop() {
       if (timer) { clearInterval(timer); timer = null; }
+      // 换卡动画进行中被打断（如切分类）时，掐掉遗留的分步 setTimeout，
+      // 否则它们会把卡推到过期槽位（曾经的另一种"错位卡"）
+      swapTimers.forEach(clearTimeout);
+      swapTimers = [];
+      swapping = false;
     }
     stage.addEventListener('mouseenter', stop);
     stage.addEventListener('mouseleave', function () {
       if (section.classList.contains('hero-swap') && cards.length >= 2) restart();
     });
 
-    // app.js 异步渲染/以后重渲染 Recent 时（innerHTML 替换）重建卡堆
+    // app.js 异步渲染/以后重渲染 Recent 时（innerHTML 替换）重建卡堆。
+    // 自己 setup 里增删的分类兜底克隆（data-fallback）要滤掉，否则死循环
     new MutationObserver(function (muts) {
-      if (muts.some(function (m) { return m.type === 'childList'; })) setup();
+      var external = muts.some(function (m) {
+        if (m.type !== 'childList') return false;
+        var nodes = Array.prototype.slice.call(m.addedNodes).concat(Array.prototype.slice.call(m.removedNodes));
+        return nodes.some(function (n) {
+          return !(n.getAttribute && n.getAttribute('data-fallback'));
+        });
+      });
+      if (external) setup();
     }).observe(stage, { childList: true });
     // 切分类 → 重建为当前分类的卡堆 + 换一句问候
     var tabsBar = document.getElementById('home-tabs');

@@ -468,7 +468,7 @@
   display: inline-block;
   opacity: 0;
   transform: translateY(0.6em);
-  transition: opacity 0.55s ease, transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition: opacity 0.9s ease, transform 1.05s cubic-bezier(0.2, 0.7, 0.2, 1);
   background: linear-gradient(120deg, var(--on-surface), color-mix(in srgb, var(--primary) 75%, var(--on-surface)));
   -webkit-background-clip: text;
   background-clip: text;
