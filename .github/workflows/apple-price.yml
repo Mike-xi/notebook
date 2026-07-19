@@ -3,6 +3,12 @@ name: 苹果比价每日刷新
 # GitHub Runner 直接读取 Apple 中国官网，避开 Apple 对 Cloudflare 出口的 403；站点端同时刷新第三方参考价。
 # 需要在仓库 Settings → Secrets and variables → Actions 配置 APPLE_REFRESH_KEY，且与 Pages 环境变量一致。
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apple-price.yml'
+      - 'scripts/apple-official-refresh.mjs'
+      - 'review-site/functions/api/apple/refresh.js'
   schedule:
     - cron: '0 1 * * *'      # 每天 UTC 01:00 = 北京时间 09:00
   workflow_dispatch:
