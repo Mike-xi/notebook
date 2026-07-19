@@ -8,7 +8,11 @@
     "color": "#4B8BBE",
     "kind": "html",
     "category": "learn",
-    "tags": ["python", "程序设计", "期末"]
+    "tags": [
+      "python",
+      "程序设计",
+      "期末"
+    ]
   },
   {
     "file": "probability.html",
@@ -19,7 +23,11 @@
     "color": "#8B5CF6",
     "kind": "html",
     "category": "learn",
-    "tags": ["概率", "统计", "期末"]
+    "tags": [
+      "概率",
+      "统计",
+      "期末"
+    ]
   },
   {
     "file": "physics.pdf",
@@ -30,7 +38,11 @@
     "color": "#0EA5E9",
     "kind": "pdf",
     "category": "learn",
-    "tags": ["物理", "大纲", "期末"]
+    "tags": [
+      "物理",
+      "大纲",
+      "期末"
+    ]
   },
   {
     "file": "dict",
@@ -42,7 +54,13 @@
     "kind": "html",
     "category": "learn",
     "link": "/dict.html",
-    "tags": ["英语", "词典", "查词", "单词本", "AI"]
+    "tags": [
+      "英语",
+      "词典",
+      "查词",
+      "单词本",
+      "AI"
+    ]
   },
   {
     "file": "apple",
@@ -54,7 +72,13 @@
     "kind": "html",
     "category": "explore",
     "link": "/apple.html",
-    "tags": ["苹果", "比价", "价格走势", "AI顾问", "购物"]
+    "tags": [
+      "苹果",
+      "比价",
+      "价格走势",
+      "AI顾问",
+      "购物"
+    ]
   },
   {
     "file": "dachuang",
@@ -66,7 +90,31 @@
     "kind": "html",
     "category": "explore",
     "link": "/dc/",
-    "tags": ["大创", "水下机器人", "编队控制", "ILOS", "Python"]
+    "tags": [
+      "大创",
+      "水下机器人",
+      "编队控制",
+      "ILOS",
+      "Python"
+    ]
+  },
+  {
+    "file": "detect",
+    "title": "实时目标检测",
+    "subject": "AI · 端侧推理",
+    "description": "YOLO11n 直接跑在你的浏览器里 · WebGPU 加速识别 80 类物体 · 打开相机即用，画面不上传任何服务器",
+    "icon": "🎯",
+    "color": "#10B981",
+    "kind": "html",
+    "category": "explore",
+    "link": "/detect.html",
+    "tags": [
+      "YOLO",
+      "目标检测",
+      "WebGPU",
+      "端侧AI",
+      "相机"
+    ]
   },
   {
     "file": "showcase",
@@ -78,7 +126,13 @@
     "kind": "html",
     "category": "explore",
     "link": "/showcase.html",
-    "tags": ["作品集", "SVG动画", "GSAP", "深海", "展示页"]
+    "tags": [
+      "作品集",
+      "SVG动画",
+      "GSAP",
+      "深海",
+      "展示页"
+    ]
   },
   {
     "file": "osiris.html",
@@ -89,7 +143,11 @@
     "color": "#00E5FF",
     "kind": "html",
     "category": "explore",
-    "tags": ["OSINT", "情报", "实时地图"]
+    "tags": [
+      "OSINT",
+      "情报",
+      "实时地图"
+    ]
   },
   {
     "file": "subwar",
@@ -101,7 +159,13 @@
     "kind": "html",
     "category": "play",
     "link": "/subwar.html",
-    "tags": ["游戏", "潜艇", "鱼雷", "3D", "大创"]
+    "tags": [
+      "游戏",
+      "潜艇",
+      "鱼雷",
+      "3D",
+      "大创"
+    ]
   },
   {
     "file": "basketball.html",
@@ -112,7 +176,12 @@
     "color": "#E2521B",
     "kind": "html",
     "category": "play",
-    "tags": ["物理", "抛体运动", "碰撞", "互动仿真"]
+    "tags": [
+      "物理",
+      "抛体运动",
+      "碰撞",
+      "互动仿真"
+    ]
   },
   {
     "file": "cube.html",
@@ -123,7 +192,13 @@
     "color": "#3b6ef5",
     "kind": "html",
     "category": "play",
-    "tags": ["魔方", "3D", "益智", "计时", "互动"]
+    "tags": [
+      "魔方",
+      "3D",
+      "益智",
+      "计时",
+      "互动"
+    ]
   },
   {
     "file": "macheng",
@@ -135,7 +210,13 @@
     "kind": "html",
     "category": "play",
     "link": "/macheng.html",
-    "tags": ["麻城一中", "Minecraft", "3D", "校园漫游", "Three.js"]
+    "tags": [
+      "麻城一中",
+      "Minecraft",
+      "3D",
+      "校园漫游",
+      "Three.js"
+    ]
   },
   {
     "file": "g2048",
@@ -147,7 +228,12 @@
     "kind": "html",
     "category": "play",
     "link": "/games/2048/",
-    "tags": ["2048", "数字", "益智", "休闲"]
+    "tags": [
+      "2048",
+      "数字",
+      "益智",
+      "休闲"
+    ]
   },
   {
     "file": "snake.html",
@@ -158,7 +244,13 @@
     "color": "#22C55E",
     "kind": "html",
     "category": "play",
-    "tags": ["贪吃蛇", "Snake", "益智", "键盘", "触屏"]
+    "tags": [
+      "贪吃蛇",
+      "Snake",
+      "益智",
+      "键盘",
+      "触屏"
+    ]
   },
   {
     "file": "minesweeper",
@@ -170,7 +262,12 @@
     "kind": "html",
     "category": "play",
     "link": "/games/minesweeper/?board=16x16x40",
-    "tags": ["扫雷", "Minesweeper", "益智", "经典"]
+    "tags": [
+      "扫雷",
+      "Minesweeper",
+      "益智",
+      "经典"
+    ]
   },
   {
     "file": "pvz2",
@@ -182,7 +279,12 @@
     "kind": "html",
     "category": "play",
     "link": "/games/pvz2.html",
-    "tags": ["植物大战僵尸", "PvZ2", "塔防", "在线游戏"]
+    "tags": [
+      "植物大战僵尸",
+      "PvZ2",
+      "塔防",
+      "在线游戏"
+    ]
   },
   {
     "file": "gomoku.html",
@@ -193,7 +295,12 @@
     "color": "#B5793B",
     "kind": "html",
     "category": "play",
-    "tags": ["五子棋", "博弈AI", "联机", "Alpha-Beta"]
+    "tags": [
+      "五子棋",
+      "博弈AI",
+      "联机",
+      "Alpha-Beta"
+    ]
   },
   {
     "file": "werewolf.html",
@@ -204,7 +311,12 @@
     "color": "#7A3B3B",
     "kind": "html",
     "category": "play",
-    "tags": ["狼人杀", "社交推理", "AI玩家", "预女猎"]
+    "tags": [
+      "狼人杀",
+      "社交推理",
+      "AI玩家",
+      "预女猎"
+    ]
   },
   {
     "file": "xiangqi.html",
@@ -215,7 +327,12 @@
     "color": "#9A2B2B",
     "kind": "html",
     "category": "play",
-    "tags": ["象棋", "博弈AI", "联机", "Alpha-Beta"]
+    "tags": [
+      "象棋",
+      "博弈AI",
+      "联机",
+      "Alpha-Beta"
+    ]
   },
   {
     "file": "majiang.html",
@@ -226,7 +343,12 @@
     "color": "#0b7a45",
     "kind": "html",
     "category": "play",
-    "tags": ["麻将", "立直", "日麻", "AI"]
+    "tags": [
+      "麻将",
+      "立直",
+      "日麻",
+      "AI"
+    ]
   },
   {
     "file": "sichuan-majiang.html",
@@ -237,7 +359,14 @@
     "color": "#c0392b",
     "kind": "html",
     "category": "play",
-    "tags": ["麻将", "四川麻将", "长沙麻将", "国标", "AI", "联机"]
+    "tags": [
+      "麻将",
+      "四川麻将",
+      "长沙麻将",
+      "国标",
+      "AI",
+      "联机"
+    ]
   },
   {
     "file": "poker.html",
@@ -248,7 +377,13 @@
     "color": "#1f7a4d",
     "kind": "html",
     "category": "play",
-    "tags": ["扑克", "斗地主", "蜘蛛纸牌", "接龙", "21点"]
+    "tags": [
+      "扑克",
+      "斗地主",
+      "蜘蛛纸牌",
+      "接龙",
+      "21点"
+    ]
   },
   {
     "file": "noname-cf.html",
@@ -259,7 +394,12 @@
     "color": "#9b1c1c",
     "kind": "html",
     "category": "play",
-    "tags": ["三国杀", "卡牌", "桌游", "联机"]
+    "tags": [
+      "三国杀",
+      "卡牌",
+      "桌游",
+      "联机"
+    ]
   },
   {
     "file": "drive",
@@ -271,7 +411,11 @@
     "kind": "html",
     "category": "explore",
     "link": "/drive.html",
-    "tags": ["云盘", "资料", "下载"]
+    "tags": [
+      "云盘",
+      "资料",
+      "下载"
+    ]
   },
   {
     "file": "board",
@@ -283,7 +427,11 @@
     "kind": "html",
     "category": "explore",
     "link": "/board.html",
-    "tags": ["留言", "论坛", "讨论"]
+    "tags": [
+      "留言",
+      "论坛",
+      "讨论"
+    ]
   },
   {
     "file": "xipan",
@@ -296,7 +444,11 @@
     "category": "explore",
     "link": "/xipan.html",
     "adminOnly": true,
-    "tags": ["私人", "云盘", "WebDAV"]
+    "tags": [
+      "私人",
+      "云盘",
+      "WebDAV"
+    ]
   },
   {
     "file": "notepad",
@@ -308,6 +460,11 @@
     "kind": "html",
     "category": "learn",
     "link": "/notepad.html",
-    "tags": ["手写", "笔记", "Apple Pencil", "同步"]
+    "tags": [
+      "手写",
+      "笔记",
+      "Apple Pencil",
+      "同步"
+    ]
   }
 ]

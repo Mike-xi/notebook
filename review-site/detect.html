@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>实时目标检测 · YOLO11n</title>
+<style>
+  :root{--bg:#0b1220;--panel:#111a2e;--line:#1f2b47;--fg:#dfe8ff;--dim:#8fa3c8;--acc:#33ff88}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--fg);font:15px/1.6 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;min-height:100vh;display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+  header a{color:var(--dim);text-decoration:none;font-size:14px}
+  header a:hover{color:var(--fg)}
+  header h1{font-size:16px;font-weight:600}
+  header .badge{font-size:12px;color:var(--acc);border:1px solid var(--acc);border-radius:99px;padding:1px 10px;opacity:.85}
+  main{flex:1;display:flex;flex-direction:column;align-items:center;padding:14px;gap:12px}
+  #stage{position:relative;max-width:min(96vw,900px);width:100%;background:#000;border:1px solid var(--line);border-radius:12px;overflow:hidden;min-height:220px;display:flex;align-items:center;justify-content:center}
+  #view{display:block;width:100%;height:auto}
+  #hint{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--dim);text-align:center;padding:20px;background:rgba(11,18,32,.85)}
+  #hint b{color:var(--fg);font-size:17px}
+  .row{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center}
+  button{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:9px 18px;font-size:15px;cursor:pointer}
+  button:hover{border-color:var(--acc)}
+  button.primary{background:var(--acc);color:#04210f;border:none;font-weight:700}
+  button:disabled{opacity:.4;cursor:default}
+  #stat{font-size:13px;color:var(--dim);text-align:center;min-height:20px}
+  #stat b{color:var(--acc)}
+  label.thr{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:8px}
+  input[type=range]{accent-color:var(--acc);width:120px}
+  footer{text-align:center;color:var(--dim);font-size:12px;padding:10px;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+<header>
+  <a href="/">← 主页</a>
+  <h1>🎯 实时目标检测</h1>
+  <span class="badge" id="backend">加载中…</span>
+</header>
+<main>
+  <div id="stage">
+    <canvas id="view" width="640" height="480"></canvas>
+    <div id="hint">
+      <b>YOLO11n · 完全在你的设备上运行</b>
+      <span>画面不上传任何服务器 · 可识别 80 类常见物体<br>首次需下载 10.6MB 模型，请稍候</span>
+    </div>
+  </div>
+  <div class="row">
+    <button class="primary" id="btnCam" disabled>📷 开启相机</button>
+    <button id="btnFlip" disabled>🔄 切换镜头</button>
+    <button id="btnDemo" disabled>🖼️ 示例图片</button>
+    <label class="thr">阈值 <input type="range" id="thr" min="15" max="70" value="35"><span id="thrv">0.35</span></label>
+  </div>
+  <div id="stat">正在加载推理引擎…</div>
+</main>
+<footer>yolo11n(10.6MB, ONNX) · onnxruntime-web · WebGPU 加速，不支持时自动回退 WASM · xinotebook</footer>
+
+<script>
+  // CDN 主备（站内惯例：jsdelivr 主、unpkg 备）
+  window.__ortBase='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
+</script>
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.webgpu.min.js"
+        onerror="__ortBase='https://unpkg.com/onnxruntime-web@1.20.1/dist/';var s=document.createElement('script');s.src=__ortBase+'ort.webgpu.min.js';s.onload=()=>boot();document.head.appendChild(s);"></script>
+<script>
+const NAMES=["人","自行车","汽车","摩托车","飞机","公交车","火车","卡车","船","红绿灯","消防栓","停牌","停车计时器","长椅","鸟","猫","狗","马","羊","牛","大象","熊","斑马","长颈鹿","背包","伞","手提包","领带","行李箱","飞盘","双板雪板","单板雪板","球","风筝","棒球棒","棒球手套","滑板","冲浪板","网球拍","瓶子","酒杯","杯子","叉子","刀","勺子","碗","香蕉","苹果","三明治","橙子","西兰花","胡萝卜","热狗","披萨","甜甜圈","蛋糕","椅子","沙发","盆栽","床","餐桌","马桶","电视","笔记本电脑","鼠标","遥控器","键盘","手机","微波炉","烤箱","烤面包机","水槽","冰箱","书","钟","花瓶","剪刀","玩偶熊","吹风机","牙刷"];
+const SZ=416, IOU=0.45;
+const view=document.getElementById('view'), ctx=view.getContext('2d');
+const stat=document.getElementById('stat'), hint=document.getElementById('hint'),
+      badge=document.getElementById('backend');
+const btnCam=document.getElementById('btnCam'), btnFlip=document.getElementById('btnFlip'),
+      btnDemo=document.getElementById('btnDemo'), thr=document.getElementById('thr');
+thr.oninput=()=>document.getElementById('thrv').textContent=(thr.value/100).toFixed(2);
+
+let session=null, video=null, stream=null, facing='environment',
+    running=false, busy=false, lastDets=[], nInf=0, tStart=0, lastMs=0;
+const lb=document.createElement('canvas'); lb.width=SZ; lb.height=SZ;
+const lctx=lb.getContext('2d',{willReadFrequently:true});
+window.__detect={get dets(){return lastDets}, get backend(){return badge.textContent}};
+
+async function boot(){
+  try{
+    ort.env.wasm.wasmPaths=__ortBase;
+    if(!crossOriginIsolated) ort.env.wasm.numThreads=1;
+    const url='/assets/yolo11n.onnx?v=1';
+    let ep='WebGPU';
+    try{ session=await ort.InferenceSession.create(url,{executionProviders:['webgpu']}); }
+    catch(e){ ep='WASM'; session=await ort.InferenceSession.create(url,{executionProviders:['wasm']}); }
+    badge.textContent=ep;
+    stat.textContent='模型就绪，选择相机或示例图片开始';
+    btnCam.disabled=btnDemo.disabled=false;
+  }catch(e){
+    badge.textContent='加载失败';
+    stat.textContent='推理引擎/模型加载失败：'+e.message;
+  }
+}
+
+function letterbox(src,w,h){
+  const r=Math.min(SZ/w,SZ/h), nw=Math.round(w*r), nh=Math.round(h*r),
+        dx=(SZ-nw)/2, dy=(SZ-nh)/2;
+  lctx.fillStyle='#727272'; lctx.fillRect(0,0,SZ,SZ);
+  lctx.drawImage(src,0,0,w,h,dx,dy,nw,nh);
+  const d=lctx.getImageData(0,0,SZ,SZ).data, n=SZ*SZ,
+        t=new Float32Array(3*n);
+  for(let i=0;i<n;i++){ t[i]=d[i*4]/255; t[n+i]=d[i*4+1]/255; t[2*n+i]=d[i*4+2]/255; }
+  return {tensor:new ort.Tensor('float32',t,[1,3,SZ,SZ]), r, dx, dy};
+}
+
+function decode(out,meta,w,h){
+  const d=out.data, N=out.dims[2], conf=thr.value/100, cand=[];
+  for(let i=0;i<N;i++){
+    let best=0,cls=-1;
+    for(let c=0;c<80;c++){ const s=d[(4+c)*N+i]; if(s>best){best=s;cls=c;} }
+    if(best<conf) continue;
+    const cx=d[i],cy=d[N+i],bw=d[2*N+i],bh=d[3*N+i];
+    cand.push({cls,conf:best,
+      x1:Math.max(0,(cx-bw/2-meta.dx)/meta.r), y1:Math.max(0,(cy-bh/2-meta.dy)/meta.r),
+      x2:Math.min(w,(cx+bw/2-meta.dx)/meta.r), y2:Math.min(h,(cy+bh/2-meta.dy)/meta.r)});
+  }
+  cand.sort((a,b)=>b.conf-a.conf);
+  const keep=[];
+  for(const b of cand){
+    let ok=true;
+    for(const k of keep){
+      if(k.cls!==b.cls) continue;
+      const ix=Math.max(0,Math.min(b.x2,k.x2)-Math.max(b.x1,k.x1)),
+            iy=Math.max(0,Math.min(b.y2,k.y2)-Math.max(b.y1,k.y1)),
+            inter=ix*iy,
+            uni=(b.x2-b.x1)*(b.y2-b.y1)+(k.x2-k.x1)*(k.y2-k.y1)-inter;
+      if(inter/uni>IOU){ ok=false; break; }
+    }
+    if(ok) keep.push(b);
+    if(keep.length>=50) break;
+  }
+  return keep;
+}
+
+async function infer(src,w,h){
+  const m=letterbox(src,w,h), t0=performance.now();
+  const out=await session.run({[session.inputNames[0]]:m.tensor});
+  lastMs=performance.now()-t0; nInf++;
+  return decode(out[session.outputNames[0]],m,w,h);
+}
+
+function color(c){ return 'hsl('+((c*47)%360)+',85%,60%)'; }
+function drawDets(w){
+  const s=Math.max(2,w/320);
+  ctx.font='bold '+(7*s)+'px system-ui';
+  for(const b of lastDets){
+    ctx.strokeStyle=color(b.cls); ctx.lineWidth=s;
+    ctx.strokeRect(b.x1,b.y1,b.x2-b.x1,b.y2-b.y1);
+    const label=NAMES[b.cls]+' '+Math.round(b.conf*100)+'%',
+          tw=ctx.measureText(label).width;
+    ctx.fillStyle='rgba(0,0,0,.65)';
+    ctx.fillRect(b.x1,Math.max(0,b.y1-9*s),tw+6*s,9*s);
+    ctx.fillStyle=color(b.cls);
+    ctx.fillText(label,b.x1+3*s,Math.max(7*s,b.y1-2.2*s));
+  }
+}
+function showStat(extra){
+  const fps=nInf/((performance.now()-tStart)/1000);
+  stat.innerHTML='推理 <b>'+lastMs.toFixed(0)+'ms</b> · <b>'+fps.toFixed(1)+
+    '</b> fps · 目标 <b>'+lastDets.length+'</b>'+(extra||'');
+}
+
+// ---- 相机模式 ----
+async function startCam(){
+  stopCam();
+  try{
+    stream=await navigator.mediaDevices.getUserMedia(
+      {video:{facingMode:facing,width:{ideal:640}},audio:false});
+  }catch(e){ stat.textContent='相机打不开：'+e.message; return; }
+  video=document.createElement('video');
+  video.srcObject=stream; video.muted=true; video.playsInline=true;
+  await video.play();
+  view.width=video.videoWidth; view.height=video.videoHeight;
+  hint.style.display='none'; btnFlip.disabled=false;
+  btnCam.textContent='⏹ 停止'; running=true; nInf=0; tStart=performance.now();
+  (function render(){
+    if(!running) return;
+    ctx.drawImage(video,0,0);
+    drawDets(view.width);
+    requestAnimationFrame(render);
+  })();
+  (async function loop(){
+    while(running){
+      if(!busy){ busy=true;
+        try{ lastDets=await infer(video,view.width,view.height); showStat(); }
+        catch(e){ stat.textContent='推理出错：'+e.message; }
+        busy=false;
+      }
+      await new Promise(r=>setTimeout(r,10));
+    }
+  })();
+}
+function stopCam(){
+  running=false;
+  if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+  btnCam.textContent='📷 开启相机'; btnFlip.disabled=true;
+}
+btnCam.onclick=()=>{ running?stopCam():startCam(); };
+btnFlip.onclick=()=>{ facing=(facing==='environment')?'user':'environment'; startCam(); };
+
+// ---- 示例图片模式 ----
+btnDemo.onclick=async()=>{
+  stopCam();
+  const img=new Image(); img.src='/assets/detect-demo.jpg?v=1';
+  await img.decode();
+  view.width=img.naturalWidth; view.height=img.naturalHeight;
+  hint.style.display='none'; nInf=0; tStart=performance.now();
+  ctx.drawImage(img,0,0);
+  try{
+    lastDets=await infer(img,view.width,view.height);
+    drawDets(view.width);
+    showStat(' · 示例图');
+  }catch(e){ stat.textContent='推理出错：'+e.message; }
+};
+
+if(window.ort) boot();   // CDN 主源已就位则直接启动；备源路径由其 onload 调 boot
+</script>
+</body>
+</html>
