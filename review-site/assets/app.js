@@ -39,7 +39,7 @@ async function loadAndRender() {
   let staticCourses = [], dynamic = [], progress = [], order = [], hidden = [], categoryOverrides = {};
   try {
     const [c1, c2, pr, od, me] = await Promise.all([
-      fetch('/courses.json').then((r) => (r.ok ? r.json() : [])),
+      fetch('/courses.json?v=' + Date.now()).then((r) => (r.ok ? r.json() : [])),   // 时间戳防 ccwu.cc 域 4h 强缓存
       fetch('/api/courses').then((r) => (r.ok ? r.json() : [])),
       fetch('/api/progress').then((r) => (r.ok ? r.json() : [])),
       fetch('/api/order').then((r) => (r.ok ? r.json() : { order: [] })),

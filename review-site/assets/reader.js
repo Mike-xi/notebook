@@ -62,7 +62,7 @@ if (shareMode) {
 } else {
   // 普通模式：合并静态 courses.json 与用户创建的 /api/courses
   Promise.all([
-    fetch('/courses.json').then((r) => (r.ok ? r.json() : [])),
+    fetch('/courses.json?v=' + Date.now()).then((r) => (r.ok ? r.json() : [])),   // 时间戳防 ccwu.cc 域 4h 强缓存
     fetch('/api/courses').then((r) => (r.ok ? r.json() : [])),
   ])
     .then(([staticCourses, dynamic]) => {
