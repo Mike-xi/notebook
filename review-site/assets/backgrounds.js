@@ -1,7 +1,7 @@
-// React Bits 风格的五种轻量 WebGL 背景。仅主页创建一个画布，不引入运行时依赖。
+// React Bits 风格的轻量 WebGL 背景。仅主页创建一个画布，不引入运行时依赖。
 (function () {
   if (!document.body.classList.contains('home')) return;
-  const VALID = new Set(['aurora', 'balatro', 'lightfall', 'lightning', 'galaxy']);
+  const VALID = new Set(['aurora', 'balatro']);
   const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)');
   const canvas = document.createElement('canvas');
   canvas.id = 'nb-background-canvas';
@@ -77,86 +77,6 @@
         }
         color=pow(max(color,0.),vec3(1.18))*1.22;
         gl_FragColor=vec4(color,.72);
-      }
-    `,
-    lightfall: `
-      precision highp float;
-      varying vec2 vUv; uniform vec2 uResolution; uniform float uTime; uniform vec2 uMouse;
-      float hash(float n){return fract(sin(n*127.1)*43758.5453);}
-      vec3 palette(float i){
-        vec3 a=vec3(.65,.78,1.),b=vec3(.32,.15,1.),c=vec3(1.,.62,.99);
-        return mix(mix(a,b,step(.34,i)),c,step(.67,i));
-      }
-      void main(){
-        vec2 uv=vUv; uv.x=(uv.x-.5)*(uResolution.x/uResolution.y)+.5;
-        vec3 color=vec3(.018,.025,.105); float alpha=.14;
-        for(float i=0.;i<10.;i++){
-          float h=hash(i+2.),speed=.045+hash(i+8.)*.075;
-          float head=fract(h-uTime*speed)*1.42-.2;
-          float x=hash(i+14.)*1.55-.25+sin(uTime*.16+i*1.7)*.035+(uMouse.x-.5)*.025;
-          float width=.004+hash(i+31.)*.01,dx=abs(uv.x-x);
-          float core=exp(-dx*dx/(width*width));
-          float glow=exp(-dx*dx/(width*width*22.));
-          float tail=smoothstep(.38,0.,head-uv.y)*step(uv.y,head);
-          float flare=exp(-abs(uv.y-head)*90.);
-          float twinkle=.7+.3*sin(uTime*(1.6+h*2.)+i*5.);
-          float energy=(core*.9+glow*.25)*(tail+flare*1.4)*twinkle;
-          color+=palette(fract(i*.37))*energy; alpha+=energy*.15;
-        }
-        color+=vec3(.17,.3,1.)*exp(-abs(uv.y-.14)*7.)*.08;
-        gl_FragColor=vec4(color,clamp(alpha,0.,.76));
-      }
-    `,
-    lightning: `
-      precision highp float;
-      uniform vec2 uResolution; uniform float uTime;
-      float hash11(float p){p=fract(p*.1031);p*=p+33.33;p*=p+p;return fract(p);}
-      float hash21(vec2 p){vec3 p3=fract(vec3(p.xyx)*.1031);p3+=dot(p3,p3.yzx+33.33);return fract((p3.x+p3.y)*p3.z);}
-      float noise(vec2 p){
-        vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
-        return mix(mix(hash21(i),hash21(i+vec2(1,0)),f.x),mix(hash21(i+vec2(0,1)),hash21(i+vec2(1,1)),f.x),f.y);
-      }
-      float fbm(vec2 p){float v=0.,a=.5;mat2 m=mat2(1.6,1.2,-1.2,1.6);for(int i=0;i<7;i++){v+=a*noise(p);p=m*p;a*=.5;}return v;}
-      vec3 hsv(float h,float s,float v){return ((clamp(abs(fract(h+vec3(0.,.666,.333))*6.-3.)-1.,0.,1.)-1.)*s+1.)*v;}
-      void main(){
-        vec2 uv=2.*gl_FragCoord.xy/uResolution.xy-1.;uv.x*=uResolution.x/uResolution.y;
-        float t=uTime*.42;uv.x+=1.65*fbm(uv*1.28+vec2(t*.15,t*.37))-.82;
-        float dist=abs(uv.x),pulse=.74+.26*hash11(floor(uTime*5.));
-        vec3 base=hsv(.64+uv.y*.045,.72,1.);
-        vec3 col=base*pow(.027/max(dist,.006),1.22)*pulse;
-        col+=base*pow(.1/max(dist,.02),.48)*.14;
-        gl_FragColor=vec4(col,clamp(max(max(col.r,col.g),col.b),0.,.82));
-      }
-    `,
-    galaxy: `
-      precision highp float;
-      varying vec2 vUv; uniform vec2 uResolution; uniform float uTime; uniform vec2 uMouse;
-      float hash21(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
-      mat2 rot(float a){float c=cos(a),s=sin(a);return mat2(c,-s,s,c);}
-      vec3 hue(float h){return .55+.45*cos(6.28318*(h+vec3(0.,.67,.33)));}
-      float star(vec2 uv,float flare){
-        float d=length(uv),m=.028/max(d,.002);float rays=max(0.,1.-abs(uv.x*uv.y*1050.));m+=rays*flare;
-        uv*=rot(.785398);rays=max(0.,1.-abs(uv.x*uv.y*1250.));m+=rays*.28*flare;
-        return m*smoothstep(.72,.12,d);
-      }
-      vec3 layer(vec2 uv,float depth){
-        vec3 col=vec3(0.);vec2 grid=fract(uv)-.5,id=floor(uv);
-        for(int y=-1;y<=1;y++)for(int x=-1;x<=1;x++){
-          vec2 off=vec2(float(x),float(y));float n=hash21(id+off+depth*17.);
-          vec2 pos=off+vec2(n,fract(n*34.))-.5;
-          float tw=.58+.42*sin(uTime*(1.1+n*2.5)+n*58.);
-          col+=star(grid-pos,smoothstep(.72,1.,n))*tw*hue(fract(n+depth*.11))*mix(.55,1.25,n);
-        } return col;
-      }
-      void main(){
-        vec2 uv=vUv-.5;uv.x*=uResolution.x/uResolution.y;uv-=(uMouse-.5)*.15;
-        uv*=rot(.08*uTime+(uMouse.x-.5)*.16);vec3 color=vec3(0.);
-        for(float i=0.;i<4.;i++){
-          float depth=fract(i*.25+uTime*.025),scale=mix(2.4,.72,depth);
-          color+=layer(uv*scale+i*31.7,depth)*depth*smoothstep(1.,.78,depth);
-        }
-        color+=vec3(.12,.2,.58)*exp(-length(uv*vec2(.55,2.4))*2.8)*.34;
-        gl_FragColor=vec4(color,clamp(max(max(color.r,color.g),color.b),0.,.78));
       }
     `,
   };

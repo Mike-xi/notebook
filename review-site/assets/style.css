@@ -2399,17 +2399,6 @@ body.home > main { position: relative; z-index: 1; }
 :root.nb-bg-fallback[data-bg="balatro"] body.home {
   background-image: conic-gradient(from 210deg at 54% 34%, #11131c, #7d29ff55, #0b91ff66, #11131c);
 }
-:root.nb-bg-fallback[data-bg="lightfall"] body.home {
-  background-image: repeating-linear-gradient(102deg, transparent 0 9%, #8bb8ff24 9.5%, transparent 10.5%), linear-gradient(#08102a, transparent 70%);
-}
-:root.nb-bg-fallback[data-bg="lightning"] body.home {
-  background-image: linear-gradient(104deg, transparent 47%, #86a9ff88 49%, #fff 50%, #6155ff88 51%, transparent 53%);
-}
-:root.nb-bg-fallback[data-bg="galaxy"] body.home {
-  background-image: radial-gradient(circle at 18% 22%, #fff 0 1px, transparent 2px), radial-gradient(circle at 72% 38%, #aebdff 0 1px, transparent 2px), radial-gradient(ellipse at 50% 50%, #4327a94d, transparent 68%);
-  background-size: 83px 91px, 127px 139px, 100% 100%;
-}
-
 .settings-menu {
   width: 286px;
   max-height: calc(100vh - 92px);
@@ -2474,17 +2463,6 @@ body.home > main { position: relative; z-index: 1; }
 .bg-thumb-balatro {
   background: repeating-radial-gradient(ellipse at 58% 50%, #7028ff 0 9%, #078eff 12%, #121322 20%);
 }
-.bg-thumb-lightfall {
-  background: repeating-linear-gradient(103deg, transparent 0 14%, #b7ceff 15%, #5835ff 16%, transparent 18%), linear-gradient(#0b1230, #120d24);
-}
-.bg-thumb-lightning {
-  background: linear-gradient(103deg, #090b18 0 42%, #584bff 47%, #eef3ff 50%, #658cff 53%, #080a16 59%);
-}
-.bg-thumb-galaxy {
-  background: radial-gradient(circle at 18% 25%, #fff 0 1px, transparent 2px), radial-gradient(circle at 76% 65%, #87a4ff 0 1px, transparent 2px), radial-gradient(ellipse at 48% 55%, #5a39c8 0, #15112f 35%, #060712 76%);
-  background-size: 17px 19px, 23px 25px, 100% 100%;
-}
-
 @media (max-width: 520px) {
   .settings-menu { width: min(286px, calc(100vw - 24px)); max-height: calc(100dvh - 86px); }
   .nb-background-canvas { opacity: .45; }

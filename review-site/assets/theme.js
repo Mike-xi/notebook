@@ -4,7 +4,7 @@
   const BG_KEY = 'nb-background';
   const PREF_KEY = 'appearance:home';
   const THEME_ORDER = ['auto', 'light', 'dark'];
-  const BG_ORDER = ['none', 'aurora', 'balatro', 'lightfall', 'lightning', 'galaxy'];
+  const BG_ORDER = ['none', 'aurora', 'balatro'];
   const ICON = { auto: '🌗', light: '☀️', dark: '🌙' };
   const LABEL = {
     auto: '主题：跟随系统（点击切到浅色）',
@@ -22,7 +22,9 @@
 
   function backgroundPref() {
     const value = localStorage.getItem(BG_KEY);
-    return BG_ORDER.includes(value) ? value : 'none';
+    if (BG_ORDER.includes(value)) return value;
+    localStorage.setItem(BG_KEY, 'none');
+    return 'none';
   }
 
   function effective(pref) {
@@ -132,7 +134,12 @@
         return;
       }
       if (THEME_ORDER.includes(remote.theme)) setTheme(remote.theme, false);
-      if (BG_ORDER.includes(remote.background)) setBackground(remote.background, false);
+      if (BG_ORDER.includes(remote.background)) {
+        setBackground(remote.background, false);
+      } else {
+        setBackground('none', false);
+        queuePersist();
+      }
       window.dispatchEvent(new CustomEvent('nb-appearance-hydrated', { detail: snapshot() }));
     } catch (_) {
       // 离线或旧部署时继续使用本机缓存。
