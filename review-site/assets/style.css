@@ -2379,7 +2379,8 @@ body.room {
    主页动态背景（设置 → 动态背景）
    ======================================== */
 :root[data-bg]:not([data-bg="none"]) body.home { background-color: transparent; }
-body.home > .topbar,
+/* 顶栏必须高于课程区：经典模式的设置/创建菜单仍挂在顶栏内。 */
+body.home > .topbar { position: relative; z-index: 70; }
 body.home > main { position: relative; z-index: 1; }
 .nb-background-canvas {
   position: fixed; inset: 0; z-index: 0;
