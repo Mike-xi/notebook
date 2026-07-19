@@ -39,6 +39,15 @@
     if (!topbar || !right || !window.NBIcon) return null;
 
     topbar.classList.add('dockbar');
+    var brandScrollFrame = 0;
+    function syncBrandScrollState() {
+      brandScrollFrame = 0;
+      topbar.classList.toggle('dockbar-scrolled', window.scrollY > 48);
+    }
+    window.addEventListener('scroll', function () {
+      if (!brandScrollFrame) brandScrollFrame = requestAnimationFrame(syncBrandScrollState);
+    }, { passive: true });
+    syncBrandScrollState();
     var panel = document.createElement('div');
     panel.className = 'dock-panel';
     panel.style.position = 'relative';

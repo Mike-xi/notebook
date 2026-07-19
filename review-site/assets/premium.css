@@ -94,6 +94,16 @@
   transform: translateY(-50%);
   z-index: 2;
 }
+@media (min-width: 701px) {
+  :root[data-ui="premium"] .dockbar .brand {
+    transition: opacity 180ms ease, transform 180ms ease;
+  }
+  :root[data-ui="premium"] .dockbar.dockbar-scrolled .brand {
+    opacity: 0;
+    transform: translateY(calc(-50% - 8px));
+    pointer-events: none;
+  }
+}
 :root[data-ui="premium"] .dockbar .topbar-right { display: contents; }
 
 :root[data-ui="premium"] .dock-panel {
