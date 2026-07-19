@@ -102,7 +102,7 @@
     "file": "detect",
     "title": "实时目标检测",
     "subject": "AI · 端侧推理",
-    "description": "YOLO11n 直接跑在你的浏览器里 · WebGPU 加速识别 80 类物体 · 打开相机即用，画面不上传任何服务器",
+    "description": "YOLO11n 直接跑在你的浏览器里 · WebGPU 加速识别 80 类物体 + 人体姿态骨架 · 相机实时 / 上传图片即用，画面不上传任何服务器",
     "icon": "🎯",
     "color": "#10B981",
     "kind": "html",
@@ -111,6 +111,7 @@
     "tags": [
       "YOLO",
       "目标检测",
+      "姿态估计",
       "WebGPU",
       "端侧AI",
       "相机"
