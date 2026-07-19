@@ -1,310 +1,260 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <title>贪吃蛇 · Snake</title>
 <script>
-  (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
+(function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
 </script>
 <style>
   :root{
-    --bg:#edf7ef;--panel:#ffffff;--fg:#17211a;--muted:#647268;--line:#d5e4d8;
-    --accent:#178847;--accent-2:#36b96a;--on-accent:#fff;--chip:#e6f2e9;
-    --board:#12261a;--board-2:#183522;--shadow:rgba(24,73,40,.18);--danger:#b3261e;
+    --bg:#f2f7f3;--panel:#ffffff;--fg:#182019;--muted:#66756a;--line:#d8e4da;
+    --acc:#18a558;--acc-on:#fff;--chip:#e7f1e9;--danger:#c4342a;
   }
   html[data-theme="dark"]{
-    --bg:#0f1511;--panel:#18201a;--fg:#e2ebe4;--muted:#a5b2a8;--line:#2c3a2f;
-    --accent:#74d99a;--accent-2:#45bd73;--on-accent:#0b2716;--chip:#223027;
-    --board:#08110c;--board-2:#102319;--shadow:rgba(0,0,0,.5);--danger:#ffb4ab;
+    --bg:#0e1410;--panel:#171f19;--fg:#e3ece5;--muted:#9fb0a4;--line:#2b382e;
+    --acc:#4cd587;--acc-on:#0a2415;--chip:#203025;--danger:#ff8d84;
   }
-  *{box-sizing:border-box}
-  html,body{margin:0;min-height:100%;overscroll-behavior:none}
-  body{
-    min-height:100dvh;background:
-      radial-gradient(circle at 14% 8%,color-mix(in srgb,var(--accent) 18%,transparent),transparent 30%),
-      radial-gradient(circle at 88% 90%,color-mix(in srgb,var(--accent-2) 14%,transparent),transparent 32%),var(--bg);
-    color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
-    display:flex;justify-content:center;padding:14px;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;
-  }
-  button{font:inherit}
-  .shell{width:min(100%,560px);display:flex;flex-direction:column;gap:12px;align-self:center}
-  .topbar{display:flex;align-items:center;gap:10px}
-  .back,.pill,.btn,.speed button,.dpad button{border:1px solid var(--line);background:var(--panel);color:var(--fg);box-shadow:0 5px 16px var(--shadow)}
-  .back{border-radius:999px;padding:8px 13px;font-weight:700;cursor:pointer}
-  .title{font-size:19px;font-weight:850;letter-spacing:-.02em}.title small{display:block;font-size:11px;color:var(--muted);font-weight:650;letter-spacing:.04em;text-transform:uppercase}
-  .stats{margin-left:auto;display:flex;gap:7px}.pill{min-width:68px;border-radius:14px;padding:7px 10px;text-align:center;font-size:11px;color:var(--muted)}
-  .pill b{display:block;color:var(--fg);font-size:18px;font-variant-numeric:tabular-nums;line-height:1.05}
-  .game-card{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:12px;box-shadow:0 18px 48px var(--shadow)}
-  .board-wrap{position:relative;width:100%;aspect-ratio:1;border-radius:17px;overflow:hidden;background:var(--board);outline:none;touch-action:none}
-  canvas{display:block;width:100%;height:100%;touch-action:none}
-  .overlay{position:absolute;inset:0;display:grid;place-items:center;background:linear-gradient(#06140b77,#06140bcc);backdrop-filter:blur(3px);transition:.18s}
-  .overlay[hidden]{display:none}
-  .overlay-card{width:min(82%,330px);text-align:center;color:#fff;padding:24px;border:1px solid #ffffff38;border-radius:22px;background:#0d2418d9;box-shadow:0 20px 55px #0008}
-  .overlay-icon{font-size:42px;line-height:1}.overlay h1{font-size:24px;margin:10px 0 5px}.overlay p{font-size:13px;line-height:1.55;color:#d6eadc;margin:0 0 17px}
-  .overlay .start{width:100%;border:0;border-radius:999px;padding:12px 18px;background:#77e39e;color:#0c2a17;font-weight:850;cursor:pointer}
-  .status-row{display:flex;align-items:center;gap:10px;margin-top:11px;padding:0 3px;min-height:34px}
-  .status{font-size:13px;color:var(--muted);font-weight:650;flex:1}.status strong{color:var(--fg)}
-  .live-dot{width:9px;height:9px;border-radius:50%;background:var(--muted);box-shadow:0 0 0 4px color-mix(in srgb,var(--muted) 16%,transparent)}
-  .live-dot.run{background:var(--accent-2);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent-2) 22%,transparent)}
-  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}.btn{border-radius:999px;padding:9px 14px;font-size:13px;font-weight:750;cursor:pointer}.btn:hover,.speed button:hover,.dpad button:hover{background:var(--chip)}
-  .btn.primary{background:var(--accent);border-color:transparent;color:var(--on-accent)}.btn.danger{color:var(--danger)}
-  .speed{display:flex;gap:4px;margin-left:auto;padding:4px;border-radius:999px;background:var(--chip)}
-  .speed button{border:0;box-shadow:none;border-radius:999px;padding:6px 10px;background:transparent;color:var(--muted);font-size:12px;font-weight:750;cursor:pointer}
-  .speed button.on{background:var(--accent);color:var(--on-accent)}
-  .dpad{width:184px;margin:0 auto;display:grid;grid-template-columns:repeat(3,54px);grid-template-rows:repeat(2,48px);gap:7px;justify-content:center}
-  .dpad button{border-radius:15px;font-size:20px;font-weight:900;cursor:pointer;touch-action:manipulation;user-select:none}.dpad button:active{transform:scale(.95);background:var(--accent);color:var(--on-accent)}
-  .dpad .up{grid-column:2}.dpad .left{grid-row:2;grid-column:1}.dpad .down{grid-row:2;grid-column:2}.dpad .right{grid-row:2;grid-column:3}
-  .tips{text-align:center;color:var(--muted);font-size:11.5px;line-height:1.55;margin:0 4px}
-  @media (min-width:720px) and (min-height:720px){.dpad{display:none}.shell{gap:14px}.tips{font-size:12px}}
-  @media (max-height:700px){body{padding:8px}.shell{gap:8px}.game-card{padding:9px}.topbar{transform:scale(.94);transform-origin:center left}.dpad{grid-template-columns:repeat(3,48px);grid-template-rows:repeat(2,42px)}.tips{display:none}}
+  *{box-sizing:border-box;margin:0}
+  body{background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+       min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:12px 12px calc(16px + env(safe-area-inset-bottom))}
+  header{width:min(94vw,560px);display:flex;align-items:center;gap:10px;padding:6px 0 10px}
+  .back{border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:12px;padding:7px 12px;font-size:13px;font-weight:650;cursor:pointer;text-decoration:none}
+  h1{font-size:18px;font-weight:800}
+  h1 small{display:block;font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.05em}
+  .stats{margin-left:auto;display:flex;gap:8px}
+  .pill{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:5px 12px;text-align:center;font-size:11px;color:var(--muted)}
+  .pill b{display:block;font-size:17px;color:var(--fg);font-variant-numeric:tabular-nums}
+  #wrap{position:relative;width:min(94vw,560px);aspect-ratio:1;border-radius:18px;overflow:hidden;
+        background:#0c1a11;border:1px solid var(--line);touch-action:none;outline:none}
+  canvas{display:block;width:100%;height:100%}
+  #overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+           background:rgba(5,12,8,.72);color:#e9f5ec;text-align:center;padding:20px;backdrop-filter:blur(2px)}
+  #overlay[hidden]{display:none}
+  #overlay .big{font-size:44px}
+  #overlay h2{font-size:20px}
+  #overlay p{font-size:13px;color:#b9cdbf;max-width:320px}
+  .btn{border:0;border-radius:999px;padding:10px 22px;font-size:15px;font-weight:750;cursor:pointer;background:var(--acc);color:var(--acc-on)}
+  .bar{width:min(94vw,560px);display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .bar .btn.sub{background:var(--panel);color:var(--fg);border:1px solid var(--line);font-size:13px;padding:9px 16px}
+  .speed{margin-left:auto;display:flex;gap:4px;background:var(--chip);border-radius:999px;padding:4px}
+  .speed button{border:0;background:transparent;color:var(--muted);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer}
+  .speed button.on{background:var(--acc);color:var(--acc-on)}
+  #status{width:min(94vw,560px);color:var(--muted);font-size:12.5px;margin-top:8px;text-align:center}
+  #dpad{display:none;grid-template-columns:repeat(3,54px);grid-auto-rows:54px;gap:6px;margin-top:12px}
+  #dpad button{border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:14px;font-size:20px;cursor:pointer;touch-action:manipulation}
+  #dpad button:active{background:var(--acc);color:var(--acc-on)}
+  @media (hover:none) and (pointer:coarse){ #dpad{display:grid} }
 </style>
 </head>
 <body>
-<main class="shell">
-  <header class="topbar">
-    <button class="back" id="backBtn" aria-label="返回课程首页">‹ 课程</button>
-    <div class="title">🐍 贪吃蛇<small>Snake · Classic</small></div>
-    <div class="stats" aria-live="polite">
-      <div class="pill">分数<b id="score">0</b></div>
-      <div class="pill">最高<b id="best">0</b></div>
-    </div>
-  </header>
+<header>
+  <a class="back" href="/">‹ 主页</a>
+  <h1>🐍 贪吃蛇<small>SNAKE</small></h1>
+  <div class="stats">
+    <span class="pill">分数<b id="score">0</b></span>
+    <span class="pill">最高<b id="best">0</b></span>
+  </div>
+</header>
 
-  <section class="game-card">
-    <div class="board-wrap" id="boardWrap" tabindex="0" aria-label="贪吃蛇游戏区域">
-      <canvas id="board"></canvas>
-      <div class="overlay" id="overlay">
-        <div class="overlay-card">
-          <div class="overlay-icon" id="overlayIcon">🐍</div>
-          <h1 id="overlayTitle">准备出发</h1>
-          <p id="overlayText">方向键或 WASD 控制方向；手机可滑动棋盘或使用方向键。</p>
-          <button class="start" id="startBtn">开始游戏</button>
-        </div>
-      </div>
-    </div>
+<div id="wrap" tabindex="0" aria-label="贪吃蛇棋盘">
+  <canvas id="cv"></canvas>
+  <div id="overlay">
+    <div class="big" id="ovIcon">🐍</div>
+    <h2 id="ovTitle">准备出发</h2>
+    <p id="ovText">方向键 / WASD 控制；手机滑动棋盘或用下方方向键。空格暂停。</p>
+    <button class="btn" id="ovBtn">开始游戏</button>
+  </div>
+</div>
 
-    <div class="status-row">
-      <span class="live-dot" id="liveDot"></span>
-      <div class="status" id="status">等待开始 · 吃到苹果得 <strong>10</strong> 分</div>
-    </div>
+<div class="bar">
+  <button class="btn" id="btnGo">开始</button>
+  <button class="btn sub" id="btnNew">重新开始</button>
+  <div class="speed" id="speed">
+    <button data-ms="170">悠闲</button>
+    <button data-ms="120">标准</button>
+    <button data-ms="80">疾速</button>
+  </div>
+</div>
+<div id="status">等待开始 · 吃到苹果 +10 分</div>
 
-    <div class="toolbar">
-      <button class="btn primary" id="pauseBtn">开始</button>
-      <button class="btn danger" id="newBtn">重新开始</button>
-      <div class="speed" id="speed" aria-label="速度">
-        <button data-ms="170">悠闲</button>
-        <button class="on" data-ms="125">标准</button>
-        <button data-ms="88">疾速</button>
-      </div>
-    </div>
-  </section>
-
-  <nav class="dpad" aria-label="触屏方向控制">
-    <button class="up" data-dir="up" aria-label="向上">↑</button>
-    <button class="left" data-dir="left" aria-label="向左">←</button>
-    <button class="down" data-dir="down" aria-label="向下">↓</button>
-    <button class="right" data-dir="right" aria-label="向右">→</button>
-  </nav>
-  <p class="tips">键盘：方向键 / WASD　·　空格暂停　·　Enter 开始　·　离开页面会自动暂停</p>
-</main>
+<div id="dpad">
+  <span></span><button data-d="up">▲</button><span></span>
+  <button data-d="left">◀</button><span></span><button data-d="right">▶</button>
+  <span></span><button data-d="down">▼</button><span></span>
+</div>
 
 <script>
 (function(){
-  'use strict';
+'use strict';
+// 自管深浅色；若被外层注入整页反相则剥离（本页配色自洽，无需反相）
+var strip=function(){document.documentElement.classList.remove('nb-dark-invert');};
+strip(); try{ new MutationObserver(strip).observe(document.documentElement,{attributes:true,attributeFilter:['class']}); }catch(e){}
 
-  const stripInvert = () => document.documentElement.classList.remove('nb-dark-invert');
-  stripInvert();
-  try { new MutationObserver(stripInvert).observe(document.documentElement,{attributes:true,attributeFilter:['class']}); } catch(e) {}
+var N=21;                                  // 21×21 格
+var cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+var wrap=document.getElementById('wrap'), overlay=document.getElementById('overlay');
+var elScore=document.getElementById('score'), elBest=document.getElementById('best'),
+    elStatus=document.getElementById('status');
+var snake, dir, ndir, food, score, timer=null, dead=false, stepMs=120, sizePx=0;
 
-  const $ = (s) => document.querySelector(s);
-  const canvas = $('#board');
-  const ctx = canvas.getContext('2d');
-  const boardWrap = $('#boardWrap');
-  const overlay = $('#overlay');
-  const scoreEl = $('#score');
-  const bestEl = $('#best');
-  const statusEl = $('#status');
-  const pauseBtn = $('#pauseBtn');
-  const liveDot = $('#liveDot');
-  const GRID = 20;
+var best=0; try{ best=Number(localStorage.getItem('snake-best'))||0; }catch(e){}
+try{ stepMs=Number(localStorage.getItem('snake-speed'))||120; }catch(e){}
+elBest.textContent=best;
 
-  let snake = [];
-  let food = {x:14,y:10};
-  let dir = {x:1,y:0};
-  let nextDir = {x:1,y:0};
-  let score = 0;
-  let best = 0;
-  let stepMs = 125;
-  let running = false;
-  let paused = false;
-  let gameOver = false;
-  let frameId = 0;
-  let lastTime = 0;
-  let accumulator = 0;
-  let touchStart = null;
+function fit(){
+  var r=wrap.getBoundingClientRect(), d=Math.min(devicePixelRatio||1,2);
+  sizePx=Math.max(1,Math.round(r.width*d));
+  if(cv.width!==sizePx){ cv.width=sizePx; cv.height=sizePx; }
+  draw();
+}
 
-  try { best = Math.max(0,Number(localStorage.getItem('snake-best'))||0); } catch(e) {}
-  try { stepMs = Number(localStorage.getItem('snake-speed'))||125; } catch(e) {}
-  bestEl.textContent = best;
+function reset(){
+  stop_();
+  snake=[{x:10,y:10},{x:9,y:10},{x:8,y:10}];
+  dir={x:1,y:0}; ndir=dir; score=0; dead=false;
+  elScore.textContent='0';
+  drop();
+  say('等待开始 · 吃到苹果 +10 分');
+  draw();
+}
 
-  function roundedRect(x,y,w,h,r){
-    const rr=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+rr,y);ctx.arcTo(x+w,y,x+w,y+h,rr);ctx.arcTo(x+w,y+h,x,y+h,rr);ctx.arcTo(x,y+h,x,y,rr);ctx.arcTo(x,y,x+w,y,rr);ctx.closePath();
+function drop(){
+  var used={}; snake.forEach(function(p){used[p.x+','+p.y]=1;});
+  var free=[];
+  for(var y=0;y<N;y++)for(var x=0;x<N;x++)if(!used[x+','+y])free.push({x:x,y:y});
+  if(!free.length){ over(true); return; }
+  food=free[(Math.random()*free.length)|0];
+}
+
+function go(){
+  if(timer) return;
+  if(dead) reset();
+  overlay.hidden=true;
+  document.getElementById('btnGo').textContent='暂停';
+  say('游戏进行中 · 别撞墙也别咬自己');
+  timer=setInterval(tick,stepMs);
+  wrap.focus({preventScroll:true});
+}
+function stop_(){
+  if(timer){ clearInterval(timer); timer=null; }
+  document.getElementById('btnGo').textContent='开始';
+}
+function pauseToggle(){
+  if(dead){ go(); return; }
+  if(timer){ stop_(); say('已暂停 · 空格或点「开始」继续'); }
+  else go();
+}
+
+function over(won){
+  stop_(); dead=true;
+  if(score>best){ best=score; elBest.textContent=best; try{localStorage.setItem('snake-best',String(best));}catch(e){} }
+  say(won?'棋盘填满，完美通关！':'游戏结束 · 得分 '+score);
+  document.getElementById('ovIcon').textContent=won?'🏆':'💥';
+  document.getElementById('ovTitle').textContent=won?'完美通关':'撞到了';
+  document.getElementById('ovText').textContent='得分 '+score+' · 最高 '+best;
+  document.getElementById('ovBtn').textContent='再来一局';
+  overlay.hidden=false;
+}
+
+function tick(){
+  dir=ndir;
+  var h={x:snake[0].x+dir.x, y:snake[0].y+dir.y};
+  var eat=(h.x===food.x&&h.y===food.y);
+  if(h.x<0||h.y<0||h.x>=N||h.y>=N){ over(false); return; }
+  var body=eat?snake:snake.slice(0,-1);
+  for(var i=0;i<body.length;i++) if(body[i].x===h.x&&body[i].y===h.y){ over(false); return; }
+  snake.unshift(h);
+  if(eat){ score+=10; elScore.textContent=score; drop(); }
+  else snake.pop();
+  draw();
+}
+
+function draw(){
+  if(!sizePx) return;
+  var s=sizePx, c=s/N;
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.fillStyle='#0c1a11'; ctx.fillRect(0,0,s,s);
+  ctx.strokeStyle='rgba(120,220,160,.06)'; ctx.lineWidth=1;
+  for(var i=1;i<N;i++){
+    var p=Math.round(i*c)+.5;
+    ctx.beginPath();ctx.moveTo(p,0);ctx.lineTo(p,s);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(0,p);ctx.lineTo(s,p);ctx.stroke();
   }
-
-  function fitCanvas(){
-    const rect=canvas.getBoundingClientRect();
-    const dpr=Math.min(devicePixelRatio||1,2);
-    const w=Math.max(1,Math.round(rect.width*dpr));
-    const h=Math.max(1,Math.round(rect.height*dpr));
-    if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}
-    ctx.setTransform(dpr,0,0,dpr,0,0);
-    draw();
+  // 苹果
+  if(food){
+    var fx=(food.x+.5)*c, fy=(food.y+.5)*c;
+    ctx.fillStyle='#ff5349';
+    ctx.beginPath();ctx.arc(fx,fy,c*.32,0,6.284);ctx.fill();
+    ctx.fillStyle='#78c850';
+    ctx.beginPath();ctx.ellipse(fx+c*.12,fy-c*.3,c*.12,c*.06,-0.6,0,6.284);ctx.fill();
   }
-
-  function draw(){
-    const size=canvas.getBoundingClientRect().width;
-    if(!size)return;
-    const cell=size/GRID;
-    ctx.clearRect(0,0,size,size);
-    const dark=document.documentElement.dataset.theme==='dark';
-    ctx.fillStyle=dark?'#08110c':'#12261a';ctx.fillRect(0,0,size,size);
-    ctx.strokeStyle=dark?'rgba(116,217,154,.07)':'rgba(143,220,166,.08)';ctx.lineWidth=1;
-    for(let i=1;i<GRID;i++){const p=Math.round(i*cell)+.5;ctx.beginPath();ctx.moveTo(p,0);ctx.lineTo(p,size);ctx.stroke();ctx.beginPath();ctx.moveTo(0,p);ctx.lineTo(size,p);ctx.stroke();}
-
-    const fx=(food.x+.5)*cell,fy=(food.y+.52)*cell;
-    ctx.fillStyle='#ef4b4b';ctx.beginPath();ctx.arc(fx,fy,cell*.31,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#ff8a76';ctx.beginPath();ctx.arc(fx-cell*.10,fy-cell*.10,cell*.08,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle='#7a4a28';ctx.lineWidth=Math.max(2,cell*.07);ctx.beginPath();ctx.moveTo(fx,fy-cell*.26);ctx.quadraticCurveTo(fx+cell*.03,fy-cell*.42,fx+cell*.12,fy-cell*.48);ctx.stroke();
-    ctx.fillStyle='#58b96c';ctx.beginPath();ctx.ellipse(fx+cell*.15,fy-cell*.38,cell*.14,cell*.07,-.5,0,Math.PI*2);ctx.fill();
-
-    snake.forEach((part,i)=>{
-      const pad=i===0?cell*.09:cell*.12;
-      const x=part.x*cell+pad,y=part.y*cell+pad,w=cell-pad*2;
-      const t=Math.max(.25,1-i/Math.max(8,snake.length));
-      ctx.fillStyle=i===0?'#74e39b':`hsl(145 58% ${36+Math.round(t*12)}%)`;
-      roundedRect(x,y,w,w,cell*.24);ctx.fill();
-      if(i===0){
-        const ex=(dir.y!==0?cell*.18:cell*.06),ey=(dir.x!==0?cell*.18:cell*.06);
-        const frontX=dir.x*cell*.17,frontY=dir.y*cell*.17;
-        ctx.fillStyle='#092312';
-        ctx.beginPath();ctx.arc((part.x+.5)*cell+frontX+ex,(part.y+.5)*cell+frontY+ey,Math.max(1.5,cell*.055),0,Math.PI*2);ctx.fill();
-        ctx.beginPath();ctx.arc((part.x+.5)*cell+frontX-ex,(part.y+.5)*cell+frontY-ey,Math.max(1.5,cell*.055),0,Math.PI*2);ctx.fill();
-      }
-    });
+  // 蛇
+  for(var k=snake.length-1;k>=0;k--){
+    var seg=snake[k], pad=(k===0? .06 : .1)*c;
+    var t=1-Math.min(.55,k/Math.max(10,snake.length));
+    ctx.fillStyle=k===0?'#7bf0a5':'rgb('+(46+40*t|0)+','+(160+60*t|0)+','+(95+30*t|0)+')';
+    rr(seg.x*c+pad, seg.y*c+pad, c-2*pad, c*.26);
+    ctx.fill();
   }
+  // 眼睛
+  var hd=snake[0], ex=(dir.y!==0)?.16:.05, ey=(dir.x!==0)?.16:.05;
+  ctx.fillStyle='#0b2013';
+  ctx.beginPath();ctx.arc((hd.x+.5+dir.x*.18+ex)*c,(hd.y+.5+dir.y*.18+ey)*c,Math.max(1.5,c*.055),0,6.284);ctx.fill();
+  ctx.beginPath();ctx.arc((hd.x+.5+dir.x*.18-ex)*c,(hd.y+.5+dir.y*.18-ey)*c,Math.max(1.5,c*.055),0,6.284);ctx.fill();
+}
+function rr(x,y,w,r){
+  var q=Math.min(r,w/2);
+  ctx.beginPath();
+  ctx.moveTo(x+q,y);ctx.arcTo(x+w,y,x+w,y+w,q);ctx.arcTo(x+w,y+w,x,y+w,q);
+  ctx.arcTo(x,y+w,x,y,q);ctx.arcTo(x,y,x+w,y,q);ctx.closePath();
+}
 
-  function freeCells(){
-    const occupied=new Set(snake.map(p=>`${p.x},${p.y}`));
-    const free=[];
-    for(let y=0;y<GRID;y++)for(let x=0;x<GRID;x++)if(!occupied.has(`${x},${y}`))free.push({x,y});
-    return free;
-  }
+function say(t){ elStatus.textContent=t; }
+function steer(x,y){
+  if(x===-dir.x&&y===-dir.y) return;
+  ndir={x:x,y:y};
+  if(!timer&&!dead) go();
+}
 
-  function placeFood(){
-    const free=freeCells();
-    if(!free.length){finish(true);return;}
-    food=free[Math.floor(Math.random()*free.length)];
-  }
+var KEYS={arrowup:[0,-1],w:[0,-1],arrowdown:[0,1],s:[0,1],arrowleft:[-1,0],a:[-1,0],arrowright:[1,0],d:[1,0]};
+addEventListener('keydown',function(e){
+  var k=e.key.toLowerCase();
+  if(KEYS[k]){ e.preventDefault(); steer(KEYS[k][0],KEYS[k][1]); }
+  else if(k===' '){ e.preventDefault(); pauseToggle(); }
+  else if(k==='enter'&&!timer){ e.preventDefault(); go(); }
+},{passive:false});
 
-  function setStatus(text,active){statusEl.innerHTML=text;liveDot.classList.toggle('run',!!active);}
+var t0=null;
+wrap.addEventListener('pointerdown',function(e){ t0={x:e.clientX,y:e.clientY}; });
+wrap.addEventListener('pointerup',function(e){
+  if(!t0) return;
+  var dx=e.clientX-t0.x, dy=e.clientY-t0.y; t0=null;
+  if(Math.max(Math.abs(dx),Math.abs(dy))<18) return;
+  if(Math.abs(dx)>Math.abs(dy)) steer(dx>0?1:-1,0); else steer(0,dy>0?1:-1);
+});
+document.getElementById('dpad').addEventListener('click',function(e){
+  var b=e.target.closest('[data-d]'); if(!b) return;
+  var m={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]}[b.dataset.d];
+  steer(m[0],m[1]);
+});
+document.getElementById('ovBtn').addEventListener('click',go);
+document.getElementById('btnGo').addEventListener('click',pauseToggle);
+document.getElementById('btnNew').addEventListener('click',function(){ reset(); go(); });
+var speedBox=document.getElementById('speed');
+speedBox.addEventListener('click',function(e){
+  var b=e.target.closest('[data-ms]'); if(!b) return;
+  stepMs=Number(b.dataset.ms);
+  try{localStorage.setItem('snake-speed',String(stepMs));}catch(err){}
+  speedBox.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x===b);});
+  if(timer){ clearInterval(timer); timer=setInterval(tick,stepMs); }
+});
+speedBox.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',Number(x.dataset.ms)===stepMs);});
+document.addEventListener('visibilitychange',function(){ if(document.hidden&&timer) pauseToggle(); });
+addEventListener('resize',fit);
 
-  function showOverlay(icon,title,text,button){
-    $('#overlayIcon').textContent=icon;$('#overlayTitle').textContent=title;$('#overlayText').textContent=text;$('#startBtn').textContent=button;overlay.hidden=false;
-  }
-
-  function reset(showIntro){
-    cancelAnimationFrame(frameId);
-    snake=[{x:9,y:10},{x:8,y:10},{x:7,y:10},{x:6,y:10}];
-    dir={x:1,y:0};nextDir={x:1,y:0};score=0;running=false;paused=false;gameOver=false;lastTime=0;accumulator=0;
-    placeFood();scoreEl.textContent='0';pauseBtn.textContent='开始';setStatus('等待开始 · 吃到苹果得 <strong>10</strong> 分',false);
-    if(showIntro)showOverlay('🐍','准备出发','方向键或 WASD 控制方向；手机可滑动棋盘或使用方向键。','开始游戏');
-    else overlay.hidden=true;
-    draw();
-  }
-
-  function start(){
-    if(running&&!paused)return;
-    if(gameOver)reset(false);
-    running=true;paused=false;overlay.hidden=true;pauseBtn.textContent='暂停';setStatus('游戏进行中 · <strong>别撞墙，也别咬到自己</strong>',true);lastTime=performance.now();accumulator=0;boardWrap.focus({preventScroll:true});
-    cancelAnimationFrame(frameId);frameId=requestAnimationFrame(loop);
-  }
-
-  function togglePause(){
-    if(!running){start();return;}
-    paused=!paused;pauseBtn.textContent=paused?'继续':'暂停';setStatus(paused?'已暂停 · 按空格或点击继续':'游戏进行中 · <strong>别撞墙，也别咬到自己</strong>',!paused);
-    if(!paused){lastTime=performance.now();accumulator=0;}
-  }
-
-  function finish(won){
-    running=false;paused=false;gameOver=true;cancelAnimationFrame(frameId);pauseBtn.textContent='再来一局';setStatus(won?'棋盘已填满 · <strong>完美通关</strong>':'游戏结束 · 最终得分 <strong>'+score+'</strong>',false);
-    showOverlay(won?'🏆':'💥',won?'完美通关':'撞到了',won?'你填满了整张棋盘！':'最终得分 '+score+'，最高分 '+best+'。','再来一局');
-  }
-
-  function step(){
-    dir={x:nextDir.x,y:nextDir.y};
-    const head={x:snake[0].x+dir.x,y:snake[0].y+dir.y};
-    const eating=head.x===food.x&&head.y===food.y;
-    const body=eating?snake:snake.slice(0,-1);
-    const hitWall=head.x<0||head.y<0||head.x>=GRID||head.y>=GRID;
-    const hitBody=body.some(p=>p.x===head.x&&p.y===head.y);
-    if(hitWall||hitBody){finish(false);return;}
-    snake.unshift(head);
-    if(eating){
-      score+=10;scoreEl.textContent=score;
-      if(score>best){best=score;bestEl.textContent=best;try{localStorage.setItem('snake-best',String(best));}catch(e){}}
-      placeFood();
-    }else snake.pop();
-  }
-
-  function loop(now){
-    if(!running)return;
-    if(paused){lastTime=now;frameId=requestAnimationFrame(loop);return;}
-    accumulator+=Math.min(250,now-lastTime);lastTime=now;
-    while(accumulator>=stepMs&&running){step();accumulator-=stepMs;}
-    draw();
-    if(running)frameId=requestAnimationFrame(loop);
-  }
-
-  function steer(x,y){
-    if(x===-nextDir.x&&y===-nextDir.y)return;
-    nextDir={x,y};
-    if(!running&&!gameOver)start();
-  }
-
-  const directions={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
-  function handleDirection(name){const d=directions[name];if(d)steer(d[0],d[1]);}
-
-  addEventListener('keydown',e=>{
-    const key=e.key.toLowerCase();
-    const map={arrowup:'up',w:'up',arrowdown:'down',s:'down',arrowleft:'left',a:'left',arrowright:'right',d:'right'};
-    if(map[key]){e.preventDefault();handleDirection(map[key]);return;}
-    if(key===' '){e.preventDefault();togglePause();}
-    if(key==='enter'&&!running){e.preventDefault();start();}
-  },{passive:false});
-
-  boardWrap.addEventListener('pointerdown',e=>{touchStart={x:e.clientX,y:e.clientY};boardWrap.focus({preventScroll:true});});
-  boardWrap.addEventListener('pointerup',e=>{
-    if(!touchStart)return;const dx=e.clientX-touchStart.x,dy=e.clientY-touchStart.y;touchStart=null;
-    if(Math.max(Math.abs(dx),Math.abs(dy))<18)return;
-    handleDirection(Math.abs(dx)>Math.abs(dy)?(dx>0?'right':'left'):(dy>0?'down':'up'));
-  });
-  boardWrap.addEventListener('pointercancel',()=>{touchStart=null;});
-  document.querySelector('.dpad').addEventListener('click',e=>{const b=e.target.closest('[data-dir]');if(b)handleDirection(b.dataset.dir);});
-  $('#startBtn').addEventListener('click',start);
-  pauseBtn.addEventListener('click',togglePause);
-  $('#newBtn').addEventListener('click',()=>{reset(false);start();});
-  $('#backBtn').addEventListener('click',()=>{location.href='/';});
-  $('#speed').addEventListener('click',e=>{
-    const b=e.target.closest('[data-ms]');if(!b)return;stepMs=Number(b.dataset.ms);document.querySelectorAll('#speed button').forEach(x=>x.classList.toggle('on',x===b));try{localStorage.setItem('snake-speed',String(stepMs));}catch(err){}
-  });
-  document.querySelectorAll('#speed button').forEach(b=>b.classList.toggle('on',Number(b.dataset.ms)===stepMs));
-  document.addEventListener('visibilitychange',()=>{if(document.hidden&&running&&!paused)togglePause();});
-  addEventListener('storage',e=>{if(e.key==='nb-theme')fitCanvas();});
-  new ResizeObserver(fitCanvas).observe(boardWrap);
-
-  reset(true);
-  fitCanvas();
+reset(); fit();
 })();
 </script>
 </body>

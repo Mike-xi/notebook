@@ -675,7 +675,8 @@
     if (level !== 'premium') return;
     buildDock();
     cardTilt();
-    cardSwap();
+    // cardSwap()（hero 问候语 + 叠卡轮播）已按用户要求下线（2026-07-19）：
+    // 最近阅读恢复为普通卡片网格，函数保留备查
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

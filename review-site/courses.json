@@ -240,7 +240,7 @@
     "file": "snake.html",
     "title": "贪吃蛇 · Snake",
     "subject": "益智",
-    "description": "经典贪吃蛇 · 方向键/WASD 与触屏滑动控制 · 三档速度 · 分数与本地最高分 · 手机/平板/桌面自适应",
+    "description": "经典贪吃蛇（全新重制版） · 方向键/WASD 与触屏滑动 · 三档速度 · 本地最高分 · 深浅色自适应",
     "icon": "🐍",
     "color": "#22C55E",
     "kind": "html",
@@ -251,7 +251,8 @@
       "益智",
       "键盘",
       "触屏"
-    ]
+    ],
+    "link": "/notes/snake.html"
   },
   {
     "file": "minesweeper",

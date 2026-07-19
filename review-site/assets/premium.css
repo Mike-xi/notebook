@@ -599,6 +599,8 @@
     padding: 6px;
     border-radius: 18px;
     width: fit-content;
+    margin-left: auto;   /* 小屏居中（原先 fit-content 左贴） */
+    margin-right: auto;
   }
   :root[data-ui="premium"] .dockbar .brand { position: static; transform: none; display: inline-flex; margin-bottom: 8px; }
   :root[data-ui="premium"] .topbar.dockbar { position: static; padding: 14px 16px 4px; text-align: center; }
