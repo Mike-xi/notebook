@@ -1,34 +1,30 @@
 name: 苹果比价每日刷新
 
-# 每天定时抓取太平洋电脑网苹果参考价并写入站点 D1（记录价格变化历史）。
-# 需要在仓库 Settings → Secrets and variables → Actions 配置 secret：APPLE_REFRESH_KEY
-#   （与 Pages 项目里 wrangler pages secret put APPLE_REFRESH_KEY 设的值一致）。
+# GitHub Runner 直接读取 Apple 中国官网，避开 Apple 对 Cloudflare 出口的 403；站点端同时刷新第三方参考价。
+# 需要在仓库 Settings → Secrets and variables → Actions 配置 APPLE_REFRESH_KEY，且与 Pages 环境变量一致。
 on:
   schedule:
     - cron: '0 1 * * *'      # 每天 UTC 01:00 = 北京时间 09:00
-  workflow_dispatch:          # 也支持在 Actions 页手动触发
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: 调用刷新端点
+      - name: 检出价格采集器
+        uses: actions/checkout@v4
+
+      - name: 使用 Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 采集官网并刷新站点
         env:
           APPLE_REFRESH_KEY: ${{ secrets.APPLE_REFRESH_KEY }}
-        run: |
-          if [ -z "$APPLE_REFRESH_KEY" ]; then
-            echo "::error::缺少 APPLE_REFRESH_KEY secret，请在仓库 Settings 配置"
-            exit 1
-          fi
-          echo "触发刷新…"
-          code=$(curl -sS -o /tmp/resp.json -w '%{http_code}' \
-            -X POST 'https://sjtu.ccwu.cc/api/apple/refresh' \
-            -H "X-API-Key: $APPLE_REFRESH_KEY" \
-            -H 'Accept: application/json')
-          echo "HTTP $code"
-          cat /tmp/resp.json
-          echo ""
-          if [ "$code" != "200" ]; then
-            echo "::error::刷新失败 (HTTP $code)"
-            exit 1
-          fi
+          APPLE_REFRESH_ENDPOINT: https://sjtu.ccwu.cc/api/apple/refresh
+        run: node scripts/apple-official-refresh.mjs

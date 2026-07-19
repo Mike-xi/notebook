@@ -1,8 +1,10 @@
 // 苹果比价前端：分类浏览 + 价格走势可视化（迷你折线 / 区间条 / 趋势大图）+ AI 预算顾问。
-// 价格数据来自 /api/apple（太平洋电脑网参考价 + 管理员手录），鉴权走站点登录 Cookie。
+// 价格数据来自 /api/apple（Apple 中国官网起售价 + 太平洋电脑网参考价 + 人工核验），鉴权走站点登录 Cookie。
 (function () {
   const $ = (id) => document.getElementById(id);
   const root = document.documentElement;
+  const SOURCE_LABELS = { 'apple-cn': 'Apple 官网', pconline: '太平洋', manual: '人工核验' };
+  const sourceLabel = (source) => SOURCE_LABELS[source] || '公开来源';
 
   // 主题跟随站点（auto 时监听系统变化）
   (function theme() {
@@ -28,14 +30,19 @@
 
   // 跳转搜索模板（型号取首个左括号前，搜索更干净）
   function jumpLinks(p) {
-    const q = encodeURIComponent('Apple ' + p.name.split('(')[0].trim());
+    const cleanName = p.name.split('(')[0].trim();
+    const q = encodeURIComponent('Apple ' + cleanName);
+    const officialUrl = p.source === 'apple-cn' && p.url
+      ? p.url
+      : `https://www.apple.com.cn/search/${encodeURIComponent(cleanName)}`;
     const links = [
-      ['官网', `https://www.apple.com.cn/search/${encodeURIComponent(p.name.split('(')[0].trim())}`],
+      ['官网', officialUrl],
       ['淘宝', `https://s.taobao.com/search?q=${q}`],
       ['京东', `https://search.jd.com/Search?keyword=${q}`],
       ['拼多多', `https://mobile.yangkeduo.com/search_result.html?search_key=${q}`],
     ];
-    if (p.url) links.push(['太平洋', p.url]);
+    if (p.url && p.source === 'pconline') links.push(['太平洋', p.url]);
+    else if (p.url && p.source === 'manual') links.push(['核验来源', p.url]);
     return links.map(([t, u]) => `<a class="ap-link" href="${esc(u)}" target="_blank" rel="noopener">${t}</a>`).join('');
   }
 
@@ -98,7 +105,7 @@
   }
 
   // —— 状态 ——
-  let DATA = { categories: [], refreshed_at: 0 };
+  let DATA = { categories: [], sources: [], refreshed_at: 0 };
   let isAdmin = false;
   let activeCat = '';
 
@@ -132,7 +139,7 @@
   function cardHTML(p) {
     const s = p.stats || {};
     const tracked = s.n >= 2 ? `已追踪 <b>${s.n}</b> 个价点` : '价格刚开始积累';
-    const srcTag = p.source === 'manual' ? '<span class="ap-tag-src">手录</span>' : '<span class="ap-tag-src">太平洋</span>';
+    const srcTag = `<span class="ap-tag-src">${esc(sourceLabel(p.source))}</span>`;
     const admin = isAdmin ? `<div class="ap-admin-row">
         <button class="ap-mini" data-act="addThird" data-name="${esc(p.name)}">＋ 渠道价</button>
         <button class="ap-mini del" data-act="delProduct" data-name="${esc(p.name)}">删除</button>
@@ -172,7 +179,7 @@
     if (!DATA.categories.length) {
       grid.innerHTML = ''; empty.hidden = false;
       empty.innerHTML = isAdmin
-        ? '还没有任何价格数据。点右上角「↻ 抓取刷新」拉取太平洋电脑网参考价，或「＋ 录入产品」手动添加 iPad/AirPods。'
+        ? '还没有价格数据。点右上角「↻ 抓取刷新」，将从 Apple 中国官网与太平洋电脑网同步真实公开价格。'
         : '价格数据正在准备中，请稍后再来看看～';
       return;
     }
@@ -181,7 +188,9 @@
   }
 
   function render() {
-    $('ap-refreshed').textContent = `· ${fmtRefreshed(DATA.refreshed_at)} · 数据源 太平洋电脑网`;
+    const labels = (DATA.sources || []).map((source) => source.label).filter(Boolean);
+    const sourceSummary = labels.length ? labels.join(' · ') : 'Apple 中国官网 · 太平洋电脑网';
+    $('ap-refreshed').textContent = `· ${fmtRefreshed(DATA.refreshed_at)} · 数据源 ${sourceSummary}`;
     renderTabs();
     renderGrid();
   }
@@ -219,7 +228,7 @@
         <span>历史最高 <b>${yuan(s.max ?? p.price)}</b></span>
         <span>均价 <b>${yuan(s.avg ?? p.price)}</b></span>
       </div>
-      <div class="ap-adv-note">价格为太平洋电脑网参考价，每日抓取累积；点位越多趋势越准。</div>
+      <div class="ap-adv-note">当前来源：${esc(sourceLabel(p.source))}。公开价格每日同步；点位越多趋势越准。</div>
     </div>`);
   }
 
@@ -232,7 +241,7 @@
   function openAddProduct() {
     openModal(`<div class="ap-modal">
       <div class="ap-mtitle"><h3>录入产品（手动）</h3><button class="ap-x" data-x>×</button></div>
-      <div class="ap-adv-note" style="margin-bottom:10px">用于 pconline 抓不到的 iPad / AirPods 等。价格请填你核实过的真实参考价，不要编造。</div>
+      <div class="ap-adv-note" style="margin-bottom:10px">五大分类已接入官网自动同步；这里仅用于补充已人工核验的特殊型号或渠道。</div>
       <div class="ap-form-grid">
         <div><label>分类</label><select id="ap-f-cat">
           <option value="ipad">iPad</option><option value="airpods">AirPods</option>
@@ -304,7 +313,8 @@
       const d = await r.json();
       if (!r.ok) { toast(d.error || '刷新失败'); return; }
       const c = d.changes || {};
-      toast(`已刷新：新增 ${c.new || 0}，降价 ${c.down || 0}，涨价 ${c.up || 0}`);
+      const warning = d.errors && d.errors.length ? `，${d.errors.length} 项源异常待重试` : '';
+      toast(`已刷新：新增 ${c.new || 0}，降价 ${c.down || 0}，涨价 ${c.up || 0}${warning}`);
       await load();
     } catch { toast('网络错误'); } finally { btn.disabled = false; btn.textContent = old; }
   }

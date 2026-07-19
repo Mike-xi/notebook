@@ -177,7 +177,7 @@ function ruleAdvice(budget, candidates, now) {
   }
   return {
     summary: picks.length ? `预算￥${budget} 内为你筛了 ${picks.length} 款，按价格时机排序` : '该预算内暂无合适产品，可放宽预算或换分类',
-    picks, timing, note: '价格为太平洋电脑网参考价，实际以各渠道为准',
+    picks, timing, note: '价格来自 Apple 中国官网起售价或公开第三方参考价，实际成交价以各渠道为准',
   };
 }
 

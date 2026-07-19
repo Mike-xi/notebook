@@ -309,8 +309,8 @@ export async function pruneDictHistory(env, owner) {
   } catch {}
 }
 
-// 苹果比价：每日抓太平洋电脑网(pconline)各分类参考价 + 记录价格变化历史 + 管理员手动第三方价。
-//  apple_products：当前在售产品当前价。source=pconline（自动抓）/manual（管理员手录，抓取不覆盖）。
+// 苹果比价：每日同步 Apple 中国官网起售价 + 太平洋电脑网参考价，并记录价格变化历史。
+//  apple_products：当前在售产品当前价。source=apple-cn（官网）/pconline（第三方）/manual（人工核验）。
 //  apple_history：每当某产品价格变化（或首次出现）记一条，做趋势折线/降涨标记/AI 出手时段分析。
 //  apple_third：管理员手动维护的第三方渠道价（淘宝/京东/拼多多），按 (name,channel) 唯一。
 let appleReady = false;

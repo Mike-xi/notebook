@@ -6,8 +6,8 @@
 //                                            third:[{channel,price,url,note,updated_at}]}]}],
 //        refreshed_at, me:{admin}, now }
 // POST /api/apple   （仅管理员）
-//   { action:'addProduct', category, name, price, url }   手录产品（iPad/AirPods 等 pconline 抓不到的；source=manual）
-//   { action:'delProduct', name }                          删除产品（pconline 行下次刷新会回来；manual 行永久删）
+//   { action:'addProduct', category, name, price, url }   手录已人工核验的补充产品（source=manual）
+//   { action:'delProduct', name }                          删除产品（自动源行下次刷新会回来；manual 行永久删）
 //   { action:'setThird', name, channel, price, url, note } 手录第三方渠道价（淘宝/京东/拼多多…）
 //   { action:'delThird', name, channel }                   删除某第三方价
 import { ensureAppleSchema, recordApplePrice, ensurePrefsSchema } from '../_lib/db.js';
@@ -21,6 +21,12 @@ const CAT_LABELS = [
   ['airpods', 'AirPods'],
   ['other', '其他'],
 ];
+
+const SOURCE_LABELS = {
+  'apple-cn': 'Apple 中国官网',
+  pconline: '太平洋电脑网',
+  manual: '人工核验',
+};
 
 const str = (v) => (typeof v === 'string' ? v : v == null ? '' : String(v)).trim();
 const clean = (s, max) => str(s).replace(/[\x00-\x1f\x7f]/g, '').slice(0, max);
@@ -44,6 +50,11 @@ export async function onRequestGet({ request, env }) {
   const products = (await env.DB.prepare(
     'SELECT category, name, price, url, source, updated_at FROM apple_products ORDER BY category, sort, price'
   ).all()).results || [];
+  const sourceCounts = new Map();
+  for (const product of products) sourceCounts.set(product.source, (sourceCounts.get(product.source) || 0) + 1);
+  const sources = [...sourceCounts].map(([key, count]) => ({
+    key, label: SOURCE_LABELS[key] || key, count,
+  }));
 
   // 价格历史（只在价变时记点，量很小）：一把查回，JS 分组
   const histByName = new Map();
@@ -88,10 +99,15 @@ export async function onRequestGet({ request, env }) {
     .filter((c) => c.products.length);
 
   await ensurePrefsSchema(env);
-  const ref = await env.DB.prepare("SELECT value FROM prefs WHERE key='apple_refreshed_at'").first();
-  const refreshed_at = ref ? parseInt(ref.value, 10) || 0 : 0;
+  const prefRows = (await env.DB.prepare(
+    "SELECT key, value FROM prefs WHERE key IN ('apple_refreshed_at', 'apple_refresh_report')"
+  ).all()).results || [];
+  const prefs = new Map(prefRows.map((row) => [row.key, row.value]));
+  const refreshed_at = parseInt(prefs.get('apple_refreshed_at'), 10) || 0;
+  let refresh_report = null;
+  try { refresh_report = JSON.parse(prefs.get('apple_refresh_report') || 'null'); } catch {}
 
-  return Response.json({ categories, refreshed_at, me: { admin }, now: Date.now() });
+  return Response.json({ categories, sources, refreshed_at, refresh_report, me: { admin }, now: Date.now() });
 }
 
 export async function onRequestPost({ request, env }) {
