@@ -7,11 +7,13 @@
   <script>
     // 首屏前定主题，避免浅/深闪烁；完整逻辑在 theme.js
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
+    // 背景也先从本机缓存恢复；登录后 theme.js 会用当前密码用户的云端偏好校准。
     // 界面风格（高级/经典）同样首屏前定，避免 Dock/经典顶栏互闪；完整逻辑在 premium.js
+    (function(){try{var b=localStorage.getItem('nb-background')||'none';var a=['none','aurora','balatro','lightfall','lightning','galaxy'];document.documentElement.dataset.bg=a.includes(b)?b:'none';}catch(e){document.documentElement.dataset.bg='none';}})();
     (function(){try{var u=localStorage.getItem('nb-ui-level');document.documentElement.dataset.ui=(u==='classic')?'classic':'premium';}catch(e){document.documentElement.dataset.ui='premium';}})();
   </script>
   <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613d">
-  <link rel="stylesheet" href="/assets/style.css?v=20260616b">
+  <link rel="stylesheet" href="/assets/style.css?v=20260719c">
   <link rel="stylesheet" href="/assets/premium.css?v=20260719a">
 </head>
 <body class="home">
@@ -62,6 +64,18 @@
               <button class="seg-btn" data-theme-set="light" aria-pressed="false">浅色</button>
               <button class="seg-btn" data-theme-set="dark" aria-pressed="false">深色</button>
             </div>
+          </div>
+          <div class="sm-section">
+            <span class="sm-label">动态背景</span>
+            <div class="bg-picker" role="group" aria-label="动态背景">
+              <button class="bg-choice" data-bg-set="none" aria-pressed="false" type="button"><span class="bg-thumb bg-thumb-none"></span><span>纯色</span></button>
+              <button class="bg-choice" data-bg-set="aurora" aria-pressed="false" type="button"><span class="bg-thumb bg-thumb-aurora"></span><span>Aurora</span></button>
+              <button class="bg-choice" data-bg-set="balatro" aria-pressed="false" type="button"><span class="bg-thumb bg-thumb-balatro"></span><span>Balatro</span></button>
+              <button class="bg-choice" data-bg-set="lightfall" aria-pressed="false" type="button"><span class="bg-thumb bg-thumb-lightfall"></span><span>Lightfall</span></button>
+              <button class="bg-choice" data-bg-set="lightning" aria-pressed="false" type="button"><span class="bg-thumb bg-thumb-lightning"></span><span>Lightning</span></button>
+              <button class="bg-choice" data-bg-set="galaxy" aria-pressed="false" type="button"><span class="bg-thumb bg-thumb-galaxy"></span><span>Galaxy</span></button>
+            </div>
+            <p class="sm-tip">跟随当前登录密码记忆；低性能设备会自动降低分辨率。</p>
           </div>
           <div class="sm-section">
             <span class="sm-label">阅读器工具栏唤出</span>
@@ -230,9 +244,10 @@
   </div>
 
   <script src="/assets/icons.js?v=20260616a"></script>
-  <script src="/assets/theme.js?v=20260608a"></script>
+  <script src="/assets/theme.js?v=20260719c"></script>
+  <script src="/assets/backgrounds.js?v=20260719c"></script>
   <script src="/assets/md.js?v=20260608d"></script>
-  <script src="/assets/app.js?v=20260719b"></script>
+  <script src="/assets/app.js?v=20260719c"></script>
   <script src="/assets/premium.js?v=20260719a"></script>
 </body>
 </html>

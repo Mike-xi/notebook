@@ -266,7 +266,10 @@ syncBarRevealButtons();
 document.getElementById('logout-btn').addEventListener('click', async () => {
   closeSettings();
   if (!confirm('退出登录？')) return;
+  try { await window.NBTheme?.flush?.(); } catch {}
   try { await fetch('/api/logout', { method: 'POST' }); } catch {}
+  localStorage.removeItem('nb-theme');
+  localStorage.removeItem('nb-background');
   location.href = '/login.html';
 });
 

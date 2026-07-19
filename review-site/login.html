@@ -41,6 +41,9 @@
           body: JSON.stringify({ password }),
         });
         if (res.ok) {
+          // 密码可能对应另一位用户；先清掉上一个会话的首屏缓存，再由服务端偏好恢复。
+          localStorage.removeItem('nb-theme');
+          localStorage.removeItem('nb-background');
           location.href = '/';
           return;
         }

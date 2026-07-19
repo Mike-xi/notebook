@@ -2375,3 +2375,118 @@ body.room {
 @media (max-width: 640px) {
   .room-bar { padding: 10px 14px; }
 }
+/* ========================================
+   主页动态背景（设置 → 动态背景）
+   ======================================== */
+:root[data-bg]:not([data-bg="none"]) body.home { background-color: transparent; }
+body.home > .topbar,
+body.home > main { position: relative; z-index: 1; }
+.nb-background-canvas {
+  position: fixed; inset: 0; z-index: 0;
+  width: 100vw; height: 100vh;
+  pointer-events: none;
+  opacity: .54;
+  filter: saturate(1.05);
+  transition: opacity 240ms ease;
+}
+[data-theme="dark"] .nb-background-canvas { opacity: .82; filter: saturate(1.14) brightness(.92); }
+:root[data-ui="premium"][data-bg]:not([data-bg="none"]) body.home::before { opacity: .22; }
+
+/* WebGL 不可用时仍保留对应的静态氛围，不退回一片空白。 */
+:root.nb-bg-fallback[data-bg="aurora"] body.home {
+  background-image: radial-gradient(70vw 38vh at 22% 18%, #7cff6766, transparent 70%), radial-gradient(62vw 42vh at 72% 28%, #5227ff70, transparent 72%);
+}
+:root.nb-bg-fallback[data-bg="balatro"] body.home {
+  background-image: conic-gradient(from 210deg at 54% 34%, #11131c, #7d29ff55, #0b91ff66, #11131c);
+}
+:root.nb-bg-fallback[data-bg="lightfall"] body.home {
+  background-image: repeating-linear-gradient(102deg, transparent 0 9%, #8bb8ff24 9.5%, transparent 10.5%), linear-gradient(#08102a, transparent 70%);
+}
+:root.nb-bg-fallback[data-bg="lightning"] body.home {
+  background-image: linear-gradient(104deg, transparent 47%, #86a9ff88 49%, #fff 50%, #6155ff88 51%, transparent 53%);
+}
+:root.nb-bg-fallback[data-bg="galaxy"] body.home {
+  background-image: radial-gradient(circle at 18% 22%, #fff 0 1px, transparent 2px), radial-gradient(circle at 72% 38%, #aebdff 0 1px, transparent 2px), radial-gradient(ellipse at 50% 50%, #4327a94d, transparent 68%);
+  background-size: 83px 91px, 127px 139px, 100% 100%;
+}
+
+.settings-menu {
+  width: 286px;
+  max-height: calc(100vh - 92px);
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.bg-picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+.bg-choice {
+  position: relative;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 5px 5px 7px;
+  border: 1px solid var(--outline-variant);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--surface-container-lowest) 76%, transparent);
+  color: var(--on-surface-variant);
+  font: 600 10px/1.1 inherit;
+  cursor: pointer;
+  transition: border-color var(--transition), color var(--transition), transform var(--transition), background-color var(--transition);
+}
+.bg-choice:hover {
+  color: var(--on-surface);
+  border-color: color-mix(in srgb, var(--primary) 48%, var(--outline-variant));
+  transform: translateY(-1px);
+}
+.bg-choice.active {
+  color: var(--primary);
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-container-lowest));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 24%, transparent);
+}
+.bg-choice.active::after {
+  content: '✓';
+  position: absolute;
+  top: 7px; right: 7px;
+  display: grid; place-items: center;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface) 74%, transparent);
+  color: var(--primary);
+  font-size: 9px;
+}
+.bg-thumb {
+  display: block;
+  width: 100%; height: 31px;
+  overflow: hidden;
+  border-radius: 7px;
+  background-color: #0b0c17;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.10);
+}
+.bg-thumb-none {
+  background: linear-gradient(135deg, var(--surface-container-lowest) 0 50%, var(--surface-container-high) 50%);
+}
+.bg-thumb-aurora {
+  background: radial-gradient(70% 90% at 16% 34%, #7cff67cc, transparent 72%), radial-gradient(90% 90% at 76% 50%, #5227ff, #0b0c17 72%);
+}
+.bg-thumb-balatro {
+  background: repeating-radial-gradient(ellipse at 58% 50%, #7028ff 0 9%, #078eff 12%, #121322 20%);
+}
+.bg-thumb-lightfall {
+  background: repeating-linear-gradient(103deg, transparent 0 14%, #b7ceff 15%, #5835ff 16%, transparent 18%), linear-gradient(#0b1230, #120d24);
+}
+.bg-thumb-lightning {
+  background: linear-gradient(103deg, #090b18 0 42%, #584bff 47%, #eef3ff 50%, #658cff 53%, #080a16 59%);
+}
+.bg-thumb-galaxy {
+  background: radial-gradient(circle at 18% 25%, #fff 0 1px, transparent 2px), radial-gradient(circle at 76% 65%, #87a4ff 0 1px, transparent 2px), radial-gradient(ellipse at 48% 55%, #5a39c8 0, #15112f 35%, #060712 76%);
+  background-size: 17px 19px, 23px 25px, 100% 100%;
+}
+
+@media (max-width: 520px) {
+  .settings-menu { width: min(286px, calc(100vw - 24px)); max-height: calc(100dvh - 86px); }
+  .nb-background-canvas { opacity: .45; }
+  [data-theme="dark"] .nb-background-canvas { opacity: .72; }
+}

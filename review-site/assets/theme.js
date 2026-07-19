@@ -1,10 +1,10 @@
-// 主题管理：偏好三态 auto/light/dark，持久化到 localStorage，解析为 <html data-theme>。
-// 各页 <head> 里有一段内联脚本先行设置 data-theme 避免首屏闪烁；本文件负责切换 UI、
-// 跟随系统变化、以及把生效主题广播给阅读器 iframe（让笔记正文也能跟着变暗）。
-
+// 主题与动态背景偏好：本机缓存用于无闪烁首屏，登录后再按密码用户与服务端同步。
 (function () {
-  const KEY = 'nb-theme';
-  const ORDER = ['auto', 'light', 'dark'];
+  const THEME_KEY = 'nb-theme';
+  const BG_KEY = 'nb-background';
+  const PREF_KEY = 'appearance:home';
+  const THEME_ORDER = ['auto', 'light', 'dark'];
+  const BG_ORDER = ['none', 'aurora', 'balatro', 'lightfall', 'lightning', 'galaxy'];
   const ICON = { auto: '🌗', light: '☀️', dark: '🌙' };
   const LABEL = {
     auto: '主题：跟随系统（点击切到浅色）',
@@ -12,83 +12,175 @@
     dark: '主题：深色（点击切到跟随系统）',
   };
   const mql = window.matchMedia('(prefers-color-scheme: dark)');
+  let dirty = false;
+  let syncTimer = 0;
 
-  function getPref() {
-    const v = localStorage.getItem(KEY);
-    return ORDER.includes(v) ? v : 'auto';
+  function themePref() {
+    const value = localStorage.getItem(THEME_KEY);
+    return THEME_ORDER.includes(value) ? value : 'auto';
   }
+
+  function backgroundPref() {
+    const value = localStorage.getItem(BG_KEY);
+    return BG_ORDER.includes(value) ? value : 'none';
+  }
+
   function effective(pref) {
     if (pref === 'dark') return 'dark';
     if (pref === 'light') return 'light';
     return mql.matches ? 'dark' : 'light';
   }
 
-  function apply(pref) {
-    const eff = effective(pref);
-    document.documentElement.dataset.theme = eff;
-    updateButton(pref);
-    // 通知本页其它脚本（如 reader.js 给 iframe 注入暗色）
-    window.dispatchEvent(new CustomEvent('nb-theme-change', { detail: { pref, effective: eff } }));
-    return eff;
-  }
-
-  function updateButton(pref) {
-    document.querySelectorAll('[data-theme-toggle]').forEach((btn) => {
-      btn.textContent = ICON[pref];
-      btn.title = LABEL[pref];
-      btn.setAttribute('aria-label', LABEL[pref]);
+  function updateThemeButtons(pref) {
+    document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
+      button.textContent = ICON[pref];
+      button.title = LABEL[pref];
+      button.setAttribute('aria-label', LABEL[pref]);
     });
-    // 分段控件（设置里的 跟随系统/浅色/深色）：高亮当前项
-    document.querySelectorAll('[data-theme-set]').forEach((btn) => {
-      const on = btn.getAttribute('data-theme-set') === pref;
-      btn.classList.toggle('active', on);
-      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    document.querySelectorAll('[data-theme-set]').forEach((button) => {
+      const active = button.getAttribute('data-theme-set') === pref;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
     });
   }
 
-  function cycle() {
-    const next = ORDER[(ORDER.indexOf(getPref()) + 1) % ORDER.length];
-    localStorage.setItem(KEY, next);
-    apply(next);
+  function updateBackgroundButtons(pref) {
+    document.querySelectorAll('[data-bg-set]').forEach((button) => {
+      const active = button.getAttribute('data-bg-set') === pref;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
   }
 
-  // 直接设定某个偏好（供分段控件用）
-  function setPref(pref) {
-    if (!ORDER.includes(pref)) return;
-    localStorage.setItem(KEY, pref);
-    apply(pref);
+  function applyTheme(pref) {
+    const resolved = effective(pref);
+    document.documentElement.dataset.theme = resolved;
+    updateThemeButtons(pref);
+    window.dispatchEvent(new CustomEvent('nb-theme-change', {
+      detail: { pref, effective: resolved },
+    }));
+    return resolved;
   }
 
-  // 系统色变化时，仅在「跟随系统」下重新解析
-  mql.addEventListener('change', () => {
-    if (getPref() === 'auto') apply('auto');
-  });
+  function applyBackground(pref) {
+    document.documentElement.dataset.bg = pref;
+    updateBackgroundButtons(pref);
+    window.dispatchEvent(new CustomEvent('nb-background-change', {
+      detail: { background: pref },
+    }));
+  }
+
+  function snapshot() {
+    return { theme: themePref(), background: backgroundPref() };
+  }
+
+  async function persist() {
+    syncTimer = 0;
+    try {
+      const response = await fetch('/api/prefs', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: PREF_KEY, value: JSON.stringify(snapshot()) }),
+        keepalive: true,
+      });
+      if (!response.ok) throw new Error('appearance sync failed');
+    } catch (_) {
+      // 本机缓存仍然有效；下次操作或刷新会再次同步。
+    }
+  }
+
+  function queuePersist() {
+    clearTimeout(syncTimer);
+    syncTimer = window.setTimeout(persist, 140);
+  }
+
+  function setTheme(pref, userAction = true) {
+    if (!THEME_ORDER.includes(pref)) return;
+    localStorage.setItem(THEME_KEY, pref);
+    if (userAction) dirty = true;
+    applyTheme(pref);
+    if (userAction) queuePersist();
+  }
+
+  function setBackground(pref, userAction = true) {
+    if (!BG_ORDER.includes(pref)) return;
+    localStorage.setItem(BG_KEY, pref);
+    if (userAction) dirty = true;
+    applyBackground(pref);
+    if (userAction) queuePersist();
+  }
+
+  function cycleTheme() {
+    const next = THEME_ORDER[(THEME_ORDER.indexOf(themePref()) + 1) % THEME_ORDER.length];
+    setTheme(next);
+  }
+
+  async function hydrate() {
+    try {
+      const response = await fetch(`/api/prefs?key=${encodeURIComponent(PREF_KEY)}`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!data.value) {
+        if (!dirty) queuePersist();
+        return;
+      }
+      const remote = JSON.parse(data.value);
+      if (dirty) {
+        queuePersist();
+        return;
+      }
+      if (THEME_ORDER.includes(remote.theme)) setTheme(remote.theme, false);
+      if (BG_ORDER.includes(remote.background)) setBackground(remote.background, false);
+      window.dispatchEvent(new CustomEvent('nb-appearance-hydrated', { detail: snapshot() }));
+    } catch (_) {
+      // 离线或旧部署时继续使用本机缓存。
+    }
+  }
 
   function wire() {
-    document.querySelectorAll('[data-theme-toggle]').forEach((btn) => {
-      if (btn.__nbWired) return;
-      btn.__nbWired = true;
-      btn.addEventListener('click', cycle);
+    document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
+      if (button.__nbThemeWired) return;
+      button.__nbThemeWired = true;
+      button.addEventListener('click', cycleTheme);
     });
-    document.querySelectorAll('[data-theme-set]').forEach((btn) => {
-      if (btn.__nbWired) return;
-      btn.__nbWired = true;
-      btn.addEventListener('click', () => setPref(btn.getAttribute('data-theme-set')));
+    document.querySelectorAll('[data-theme-set]').forEach((button) => {
+      if (button.__nbThemeWired) return;
+      button.__nbThemeWired = true;
+      button.addEventListener('click', () => setTheme(button.getAttribute('data-theme-set')));
     });
-    updateButton(getPref());
+    document.querySelectorAll('[data-bg-set]').forEach((button) => {
+      if (button.__nbBackgroundWired) return;
+      button.__nbBackgroundWired = true;
+      button.addEventListener('click', () => setBackground(button.getAttribute('data-bg-set')));
+    });
+    updateThemeButtons(themePref());
+    updateBackgroundButtons(backgroundPref());
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', wire);
-  } else {
-    wire();
-  }
+  mql.addEventListener('change', () => {
+    if (themePref() === 'auto') applyTheme('auto');
+  });
+  window.addEventListener('storage', (event) => {
+    if (event.key === THEME_KEY) applyTheme(themePref());
+    if (event.key === BG_KEY) applyBackground(backgroundPref());
+  });
 
-  // 暴露给 reader.js：当前生效主题 + 偏好
+  applyTheme(themePref());
+  applyBackground(backgroundPref());
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
+  else wire();
+  window.addEventListener('load', hydrate, { once: true });
+
   window.NBTheme = {
-    get effective() { return effective(getPref()); },
-    get pref() { return getPref(); },
-    apply: () => apply(getPref()),
-    set: setPref,
+    get effective() { return effective(themePref()); },
+    get pref() { return themePref(); },
+    get background() { return backgroundPref(); },
+    apply: () => applyTheme(themePref()),
+    set: setTheme,
+    setBackground,
+    sync: queuePersist,
+    flush: persist,
   };
 })();
