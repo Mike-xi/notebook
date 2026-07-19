@@ -4,13 +4,13 @@
 const MAX_TEXT_BYTES = 25_000_000;   // html / md：≤1.4MB 存 D1，超过自动转存 R2，整体上限 25MB
 const MAX_PDF_BYTES = 20_000_000;   // pdf 存 R2
 const KIND_ICON = { html: '📘', md: '📝', pdf: '📕' };
+const COVER_ASSET_VERSION = '20260719b'; // 封面 URL 版本；绕过自定义域的长缓存
 
 let studyProfile = null;       // 「关于」弹窗用：基于你自己的课程数据生成的学习画像
 let staticCoursesData = [];     // 静态课程元数据，供「全能问答」随请求带给后端
 let allCoursesMap = new Map();  // file -> 课程元数据，深入搜索结果展示用
 let activeTab = 'learn';        // 当前分类 Tab：默认 learn；顺序 learn / explore / play / all
 let searchQ = '';               // 即时搜索词（小写）
-let hasRecent = false;          // 是否存在「最近阅读」
 let totalCourses = 0;           // 课程总数（空状态判断用）
 let ncCat = 'learn';            // 创建课程时选择的分类
 let isAdmin = false;            // 当前账号是否为管理员（游客只能浏览/使用，不能增删改课程）
@@ -86,10 +86,6 @@ async function loadAndRender() {
   allCoursesMap = new Map(courses.map((c) => [c.file, c]));
   studyProfile = buildProfile(courses, progress, recent);
 
-  hasRecent = recent.length > 0;
-  if (hasRecent) {
-    document.getElementById('recent').innerHTML = recent.map((c) => cardHTML(c)).join('');
-  }
 
   // 全部课程
   const grid = document.getElementById('courses');
@@ -129,7 +125,7 @@ homeTabs.addEventListener('click', (e) => {
   applyFilters();
 });
 
-// 课程卡按「当前 Tab 分类」与「搜索词」联合显隐；Recent 仅在 All 且无搜索时出现
+// 课程卡按「当前 Tab 分类」与「搜索词」联合显隐
 function applyFilters() {
   let visible = 0;
   document.querySelectorAll('#courses .nb-card').forEach((card) => {
@@ -139,9 +135,6 @@ function applyFilters() {
     card.style.display = show ? '' : 'none';
     if (show) visible++;
   });
-  // 经典模式沿用「仅 All 分类显示」；高级模式 Recent 是卡堆英雄区，除搜索外常驻
-  const premiumUI = document.documentElement.dataset.ui === 'premium';
-  document.getElementById('recent-section').hidden = !(hasRecent && !searchQ && (premiumUI || activeTab === 'all'));
   const empty = document.getElementById('empty-hint');
   if (totalCourses === 0) {
     empty.hidden = false;
@@ -1003,7 +996,7 @@ function cardHTML(c, deletable = false) {
     ? `<button class="nb-edit" data-file="${escapeAttr(c.file)}" title="编辑笔记" aria-label="编辑笔记">${ic('edit', 15)}</button>`
     : '';
 
-  // 主网格（deletable=true）的卡片可拖动排序；「最近阅读」不可；游客不可
+  // 主网格（deletable=true）的卡片可拖动排序；游客不可
   const dragHandle = (deletable && isAdmin)
     ? `<button type="button" class="nb-drag" title="拖动排序" aria-label="拖动排序">${ic('drag', 16)}</button>`
     : '';
@@ -1020,7 +1013,7 @@ function cardHTML(c, deletable = false) {
   // 封面图（仅高级界面显示，经典模式 CSS 隐藏）：/assets/covers/<file去扩展名>.webp，
   // 加载失败退回卡片自带的 accent 渐变底
   const coverSlug = String(c.file || '').replace(/\.[a-z0-9]+$/i, '');
-  const coverBlock = `<div class="nb-card-cover" aria-hidden="true"><img src="/assets/covers/${escapeAttr(coverSlug)}.webp" alt="" loading="lazy" onerror="this.parentElement.classList.add('noimg')"></div>`;
+  const coverBlock = `<div class="nb-card-cover" aria-hidden="true"><img src="/assets/covers/${escapeAttr(coverSlug)}.webp?v=${COVER_ASSET_VERSION}" alt="" loading="lazy" onerror="this.parentElement.classList.add('noimg')"></div>`;
 
   return `
     <a class="nb-card" href="${escapeAttr(href)}"
