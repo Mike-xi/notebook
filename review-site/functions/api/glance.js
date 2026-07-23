@@ -126,24 +126,56 @@ async function hackerNews(params) {
 }
 
 async function markets() {
-  const ids = 'bitcoin,ethereum,solana';
-  const data = await fetchJson(
-    `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd,cny&include_24hr_change=true`,
-    120,
-  );
   const labels = {
     bitcoin: ['BTC', 'Bitcoin'],
     ethereum: ['ETH', 'Ethereum'],
     solana: ['SOL', 'Solana'],
   };
-  return Object.entries(labels).map(([id, [symbol, name]]) => ({
-    id,
-    symbol,
-    name,
-    usd: data[id]?.usd ?? null,
-    cny: data[id]?.cny ?? null,
-    change: data[id]?.usd_24h_change ?? null,
-  }));
+  try {
+    const ids = Object.keys(labels).join(',');
+    const data = await fetchJson(
+      `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd,cny&include_24hr_change=true`,
+      120,
+    );
+    const result = Object.entries(labels).map(([id, [symbol, name]]) => ({
+      id,
+      symbol,
+      name,
+      usd: data[id]?.usd ?? null,
+      cny: data[id]?.cny ?? null,
+      change: data[id]?.usd_24h_change ?? null,
+      source: 'CoinGecko',
+    }));
+    if (result.every((item) => Number.isFinite(item.usd))) return result;
+    throw new Error('CoinGecko returned incomplete data');
+  } catch {
+    // CoinGecko 的匿名接口在部分 Cloudflare 出口容易触发限流；
+    // Coinbase Exchange 公共 24h stats 无需 token，作为实时后备源。
+    const products = {
+      bitcoin: 'BTC-USD',
+      ethereum: 'ETH-USD',
+      solana: 'SOL-USD',
+    };
+    return Promise.all(Object.entries(labels).map(async ([id, [symbol, name]]) => {
+      const stats = await fetchJson(
+        `https://api.exchange.coinbase.com/products/${products[id]}/stats`,
+        120,
+      );
+      const last = Number(stats.last);
+      const open = Number(stats.open);
+      return {
+        id,
+        symbol,
+        name,
+        usd: Number.isFinite(last) ? last : null,
+        cny: null,
+        change: Number.isFinite(last) && Number.isFinite(open) && open
+          ? ((last - open) / open) * 100
+          : null,
+        source: 'Coinbase',
+      };
+    }));
+  }
 }
 
 function cleanRepo(value) {
