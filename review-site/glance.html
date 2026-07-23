@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111114">
+  <meta name="color-scheme" content="dark light">
+  <title>Glance · 一瞥全景台</title>
+  <link rel="stylesheet" href="/assets/glance.css?v=20260723a">
+</head>
+<body>
+  <svg class="svg-defs" aria-hidden="true">
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M19 12H5m6-6-6 6 6 6"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 5h5v5m0-5-9 9"/><path d="M19 13v6H5V5h6"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-grip" viewBox="0 0 24 24"><circle cx="8" cy="7" r="1"/><circle cx="16" cy="7" r="1"/><circle cx="8" cy="12" r="1"/><circle cx="16" cy="12" r="1"/><circle cx="8" cy="17" r="1"/><circle cx="16" cy="17" r="1"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M5 20h14"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4m-5 5 5-5 5 5M5 20h14"/></symbol>
+  </svg>
+
+  <header class="topbar">
+    <a class="brand" href="/index.html" aria-label="返回 Xi Notebook">
+      <span class="brand-mark">G</span>
+      <span class="brand-name">一瞥</span>
+    </a>
+    <nav class="page-tabs" aria-label="仪表盘页面">
+      <button class="page-tab active" type="button" data-page="home">总览</button>
+      <button class="page-tab" type="button" data-page="news">资讯</button>
+      <button class="page-tab" type="button" data-page="dev">开发</button>
+    </nav>
+    <div class="top-actions">
+      <span class="top-clock" id="top-clock" aria-label="当前时间">--:--</span>
+      <button class="icon-button" id="refresh-button" type="button" title="刷新数据" aria-label="刷新数据">
+        <svg><use href="#i-refresh"/></svg>
+      </button>
+      <button class="icon-button" id="settings-button" type="button" title="自定义仪表盘" aria-label="自定义仪表盘">
+        <svg><use href="#i-settings"/></svg>
+      </button>
+      <a class="icon-button" href="/index.html" title="返回课程" aria-label="返回课程">
+        <svg><use href="#i-arrow"/></svg>
+      </a>
+    </div>
+  </header>
+
+  <main class="dashboard-shell">
+    <section class="welcome" data-pages="home">
+      <div>
+        <p class="eyebrow" id="greeting">下午好</p>
+        <h1>把今天需要知道的事，<br><span>收在这一瞥里。</span></h1>
+      </div>
+      <form class="search-box" id="search-form">
+        <svg><use href="#i-search"/></svg>
+        <input id="search-input" type="search" autocomplete="off" spellcheck="false"
+               placeholder="搜索网络，或输入 !gh / !yt / !b 直达">
+        <kbd>/</kbd>
+      </form>
+    </section>
+
+    <div class="dashboard-grid" id="dashboard-grid">
+      <div class="dashboard-column column-small" data-column="left">
+        <article class="widget calendar-widget" data-widget="calendar" data-pages="home,news">
+          <div class="widget-head">
+            <span class="widget-label">日历</span>
+            <div class="widget-tools"><button class="drag-handle" type="button" aria-label="拖动日历"><svg><use href="#i-grip"/></svg></button></div>
+          </div>
+          <div class="calendar-title">
+            <strong id="calendar-month">—</strong>
+            <span id="calendar-week">—</span>
+          </div>
+          <div class="calendar-grid" id="calendar-grid" aria-label="本月日历"></div>
+        </article>
+
+        <article class="widget feed-widget" data-widget="feeds" data-pages="home,news">
+          <div class="widget-head">
+            <span class="widget-label">RSS 聚合</span>
+            <div class="widget-tools">
+              <button class="text-button" type="button" data-action="cycle-feed">切换</button>
+              <button class="drag-handle" type="button" aria-label="拖动 RSS"><svg><use href="#i-grip"/></svg></button>
+            </div>
+          </div>
+          <div class="subtabs" id="feed-tabs" role="tablist"></div>
+          <div class="feed-list compact-list" id="feed-list">
+            <div class="skeleton-lines" aria-label="正在加载"><i></i><i></i><i></i><i></i></div>
+          </div>
+        </article>
+
+        <article class="widget bookmarks-widget" data-widget="bookmarks" data-pages="home,dev">
+          <div class="widget-head">
+            <span class="widget-label">书签</span>
+            <div class="widget-tools">
+              <button class="text-button" type="button" data-action="add-bookmark">添加</button>
+              <button class="drag-handle" type="button" aria-label="拖动书签"><svg><use href="#i-grip"/></svg></button>
+            </div>
+          </div>
+          <div class="bookmark-groups" id="bookmark-list"></div>
+        </article>
+      </div>
+
+      <div class="dashboard-column column-main" data-column="main">
+        <article class="widget hn-widget" data-widget="hackernews" data-pages="home,news">
+          <div class="widget-head">
+            <div class="headline-tabs" role="tablist" aria-label="头条来源">
+              <button class="headline-tab active" type="button">Hacker News</button>
+              <a class="headline-tab" href="https://news.ycombinator.com/" target="_blank" rel="noopener">原站 ↗</a>
+            </div>
+            <div class="widget-tools">
+              <button class="drag-handle" type="button" aria-label="拖动 Hacker News"><svg><use href="#i-grip"/></svg></button>
+            </div>
+          </div>
+          <ol class="story-list" id="hn-list">
+            <li class="story-loading"></li><li class="story-loading"></li><li class="story-loading"></li>
+          </ol>
+          <button class="show-more" id="hn-more" type="button">显示更多 <span>⌄</span></button>
+        </article>
+
+        <article class="widget latest-widget" data-widget="latest" data-pages="news">
+          <div class="widget-head">
+            <span class="widget-label">最新资讯</span>
+            <div class="widget-tools"><button class="drag-handle" type="button" aria-label="拖动资讯"><svg><use href="#i-grip"/></svg></button></div>
+          </div>
+          <div class="latest-feed" id="latest-feed"></div>
+        </article>
+
+        <article class="widget releases-widget" data-widget="releases" data-pages="home,dev">
+          <div class="widget-head">
+            <span class="widget-label">项目动态</span>
+            <div class="widget-tools"><button class="drag-handle" type="button" aria-label="拖动项目动态"><svg><use href="#i-grip"/></svg></button></div>
+          </div>
+          <div class="release-grid" id="release-list">
+            <div class="repo-skeleton"></div><div class="repo-skeleton"></div>
+          </div>
+        </article>
+
+        <article class="widget todo-widget" data-widget="todo" data-pages="dev">
+          <div class="widget-head">
+            <span class="widget-label">待办事项</span>
+            <div class="widget-tools">
+              <span class="muted-count" id="todo-count">0 项</span>
+              <button class="drag-handle" type="button" aria-label="拖动待办"><svg><use href="#i-grip"/></svg></button>
+            </div>
+          </div>
+          <form class="todo-form" id="todo-form">
+            <input id="todo-input" maxlength="100" placeholder="添加一件要做的事…">
+            <button type="submit" aria-label="添加待办"><svg><use href="#i-plus"/></svg></button>
+          </form>
+          <ul class="todo-list" id="todo-list"></ul>
+        </article>
+      </div>
+
+      <div class="dashboard-column column-small" data-column="right">
+        <article class="widget weather-widget" data-widget="weather" data-pages="home,news">
+          <div class="widget-head">
+            <span class="widget-label">天气</span>
+            <div class="widget-tools">
+              <span class="weather-place" id="weather-place">上海</span>
+              <button class="drag-handle" type="button" aria-label="拖动天气"><svg><use href="#i-grip"/></svg></button>
+            </div>
+          </div>
+          <div class="weather-current">
+            <div>
+              <strong id="weather-temp">--°</strong>
+              <span id="weather-condition">正在连接气象站</span>
+              <small id="weather-feels">体感 --°</small>
+            </div>
+            <div class="weather-glyph" id="weather-glyph" aria-hidden="true">◌</div>
+          </div>
+          <div class="hourly-chart" id="hourly-chart" aria-label="逐小时温度"></div>
+          <div class="weather-facts" id="weather-facts"></div>
+        </article>
+
+        <article class="widget market-widget" data-widget="markets" data-pages="home,dev">
+          <div class="widget-head">
+            <span class="widget-label">市场</span>
+            <div class="widget-tools"><span class="widget-note">USD · 24H</span><button class="drag-handle" type="button" aria-label="拖动市场"><svg><use href="#i-grip"/></svg></button></div>
+          </div>
+          <div class="market-list" id="market-list"></div>
+        </article>
+
+        <article class="widget repo-widget" data-widget="repositories" data-pages="dev">
+          <div class="widget-head">
+            <span class="widget-label">代码仓库</span>
+            <div class="widget-tools"><button class="drag-handle" type="button" aria-label="拖动代码仓库"><svg><use href="#i-grip"/></svg></button></div>
+          </div>
+          <div class="repo-list" id="repo-list"></div>
+        </article>
+
+        <article class="widget monitor-widget" data-widget="monitors" data-pages="home,dev">
+          <div class="widget-head">
+            <span class="widget-label">服务状态</span>
+            <div class="widget-tools"><button class="drag-handle" type="button" aria-label="拖动服务状态"><svg><use href="#i-grip"/></svg></button></div>
+          </div>
+          <div class="monitor-list" id="monitor-list"></div>
+        </article>
+      </div>
+    </div>
+
+    <footer class="page-footer">
+      <span>Cloudflare Pages 适配版 · 数据按需加载并短时缓存</span>
+      <span>设计与功能参考 <a href="https://github.com/glanceapp/glance" target="_blank" rel="noopener">glanceapp/glance</a>（AGPL-3.0）</span>
+    </footer>
+  </main>
+
+  <dialog class="settings-dialog" id="settings-dialog">
+    <form method="dialog" class="settings-panel" id="settings-form">
+      <header class="settings-head">
+        <div>
+          <p class="eyebrow">Dashboard configuration</p>
+          <h2>自定义一瞥</h2>
+        </div>
+        <button class="icon-button" value="cancel" aria-label="关闭设置"><svg><use href="#i-close"/></svg></button>
+      </header>
+      <div class="settings-body">
+        <section class="settings-section">
+          <h3>外观</h3>
+          <div class="field-grid">
+            <label>主题
+              <select name="theme" id="setting-theme">
+                <option value="dark">深色</option>
+                <option value="light">浅色</option>
+                <option value="auto">跟随系统</option>
+              </select>
+            </label>
+            <label>密度
+              <select name="density" id="setting-density">
+                <option value="comfortable">舒适</option>
+                <option value="compact">紧凑</option>
+              </select>
+            </label>
+            <label class="range-field">强调色
+              <input name="hue" id="setting-hue" type="range" min="25" max="240" value="42">
+            </label>
+            <label>时间制
+              <select name="hourFormat" id="setting-hour-format">
+                <option value="24">24 小时</option>
+                <option value="12">12 小时</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <h3>天气位置</h3>
+          <div class="field-grid three">
+            <label>显示名称<input name="city" id="setting-city" value="上海" maxlength="30"></label>
+            <label>纬度<input name="lat" id="setting-lat" type="number" min="-90" max="90" step="0.0001" value="31.2304"></label>
+            <label>经度<input name="lon" id="setting-lon" type="number" min="-180" max="180" step="0.0001" value="121.4737"></label>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <h3>RSS 来源</h3>
+          <div class="check-grid" id="feed-options">
+            <label><input type="checkbox" name="feeds" value="ithome" checked> IT之家</label>
+            <label><input type="checkbox" name="feeds" value="sspai" checked> 少数派</label>
+            <label><input type="checkbox" name="feeds" value="cloudflare" checked> Cloudflare Blog</label>
+            <label><input type="checkbox" name="feeds" value="github"> GitHub Blog</label>
+            <label><input type="checkbox" name="feeds" value="solidot"> Solidot</label>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <h3>GitHub 仓库</h3>
+          <label class="wide-field">每行一个 owner/repo，最多 6 个
+            <textarea id="setting-repos" name="repos" rows="4">glanceapp/glance
+ourongxing/newsnow
+cloudflare/workers-sdk</textarea>
+          </label>
+        </section>
+
+        <section class="settings-section">
+          <h3>HTTPS 监控</h3>
+          <p class="section-note">每行使用“名称 | https://地址”，最多 6 个。只请求公开 HTTPS 端点。</p>
+          <textarea id="setting-monitors" name="monitors" rows="4">Xi Notebook | https://sjtu.ccwu.cc/
+NewsNow | https://xi-newsnow.pages.dev/
+Cloudflare | https://www.cloudflarestatus.com/api/v2/status.json</textarea>
+        </section>
+
+        <section class="settings-section data-tools">
+          <h3>配置数据</h3>
+          <div class="tool-row">
+            <button type="button" class="secondary-button" id="export-button"><svg><use href="#i-download"/></svg>导出配置</button>
+            <label class="secondary-button file-button"><svg><use href="#i-upload"/></svg>导入配置<input id="import-input" type="file" accept="application/json"></label>
+            <button type="button" class="danger-button" id="reset-button">恢复默认</button>
+          </div>
+        </section>
+      </div>
+      <footer class="settings-actions">
+        <button class="secondary-button" value="cancel">取消</button>
+        <button class="primary-button" id="save-settings" value="default">保存并刷新</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog class="mini-dialog" id="bookmark-dialog">
+    <form method="dialog" id="bookmark-form">
+      <header><h3>添加书签</h3><button class="icon-button" value="cancel" aria-label="关闭"><svg><use href="#i-close"/></svg></button></header>
+      <label>名称<input id="bookmark-name" required maxlength="36" placeholder="例如：Canvas"></label>
+      <label>网址<input id="bookmark-url" required type="url" placeholder="https://…"></label>
+      <footer><button class="secondary-button" value="cancel">取消</button><button class="primary-button" value="default">添加</button></footer>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/assets/glance.js?v=20260723a"></script>
+</body>
+</html>

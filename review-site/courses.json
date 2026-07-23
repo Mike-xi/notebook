@@ -151,6 +151,45 @@
     ]
   },
   {
+    "file": "newsnow",
+    "title": "潮汐 · NewsNow 热点雷达",
+    "subject": "实时资讯",
+    "description": "NewsNow v0.0.41 完整 Cloudflare Pages 部署 · 国内/国际/科技/财经/体育多源热榜与快讯 · 自定义栏目、关注、刷新、暗色模式与 PWA 离线入口",
+    "icon": "📡",
+    "color": "#D6AD60",
+    "kind": "html",
+    "category": "explore",
+    "link": "/newsnow.html",
+    "tags": [
+      "NewsNow",
+      "实时资讯",
+      "热榜",
+      "PWA",
+      "Cloudflare Pages",
+      "开源"
+    ]
+  },
+  {
+    "file": "glance",
+    "title": "Glance · 一瞥全景台",
+    "subject": "个人仪表盘",
+    "description": "为 Pages 重构的 Glance 式信息台 · 多页与三栏布局、RSS/Hacker News、天气、市场、GitHub 发布、书签、待办、HTTPS 监控 · 可拖拽、自定义主题并导入导出配置",
+    "icon": "🧭",
+    "color": "#C7A86B",
+    "kind": "html",
+    "category": "explore",
+    "link": "/glance.html",
+    "tags": [
+      "Glance",
+      "仪表盘",
+      "RSS",
+      "天气",
+      "GitHub",
+      "监控",
+      "自定义"
+    ]
+  },
+  {
     "file": "subwar",
     "title": "深海猎杀 · 潜艇鱼雷战",
     "subject": "游戏",

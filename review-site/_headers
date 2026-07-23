@@ -12,6 +12,16 @@
 /dc/*
   Cache-Control: public, max-age=0, must-revalidate
 
+# Explore 实时应用：HTML 与功能脚本迭代频繁，每次进入都校验最新版
+/glance
+  Cache-Control: private, max-age=0, must-revalidate
+/glance.html
+  Cache-Control: private, max-age=0, must-revalidate
+/newsnow
+  Cache-Control: private, max-age=0, must-revalidate
+/newsnow.html
+  Cache-Control: private, max-age=0, must-revalidate
+
 # 英汉词典分片数据：内容稳定、体积大，浏览器本地长缓存一天，避免重复下载
 /dict/*
   Cache-Control: public, max-age=86400
