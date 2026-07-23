@@ -315,7 +315,15 @@ body.home {
   cursor: pointer;
   transition: background-color var(--transition), color var(--transition);
 }
+.tab-news {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 9%, transparent);
+}
 .tab:hover { background: var(--surface-container-high); color: var(--on-surface); }
+.tab-news:hover { background: var(--primary-container); color: var(--on-primary-container); }
 .tab.active { background: var(--on-surface); color: var(--surface); }
 /* 拖动课程卡时：Tab 显出可放置边框；悬停的目标 Tab 高亮成「投放区」 */
 body.sorting .home-tabs .tab { box-shadow: inset 0 0 0 1.5px var(--outline-variant); transition: none; }
