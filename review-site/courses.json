@@ -159,7 +159,7 @@
     "color": "#D6AD60",
     "kind": "html",
     "category": "explore",
-    "link": "/newsnow.html",
+    "link": "/newsnow",
     "tags": [
       "NewsNow",
       "实时资讯",
@@ -178,7 +178,7 @@
     "color": "#C7A86B",
     "kind": "html",
     "category": "explore",
-    "link": "/glance.html",
+    "link": "/glance",
     "tags": [
       "Glance",
       "仪表盘",
