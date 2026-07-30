@@ -20,6 +20,16 @@ const chatScript = await readFile(new URL('../public/chat.js', import.meta.url),
 assert.match(chatScript, /const APP_BASE = location\.pathname/);
 assert.match(chatScript, /fetch\(appPath\(path\)/);
 assert.match(chatScript, /appPath\(`\/ws\//);
+assert.match(chatScript, /prepareAvatar/);
+assert.match(chatScript, /onlineUsers/);
+
+const chatStyles = await readFile(new URL('../public/chat.css', import.meta.url), 'utf8');
+assert.match(chatStyles, /\.conversation \{[^}]*min-height: 0;[^}]*overflow: hidden;/s);
+assert.match(chatStyles, /\.conversation-active \{[^}]*height: 100%;[^}]*overflow: hidden;/s);
+
+const chatPage = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
+assert.match(chatPage, /id="online-button"/);
+assert.match(chatPage, /id="avatar-input"/);
 
 await access(new URL('assets/icons/starpost.svg', site));
 await access(new URL('functions/starpost-app/[[path]].js', site));

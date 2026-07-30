@@ -4,8 +4,10 @@ const enc = new TextEncoder();
 const SESSION_SECONDS = 30 * 24 * 60 * 60;
 const MAX_MESSAGE = 4000;
 const MAX_UPLOAD = 8 * 1024 * 1024;
+const MAX_AVATAR = 2 * 1024 * 1024;
+const AVATAR_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const PASSWORD_ITERATIONS = 100000;
-const BUILD_VERSION = '2026.07.30-3';
+const BUILD_VERSION = '2026.07.30-4';
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,24}$/;
 
 function base64url(bytes) {
@@ -111,11 +113,26 @@ function publicUser(row) {
     username: row.username,
     displayName: row.display_name,
     bio: row.bio || '',
+    avatarUrl: row.avatar_key && row.avatar_updated_at ? `/avatars/${row.id}?v=${row.avatar_updated_at}` : null,
     role: row.role,
     status: row.status,
     createdAt: row.created_at,
     lastSeenAt: row.last_seen_at,
   };
+}
+
+function validAvatarBytes(data, mime) {
+  const bytes = new Uint8Array(data);
+  if (mime === 'image/jpeg') return bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  if (mime === 'image/png') {
+    return bytes.length > 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e
+      && bytes[3] === 0x47 && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a;
+  }
+  if (mime === 'image/webp') {
+    return bytes.length > 12 && String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF'
+      && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP';
+  }
+  return false;
 }
 
 async function currentUser(request, env) {
@@ -175,7 +192,7 @@ async function isMember(env, conversationId, userId) {
 
 async function getMessageRows(env, conversationId, before = Number.MAX_SAFE_INTEGER, limit = 60) {
   const result = await env.DB.prepare(`
-    SELECT m.*, u.username, u.display_name,
+    SELECT m.*, u.username, u.display_name, u.avatar_key, u.avatar_updated_at,
            a.file_name, a.mime, a.size
     FROM messages m
     JOIN users u ON u.id = m.sender_id
@@ -195,6 +212,7 @@ function formatMessage(row) {
       id: row.sender_id,
       username: row.username,
       displayName: row.display_name,
+      avatarUrl: row.avatar_key && row.avatar_updated_at ? `/avatars/${row.sender_id}?v=${row.avatar_updated_at}` : null,
     },
     kind: row.deleted_at ? 'text' : row.kind,
     body: row.deleted_at ? '' : row.body,
@@ -312,6 +330,42 @@ async function handleAuth(request, env, pathname) {
     if (!displayName) return failure('昵称不能为空');
     await env.DB.prepare('UPDATE users SET display_name = ?, bio = ? WHERE id = ?')
       .bind(displayName, bio, user.id).run();
+    const updated = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(user.id).first();
+    return response({ user: publicUser(updated) });
+  }
+
+  if (pathname === '/api/profile/avatar' && request.method === 'POST') {
+    const user = await requireUser(request, env);
+    const mime = cleanText((request.headers.get('content-type') || '').split(';')[0], 80).toLowerCase();
+    if (!AVATAR_MIME_TYPES.has(mime)) return failure('头像仅支持 JPEG、PNG 或 WebP', 415, 'invalid_avatar_type');
+    const length = Number(request.headers.get('content-length')) || 0;
+    if (length > MAX_AVATAR) return failure('头像不能超过 2 MB', 413, 'avatar_too_large');
+    const data = await request.arrayBuffer();
+    if (!data.byteLength || data.byteLength > MAX_AVATAR) return failure('头像大小需在 2 MB 以内', 413, 'avatar_too_large');
+    if (!validAvatarBytes(data, mime)) return failure('头像文件内容无效', 415, 'invalid_avatar_data');
+
+    const updatedAt = Date.now();
+    const objectKey = `chat/avatars/${user.id}/${updatedAt}-${randomToken(6)}`;
+    await env.FILES.put(objectKey, data, { httpMetadata: { contentType: mime } });
+    try {
+      await env.DB.prepare('UPDATE users SET avatar_key = ?, avatar_mime = ?, avatar_updated_at = ? WHERE id = ?')
+        .bind(objectKey, mime, updatedAt, user.id).run();
+    } catch (error) {
+      await env.FILES.delete(objectKey);
+      throw error;
+    }
+    if (user.avatar_key && user.avatar_key !== objectKey) await env.FILES.delete(user.avatar_key);
+    await audit(env, user.id, 'update_avatar', 'user', user.id);
+    const updated = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(user.id).first();
+    return response({ user: publicUser(updated) });
+  }
+
+  if (pathname === '/api/profile/avatar' && request.method === 'DELETE') {
+    const user = await requireUser(request, env);
+    await env.DB.prepare("UPDATE users SET avatar_key = '', avatar_mime = '', avatar_updated_at = NULL WHERE id = ?")
+      .bind(user.id).run();
+    if (user.avatar_key) await env.FILES.delete(user.avatar_key);
+    await audit(env, user.id, 'remove_avatar', 'user', user.id);
     const updated = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(user.id).first();
     return response({ user: publicUser(updated) });
   }
@@ -813,6 +867,26 @@ async function handleMedia(request, env, pathname) {
   });
 }
 
+async function handleAvatar(request, env, pathname) {
+  const match = pathname.match(/^\/avatars\/([^/]+)$/);
+  if (!match || request.method !== 'GET') return null;
+  await requireUser(request, env);
+  const owner = await env.DB.prepare(`
+    SELECT avatar_key, avatar_mime, avatar_updated_at FROM users WHERE id = ?
+  `).bind(match[1]).first();
+  if (!owner?.avatar_key) return new Response('Not found', { status: 404 });
+  const object = await env.FILES.get(owner.avatar_key);
+  if (!object) return new Response('Not found', { status: 404 });
+  return new Response(object.body, {
+    headers: {
+      'Content-Type': owner.avatar_mime || object.httpMetadata?.contentType || 'image/webp',
+      'Content-Length': String(object.size),
+      'Cache-Control': 'private, max-age=86400, immutable',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
+}
+
 async function handleWebSocket(request, env, pathname) {
   const match = pathname.match(/^\/ws\/([^/]+)$/);
   if (!match || request.headers.get('upgrade')?.toLowerCase() !== 'websocket') return null;
@@ -821,6 +895,7 @@ async function handleWebSocket(request, env, pathname) {
   const headers = new Headers(request.headers);
   headers.set('x-chat-user-id', user.id);
   headers.set('x-chat-user-name', encodeURIComponent(user.display_name));
+  headers.set('x-chat-avatar-url', encodeURIComponent(publicUser(user).avatarUrl || ''));
   return env.CHAT_ROOMS.getByName(match[1]).fetch(new Request(`https://room.internal/connect/${match[1]}`, {
     method: 'GET',
     headers,
@@ -859,6 +934,10 @@ export default {
       if (pathname.startsWith('/media/')) {
         const media = await handleMedia(request, env, pathname);
         if (media) return securityHeaders(media);
+      }
+      if (pathname.startsWith('/avatars/')) {
+        const avatar = await handleAvatar(request, env, pathname);
+        if (avatar) return securityHeaders(avatar);
       }
       if (pathname.startsWith('/api/')) {
         let result = await handleAuth(request, env, pathname);
@@ -906,9 +985,10 @@ export class ConversationRoom extends DurableObject {
     const server = pair[1];
     const userId = request.headers.get('x-chat-user-id');
     const displayName = decodeURIComponent(request.headers.get('x-chat-user-name') || '用户');
-    server.serializeAttachment({ userId, displayName });
+    const avatarUrl = decodeURIComponent(request.headers.get('x-chat-avatar-url') || '');
+    server.serializeAttachment({ userId, displayName, avatarUrl });
     this.ctx.acceptWebSocket(server);
-    server.send(JSON.stringify({ type: 'ready', membersOnline: this.ctx.getWebSockets().length }));
+    server.send(JSON.stringify({ type: 'ready', ...this.presenceState() }));
     this.broadcastPresence();
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -972,7 +1052,7 @@ export class ConversationRoom extends DurableObject {
       id,
       conversationId,
       seq,
-      sender: { id: session.userId, displayName: session.displayName },
+      sender: { id: session.userId, displayName: session.displayName, avatarUrl: session.avatarUrl || null },
       kind,
       body,
       attachment: attachment ? {
@@ -990,12 +1070,12 @@ export class ConversationRoom extends DurableObject {
     this.broadcast({ type: 'message', message });
   }
 
-  webSocketClose() {
-    this.broadcastPresence();
+  webSocketClose(socket) {
+    this.broadcastPresence(socket);
   }
 
-  webSocketError() {
-    this.broadcastPresence();
+  webSocketError(socket) {
+    this.broadcastPresence(socket);
   }
 
   broadcast(payload, except = null) {
@@ -1010,7 +1090,23 @@ export class ConversationRoom extends DurableObject {
     }
   }
 
-  broadcastPresence() {
-    this.broadcast({ type: 'presence', membersOnline: this.ctx.getWebSockets().length });
+  presenceState(except = null) {
+    const users = new Map();
+    for (const socket of this.ctx.getWebSockets()) {
+      if (socket === except) continue;
+      const session = socket.deserializeAttachment() || {};
+      if (!session.userId || users.has(session.userId)) continue;
+      users.set(session.userId, {
+        id: session.userId,
+        displayName: session.displayName || '用户',
+        avatarUrl: session.avatarUrl || null,
+      });
+    }
+    const onlineUsers = [...users.values()];
+    return { membersOnline: onlineUsers.length, onlineUsers };
+  }
+
+  broadcastPresence(except = null) {
+    this.broadcast({ type: 'presence', ...this.presenceState(except) }, except);
   }
 }

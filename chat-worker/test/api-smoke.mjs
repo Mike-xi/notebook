@@ -59,6 +59,19 @@ const bob = await call('bob', '/api/register', {
 assert.equal(alice.data.user.username, aliceName);
 assert.equal(bob.data.user.username, bobName);
 
+const avatarBytes = Uint8Array.from(Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2n0kAAAAASUVORK5CYII=',
+  'base64',
+)).buffer;
+const avatarUpload = await call('alice', '/api/profile/avatar', {
+  method: 'POST',
+  headers: { 'Content-Type': 'image/png' },
+  body: avatarBytes,
+});
+assert.match(avatarUpload.data.user.avatarUrl, /^\/avatars\//);
+const avatarDownload = await call('alice', avatarUpload.data.user.avatarUrl);
+assert.equal(avatarDownload.data.byteLength, avatarBytes.byteLength);
+
 await call('alice', '/api/friends/request', { method: 'POST', body: { username: bobName } });
 const bobFriends = await call('bob', '/api/friends');
 assert.equal(bobFriends.data.incoming.length, 1);
@@ -102,5 +115,6 @@ console.log(JSON.stringify({
   users: adminStats.data.users,
   friends: aliceFriends.data.friends.length,
   conversations: adminConversations.data.conversations.length,
+  avatarBytes: avatarDownload.data.byteLength,
   attachmentBytes: adminStats.data.attachmentBytes,
 }));

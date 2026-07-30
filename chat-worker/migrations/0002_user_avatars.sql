@@ -1,0 +1,3 @@
+ALTER TABLE users ADD COLUMN avatar_key TEXT NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN avatar_mime TEXT NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN avatar_updated_at INTEGER;

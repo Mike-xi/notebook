@@ -80,6 +80,15 @@ await Promise.all([
   alice.waitFor((event) => event.type === 'ready'),
   bob.waitFor((event) => event.type === 'ready'),
 ]);
+const [alicePresence, bobPresence] = await Promise.all([
+  alice.waitFor((event) => event.type === 'presence' && event.onlineUsers?.length === 2),
+  bob.waitFor((event) => event.type === 'presence' && event.onlineUsers?.length === 2),
+]);
+assert.deepEqual(
+  new Set(alicePresence.onlineUsers.map((user) => user.displayName)),
+  new Set(['Alice', 'Bob']),
+);
+assert.equal(bobPresence.membersOnline, 2);
 
 const body = `实时消息 ${Date.now()}`;
 alice.socket.send(JSON.stringify({ type: 'message', conversationId: conversation.id, kind: 'text', body }));
@@ -88,6 +97,7 @@ const [aliceEvent, bobEvent] = await Promise.all([
   bob.waitFor((event) => event.type === 'message' && event.message?.body === body),
 ]);
 assert.equal(aliceEvent.message.id, bobEvent.message.id);
+assert.match(aliceEvent.message.sender.avatarUrl, /^\/avatars\//);
 
 const editedBody = `${body}（已编辑）`;
 await api(aliceCookie, `/api/messages/${aliceEvent.message.id}`, {
@@ -109,12 +119,18 @@ const history = await api(bobCookie, `/api/conversations/${conversation.id}/mess
 const persisted = history.messages.find((item) => item.id === aliceEvent.message.id);
 assert.ok(persisted?.deletedAt, 'revoked message should remain as an audited tombstone');
 
-alice.socket.close();
 bob.socket.close();
+const aliceAfterBobLeaves = await alice.waitFor(
+  (event) => event.type === 'presence' && event.onlineUsers?.length === 1,
+);
+assert.equal(aliceAfterBobLeaves.onlineUsers[0].displayName, 'Alice');
+alice.socket.close();
 console.log(JSON.stringify({
   ok: true,
   conversationId: conversation.id,
   realtimeDeliveredTo: 2,
+  presenceUsers: alicePresence.onlineUsers.length,
+  presenceAfterLeave: aliceAfterBobLeaves.onlineUsers.length,
   edited: true,
   revoked: true,
   persisted: true,

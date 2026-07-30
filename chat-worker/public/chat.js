@@ -20,6 +20,7 @@ const state = {
   mediaChunks: [],
   typingTimer: null,
   activeView: 'chats',
+  onlineUsers: [],
 };
 
 const authView = $('#auth-view');
@@ -41,6 +42,22 @@ function icon(name) {
 function initials(name) {
   const text = String(name || 'U').trim();
   return [...text][0]?.toUpperCase() || 'U';
+}
+
+function avatarContent(user, fallbackName) {
+  if (user?.avatarUrl) {
+    return `<img src="${escapeHTML(appPath(user.avatarUrl))}" alt="" loading="lazy">`;
+  }
+  return escapeHTML(initials(fallbackName || user?.displayName));
+}
+
+function avatarHTML(user, fallbackName, className = '') {
+  return `<span class="avatar ${className}">${avatarContent(user, fallbackName)}</span>`;
+}
+
+function setAvatar(element, user, fallbackName) {
+  if (!element) return;
+  element.innerHTML = avatarContent(user, fallbackName);
 }
 
 function escapeHTML(value) {
@@ -169,7 +186,7 @@ async function init() {
 async function enterApp() {
   authView.hidden = true;
   appView.hidden = false;
-  $('#rail-avatar').textContent = initials(state.user.displayName);
+  setAvatar($('#rail-avatar'), state.user, state.user.displayName);
   $('#admin-link').hidden = state.user.role !== 'admin';
   await Promise.all([loadFriends(), loadConversations()]);
   setView('chats');
@@ -225,7 +242,7 @@ function renderChats() {
       ? (item.lastMessage.kind === 'text' ? item.lastMessage.body : { image: '[图片]', audio: '[语音]', file: '[文件]' }[item.lastMessage.kind] || '[消息]')
       : '开始一段对话';
     return `<button class="chat-item ${item.id === state.activeId ? 'active' : ''}" type="button" data-chat-id="${item.id}">
-      <span class="avatar ${item.kind === 'group' ? 'group' : ''}">${escapeHTML(initials(item.title))}</span>
+      ${avatarHTML(item.kind === 'dm' ? item.peer : null, item.title, item.kind === 'group' ? 'group' : '')}
       <span class="chat-item-main">
         <span class="chat-item-row"><strong>${escapeHTML(item.title)}</strong><time>${formatTime(item.lastMessage?.createdAt || item.updatedAt)}</time></span>
         <span class="chat-item-row"><p>${escapeHTML(preview)}</p>${item.unread ? `<b class="unread-badge">${item.unread > 99 ? '99+' : item.unread}</b>` : ''}</span>
@@ -273,7 +290,7 @@ function personHTML(person, relation) {
     actions = '<button disabled>已发送</button>';
   }
   return `<div class="person-item">
-    <span class="avatar">${escapeHTML(initials(person.displayName))}</span>
+    ${avatarHTML(person, person.displayName)}
     <span class="person-main"><strong>${escapeHTML(person.displayName)}</strong><p>@${escapeHTML(person.username)}${person.bio ? ` · ${escapeHTML(person.bio)}` : ''}</p></span>
     <span class="person-actions">${actions}</span>
   </div>`;
@@ -330,6 +347,8 @@ async function openConversation(id) {
   }
   closeSocket();
   state.activeId = id;
+  state.onlineUsers = [];
+  updatePresence({ membersOnline: 0, onlineUsers: [] });
   renderChats();
   conversationEmpty.hidden = true;
   conversationActive.hidden = false;
@@ -344,7 +363,10 @@ async function openConversation(id) {
     state.messages = history.messages;
     const summary = state.conversations.find((item) => item.id === id);
     $('#chat-title').textContent = summary?.title || detail.conversation.title || '会话';
-    $('#chat-avatar').textContent = initials($('#chat-title').textContent);
+    const peer = detail.conversation.kind === 'dm'
+      ? detail.members.find((member) => member.id !== state.user.id)
+      : null;
+    setAvatar($('#chat-avatar'), peer, $('#chat-title').textContent);
     $('#chat-avatar').classList.toggle('group', detail.conversation.kind === 'group');
     renderMessages();
     renderDetail();
@@ -396,7 +418,7 @@ function messageHTML(message) {
   }
   const actions = own && !deleted ? `<span class="message-actions"><button data-edit-message="${message.id}" title="编辑">${icon('edit')}</button><button data-delete-message="${message.id}" title="撤回">${icon('trash')}</button></span>` : '';
   return `<div class="message-row ${own ? 'own' : ''}" data-message-id="${message.id}">
-    ${!own ? `<span class="message-avatar">${escapeHTML(initials(message.sender.displayName))}</span>` : actions}
+    ${!own ? `<span class="message-avatar">${avatarContent(message.sender, message.sender.displayName)}</span>` : actions}
     <div class="message-stack">
       ${!own ? `<p class="message-sender">${escapeHTML(message.sender.displayName)}</p>` : ''}
       <div class="message-bubble ${deleted ? 'deleted' : ''}">
@@ -448,6 +470,31 @@ async function loadOlderMessages() {
   }
 }
 
+function updatePresence(data) {
+  state.onlineUsers = Array.isArray(data.onlineUsers) ? data.onlineUsers : [];
+  const count = Number(data.membersOnline) || state.onlineUsers.length || 0;
+  $('#chat-status').textContent = count ? `${count} 人在线` : '已连接';
+  $('#chat-status').classList.add('connected');
+  $('#online-count').textContent = String(count);
+  $('#online-button').hidden = !count || !state.onlineUsers.length;
+}
+
+function renderOnlineList() {
+  const members = new Map((state.activeDetail?.members || []).map((member) => [member.id, member]));
+  $('#online-list').innerHTML = state.onlineUsers.map((presence) => {
+    const member = members.get(presence.id);
+    const person = member || presence;
+    const subtitle = member?.username
+      ? `@${escapeHTML(member.username)}${presence.id === state.user.id ? ' · 你' : ''}`
+      : (presence.id === state.user.id ? '你' : '当前在线');
+    return `<div class="online-person">
+      ${avatarHTML(person, presence.displayName)}
+      <div><strong>${escapeHTML(presence.displayName || member?.displayName || '用户')}</strong><span>${subtitle}</span></div>
+      <i class="online-dot" aria-label="在线"></i>
+    </div>`;
+  }).join('') || '<div class="list-empty"><span>暂时没有其他人在线</span></div>';
+}
+
 function connectSocket() {
   if (!state.activeId) return;
   state.manualClose = false;
@@ -466,8 +513,7 @@ function connectSocket() {
     let data;
     try { data = JSON.parse(event.data); } catch { return; }
     if (data.type === 'ready' || data.type === 'presence') {
-      $('#chat-status').textContent = `${data.membersOnline || 1} 人在线`;
-      $('#chat-status').classList.add('connected');
+      updatePresence(data);
     } else if (data.type === 'message') {
       if (!state.messages.some((item) => item.id === data.message.id)) {
         state.messages.push(data.message);
@@ -503,6 +549,7 @@ function connectSocket() {
     if (socket !== state.ws || state.manualClose) return;
     $('#chat-status').textContent = '连接已断开，正在重连…';
     $('#chat-status').classList.remove('connected');
+    $('#online-button').hidden = true;
     clearTimeout(state.reconnectTimer);
     state.reconnectTimer = setTimeout(connectSocket, 1800);
   });
@@ -513,7 +560,14 @@ function closeSocket() {
   clearTimeout(state.reconnectTimer);
   if (state.ws) state.ws.close(1000, 'switch conversation');
   state.ws = null;
+  state.onlineUsers = [];
+  $('#online-button').hidden = true;
 }
+
+$('#online-button').addEventListener('click', () => {
+  renderOnlineList();
+  $('#online-dialog').showModal();
+});
 
 async function markRead() {
   const last = state.messages.at(-1);
@@ -641,26 +695,35 @@ function renderDetail() {
   if (!detail) return;
   const summary = state.conversations.find((item) => item.id === state.activeId);
   const title = summary?.title || detail.conversation.title || '会话';
+  const peer = detail.conversation.kind === 'dm'
+    ? detail.members.find((member) => member.id !== state.user.id)
+    : null;
   $('#detail-content').innerHTML = `
     <div class="detail-hero">
-      <span class="avatar ${detail.conversation.kind === 'group' ? 'group' : ''}">${escapeHTML(initials(title))}</span>
+      ${avatarHTML(peer, title, detail.conversation.kind === 'group' ? 'group' : '')}
       <h3>${escapeHTML(title)}</h3>
       <p>${detail.conversation.kind === 'group' ? `${detail.members.length} 位成员` : '私人对话'}</p>
     </div>
     <div class="section-caption">成员</div>
     <div class="member-list">${detail.members.map((member) => `
-      <div class="member-line"><span class="avatar">${escapeHTML(initials(member.displayName))}</span><div><strong>${escapeHTML(member.displayName)}</strong><span>@${escapeHTML(member.username)}${member.memberRole !== 'member' ? ` · ${member.memberRole === 'owner' ? '群主' : '管理员'}` : ''}</span></div></div>
+      <div class="member-line">${avatarHTML(member, member.displayName)}<div><strong>${escapeHTML(member.displayName)}</strong><span>@${escapeHTML(member.username)}${member.memberRole !== 'member' ? ` · ${member.memberRole === 'owner' ? '群主' : '管理员'}` : ''}</span></div></div>
     `).join('')}</div>`;
 }
 
-$('#chat-details-button').addEventListener('click', () => { $('#detail-panel').hidden = false; });
-$('#detail-close').addEventListener('click', () => { $('#detail-panel').hidden = true; });
+$('#chat-details-button').addEventListener('click', () => {
+  $('#detail-panel').hidden = false;
+  appView.classList.add('detail-open');
+});
+$('#detail-close').addEventListener('click', () => {
+  $('#detail-panel').hidden = true;
+  appView.classList.remove('detail-open');
+});
 $('#mobile-back').addEventListener('click', () => appView.classList.remove('mobile-chat-open'));
 
 $('#new-group-button').addEventListener('click', () => {
   if (!state.friends.friends.length) return toast('先添加至少一位好友');
   $('#group-member-picker').innerHTML = state.friends.friends.map((person) => `
-    <label class="pick-line"><span class="avatar">${escapeHTML(initials(person.displayName))}</span><span><strong>${escapeHTML(person.displayName)}</strong><br><small>@${escapeHTML(person.username)}</small></span><input type="checkbox" name="member" value="${person.id}"></label>
+    <label class="pick-line">${avatarHTML(person, person.displayName)}<span><strong>${escapeHTML(person.displayName)}</strong><br><small>@${escapeHTML(person.username)}</small></span><input type="checkbox" name="member" value="${person.id}"></label>
   `).join('');
   $('#group-form').reset();
   $('#group-dialog').showModal();
@@ -685,13 +748,105 @@ $('#group-submit').addEventListener('click', async () => {
 });
 
 function openProfile() {
-  $('#profile-avatar').textContent = initials(state.user.displayName);
+  setAvatar($('#profile-avatar'), state.user, state.user.displayName);
   $('#profile-username').textContent = `@${state.user.username}`;
   $('#profile-role').textContent = state.user.role === 'admin' ? '站点管理员' : '成员';
+  $('#avatar-remove-button').hidden = !state.user.avatarUrl;
   $('#profile-form').elements.displayName.value = state.user.displayName;
   $('#profile-form').elements.bio.value = state.user.bio || '';
   $('#profile-dialog').showModal();
 }
+
+function syncCurrentUserAvatar() {
+  setAvatar($('#rail-avatar'), state.user, state.user.displayName);
+  setAvatar($('#profile-avatar'), state.user, state.user.displayName);
+  $('#avatar-remove-button').hidden = !state.user.avatarUrl;
+  const activeMember = state.activeDetail?.members?.find((member) => member.id === state.user.id);
+  if (activeMember) Object.assign(activeMember, { avatarUrl: state.user.avatarUrl, displayName: state.user.displayName });
+  if (state.activeId) {
+    closeSocket();
+    connectSocket();
+  }
+}
+
+function imageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('无法读取这张图片'));
+    };
+    image.src = url;
+  });
+}
+
+function canvasBlob(canvas, type, quality) {
+  return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+}
+
+async function prepareAvatar(file) {
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    throw new Error('请选择 JPEG、PNG 或 WebP 图片');
+  }
+  if (file.size > 20 * 1024 * 1024) throw new Error('原图不能超过 20 MB');
+  const image = await imageFromFile(file);
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const context = canvas.getContext('2d', { alpha: false });
+  const sourceSize = Math.min(image.naturalWidth, image.naturalHeight);
+  const sourceX = (image.naturalWidth - sourceSize) / 2;
+  const sourceY = (image.naturalHeight - sourceSize) / 2;
+  context.fillStyle = '#f7f5fb';
+  context.fillRect(0, 0, 512, 512);
+  context.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, 512, 512);
+  const webp = await canvasBlob(canvas, 'image/webp', 0.86);
+  const result = webp?.type === 'image/webp' ? webp : await canvasBlob(canvas, 'image/jpeg', 0.88);
+  if (!result) throw new Error('当前浏览器无法处理头像');
+  if (result.size > 2 * 1024 * 1024) throw new Error('处理后的头像仍超过 2 MB');
+  return result;
+}
+
+$('#avatar-upload-button').addEventListener('click', () => $('#avatar-input').click());
+$('#avatar-input').addEventListener('change', async (event) => {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  const button = $('#avatar-upload-button');
+  button.disabled = true;
+  try {
+    const avatar = await prepareAvatar(file);
+    const data = await api('/api/profile/avatar', {
+      method: 'POST',
+      headers: { 'Content-Type': avatar.type },
+      body: await avatar.arrayBuffer(),
+    });
+    state.user = data.user;
+    syncCurrentUserAvatar();
+    toast('头像已更新');
+  } catch (error) {
+    toast(error.message);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$('#avatar-remove-button').addEventListener('click', async () => {
+  if (!confirm('移除当前头像？')) return;
+  try {
+    const data = await api('/api/profile/avatar', { method: 'DELETE' });
+    state.user = data.user;
+    syncCurrentUserAvatar();
+    toast('头像已移除');
+  } catch (error) {
+    toast(error.message);
+  }
+});
 
 $('#profile-save').addEventListener('click', async () => {
   const form = $('#profile-form');
@@ -702,7 +857,7 @@ $('#profile-save').addEventListener('click', async () => {
       bio: form.elements.bio.value,
     } });
     state.user = data.user;
-    $('#rail-avatar').textContent = initials(state.user.displayName);
+    syncCurrentUserAvatar();
     $('#profile-dialog').close();
     toast('个人资料已保存');
   } catch (error) {
