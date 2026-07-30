@@ -259,6 +259,24 @@
     ]
   },
   {
+    "file": "classicube",
+    "title": "方块世界 · 创造模式",
+    "subject": "沙盒",
+    "description": "第一人称方块沙盒 · 全部方块无限量供应，挖掘/放置/双击起飞自由建造 · 世界存档留在本地浏览器，也能导出文件带走 · 可在游戏内换材质包 · 手机自动切触屏操作（ClassiCube 引擎 BSD-3，材质 Pixel Perfection CE）",
+    "icon": "🧱",
+    "color": "#7cc95f",
+    "kind": "html",
+    "category": "play",
+    "link": "/games/classicube/",
+    "tags": [
+      "创造模式",
+      "沙盒",
+      "方块",
+      "建造",
+      "存档"
+    ]
+  },
+  {
     "file": "g2048",
     "title": "2048",
     "subject": "益智",

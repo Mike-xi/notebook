@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>创造模式 · 方块世界</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#0d1117;
+    font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;-webkit-user-select:none;user-select:none}
+  /* canvas 不能有 border/padding，否则鼠标坐标会错位 */
+  #canvas{display:block;border:0;padding:0;background:#87b9e8;width:100vw;height:100vh;touch-action:none;outline:none}
+
+  #boot{position:fixed;inset:0;z-index:30;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:14px;background:linear-gradient(165deg,#16241a 0%,#243b28 55%,#3a5d3e 100%);color:#eaf5ea;text-align:center;padding:24px}
+  #boot h1{font-size:27px;letter-spacing:3px;text-shadow:2px 2px 0 #0006}
+  #boot .sub{font-size:13px;opacity:.82;line-height:1.7;max-width:560px}
+  #boot .keys{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;font-size:13px;max-width:430px;text-align:left;margin-top:4px}
+  #boot .keys b{display:inline-block;min-width:74px;color:#ffd76a}
+  #bar{width:min(78vw,340px);height:7px;border-radius:99px;background:#ffffff22;overflow:hidden}
+  #bar i{display:block;height:100%;width:0;background:#7cc95f;transition:width .3s}
+  #msg{font-size:12px;opacity:.72;min-height:17px;font-variant-numeric:tabular-nums}
+  #go{margin-top:2px;font-size:17px;padding:12px 38px;border:none;border-radius:10px;cursor:pointer;letter-spacing:3px;
+    background:#4caf50;color:#fff;box-shadow:0 4px 0 #35793a,0 8px 20px #0007;transition:.12s}
+  #go:hover{background:#5cc15f}
+  #go:active{transform:translateY(3px);box-shadow:0 1px 0 #35793a}
+  #go[disabled]{background:#5a6b5c;box-shadow:0 4px 0 #3e4a3f;cursor:default;opacity:.75}
+
+  /* 靠右上，避开引擎自己画在左上角的 fps / 坐标 HUD */
+  #back{position:fixed;right:10px;top:10px;z-index:12;color:#fff;text-decoration:none;background:#0008;padding:7px 14px;
+    border-radius:99px;font-size:13px;font-weight:600;border:1px solid #ffffff33;backdrop-filter:blur(4px)}
+  #back:hover{background:#000b}
+  /* 靠左下，避开底部居中的物品栏 */
+  #credit{position:fixed;left:8px;bottom:6px;z-index:12;color:#ffffffb0;font-size:10.5px;line-height:1.55;
+    background:#0006;padding:4px 9px;border-radius:7px;backdrop-filter:blur(3px);pointer-events:none;max-width:44vw}
+  #credit a{color:#cfe9ff;pointer-events:auto}
+  @media (max-width:720px){ #back{font-size:12px;padding:6px 11px} #credit{font-size:9.5px;max-width:66vw} #boot .keys{display:none} }
+</style>
+</head>
+<body>
+<canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+<a id="back" href="/">‹ 返回复习站</a>
+<div id="credit">
+  引擎 <a href="https://github.com/ClassiCube/ClassiCube" target="_blank" rel="noopener">ClassiCube</a>（BSD-3-Clause）·
+  材质 <a href="https://github.com/Athemis/PixelPerfectionCE" target="_blank" rel="noopener">Pixel Perfection CE</a> by XSSheep（CC-BY-SA 4.0）<br>
+  与 Mojang / Microsoft 无关联
+</div>
+
+<div id="boot">
+  <h1>方 块 世 界</h1>
+  <div class="sub">
+    创造模式沙盒 · 全部方块无限量供应 · 想怎么盖就怎么盖<br>
+    存档保存在你自己的浏览器里，也可以导出成文件带走
+  </div>
+  <div class="keys">
+    <div><b>W A S D</b> 移动</div>
+    <div><b>鼠标</b> 转视角</div>
+    <div><b>左键</b> 挖掉方块</div>
+    <div><b>右键</b> 放置方块</div>
+    <div><b>1~9 / 滚轮</b> 换方块</div>
+    <div><b>B</b> 打开方块栏</div>
+    <div><b>空格×2</b> 起飞</div>
+    <div><b>Esc</b> 菜单 / 存档</div>
+  </div>
+  <div id="bar"><i></i></div>
+  <div id="msg">正在准备…</div>
+  <button id="go" disabled>加载中</button>
+</div>
+
+<script>
+/* 关键：canvas 的像素尺寸必须在 ClassiCube.js 执行之前设好。
+   引擎启动时只读一次 canvas.width/height 就固定下来，之后再改（含 setCanvasSize）都不会生效。 */
+(function () {
+  var c = document.getElementById('canvas');
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  c.width = Math.round(c.clientWidth * dpr);
+  c.height = Math.round(c.clientHeight * dpr);
+})();
+</script>
+<script>
+(function () {
+  var boot = document.getElementById('boot'), bar = document.querySelector('#bar i');
+  var msg = document.getElementById('msg'), go = document.getElementById('go');
+  var ready = false;
+
+  window.__ccReady = function () {
+    if (ready) return;
+    ready = true;
+    bar.style.width = '100%';
+    msg.textContent = '准备就绪';
+    go.disabled = false;
+    go.textContent = '进入世界';
+  };
+
+  go.addEventListener('click', function () {
+    if (!ready) return;
+    boot.style.display = 'none';
+    document.getElementById('canvas').focus();
+  });
+
+  var Mod = {
+    preRun: [], postRun: [],
+    arguments: ['Builder'],
+    print: function (t) { console.log(t); },
+    printErr: function (t) { console.error(t); },
+    canvas: document.getElementById('canvas'),
+    setStatus: function (text) {
+      if (!text) return;
+      msg.textContent = text;
+      var m = /\((\d+)\/(\d+)\)/.exec(text);
+      if (m) bar.style.width = Math.round(m[1] / m[2] * 100) + '%';
+      if (text.indexOf('Preloading filesystem') >= 0) setTimeout(window.__ccReady, 1200);
+    },
+    totalDependencies: 0,
+    monitorRunDependencies: function (left) {
+      this.totalDependencies = Math.max(this.totalDependencies, left);
+      if (left) Mod.setStatus('准备资源 (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')');
+      else Mod.setStatus('资源就绪');
+    }
+  };
+  window.Module = Mod;
+  Mod.setStatus('正在下载引擎…');
+  /* 引擎跑起来后一定会到这一步，兜底防止卡在按钮不可点 */
+  setTimeout(window.__ccReady, 30000);
+
+  window.onerror = function (m) { msg.textContent = '出错了，请刷新重试（' + m + '）'; };
+})();
+</script>
+<script async type="text/javascript" src="ClassiCube.js"></script>
+</body>
+</html>
