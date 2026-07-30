@@ -24,11 +24,13 @@ assert.match(chatScript, /prepareAvatar/);
 assert.match(chatScript, /onlineUsers/);
 
 const chatStyles = await readFile(new URL('../public/chat.css', import.meta.url), 'utf8');
+assert.match(chatStyles, /\.chat-app \{[^}]*grid-template-rows: minmax\(0,1fr\);[^}]*overflow: hidden;/s);
 assert.match(chatStyles, /\.conversation \{[^}]*min-height: 0;[^}]*overflow: hidden;/s);
 assert.match(chatStyles, /\.conversation-active \{[^}]*height: 100%;[^}]*overflow: hidden;/s);
 
 const chatPage = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
 assert.match(chatPage, /id="online-button"/);
+assert.doesNotMatch(chatPage, /id="online-button"[^>]*hidden/);
 assert.match(chatPage, /id="avatar-input"/);
 
 await access(new URL('assets/icons/starpost.svg', site));

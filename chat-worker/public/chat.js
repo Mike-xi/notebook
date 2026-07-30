@@ -21,6 +21,7 @@ const state = {
   typingTimer: null,
   activeView: 'chats',
   onlineUsers: [],
+  unknownOnlineCount: 0,
 };
 
 const authView = $('#auth-view');
@@ -471,17 +472,27 @@ async function loadOlderMessages() {
 }
 
 function updatePresence(data) {
-  state.onlineUsers = Array.isArray(data.onlineUsers) ? data.onlineUsers : [];
-  const count = Number(data.membersOnline) || state.onlineUsers.length || 0;
+  const receivedUsers = Array.isArray(data.onlineUsers) ? data.onlineUsers : [];
+  const count = Number(data.membersOnline) || receivedUsers.length || 0;
+  state.onlineUsers = receivedUsers;
+  state.unknownOnlineCount = Math.max(0, count - receivedUsers.length);
+  if (count > 0 && !state.onlineUsers.length && state.user) {
+    state.onlineUsers = [{
+      id: state.user.id,
+      displayName: state.user.displayName,
+      avatarUrl: state.user.avatarUrl || null,
+    }];
+    state.unknownOnlineCount = Math.max(0, count - 1);
+  }
   $('#chat-status').textContent = count ? `${count} 人在线` : '已连接';
   $('#chat-status').classList.add('connected');
   $('#online-count').textContent = String(count);
-  $('#online-button').hidden = !count || !state.onlineUsers.length;
+  $('#online-button').hidden = false;
 }
 
 function renderOnlineList() {
   const members = new Map((state.activeDetail?.members || []).map((member) => [member.id, member]));
-  $('#online-list').innerHTML = state.onlineUsers.map((presence) => {
+  const knownUsers = state.onlineUsers.map((presence) => {
     const member = members.get(presence.id);
     const person = member || presence;
     const subtitle = member?.username
@@ -492,7 +503,12 @@ function renderOnlineList() {
       <div><strong>${escapeHTML(presence.displayName || member?.displayName || '用户')}</strong><span>${subtitle}</span></div>
       <i class="online-dot" aria-label="在线"></i>
     </div>`;
-  }).join('') || '<div class="list-empty"><span>暂时没有其他人在线</span></div>';
+  }).join('');
+  const unknownUsers = state.unknownOnlineCount
+    ? `<div class="online-pending"><span>另有 ${state.unknownOnlineCount} 人在线，等待其客户端刷新后显示身份</span></div>`
+    : '';
+  $('#online-list').innerHTML = knownUsers + unknownUsers
+    || '<div class="list-empty"><span>当前没有成员在线</span></div>';
 }
 
 function connectSocket() {
@@ -549,7 +565,7 @@ function connectSocket() {
     if (socket !== state.ws || state.manualClose) return;
     $('#chat-status').textContent = '连接已断开，正在重连…';
     $('#chat-status').classList.remove('connected');
-    $('#online-button').hidden = true;
+    $('#online-count').textContent = '…';
     clearTimeout(state.reconnectTimer);
     state.reconnectTimer = setTimeout(connectSocket, 1800);
   });
@@ -561,7 +577,8 @@ function closeSocket() {
   if (state.ws) state.ws.close(1000, 'switch conversation');
   state.ws = null;
   state.onlineUsers = [];
-  $('#online-button').hidden = true;
+  state.unknownOnlineCount = 0;
+  $('#online-count').textContent = '0';
 }
 
 $('#online-button').addEventListener('click', () => {

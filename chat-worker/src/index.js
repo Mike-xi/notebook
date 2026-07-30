@@ -7,7 +7,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 const MAX_AVATAR = 2 * 1024 * 1024;
 const AVATAR_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const PASSWORD_ITERATIONS = 100000;
-const BUILD_VERSION = '2026.07.30-4';
+const BUILD_VERSION = '2026.07.30-5';
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,24}$/;
 
 function base64url(bytes) {

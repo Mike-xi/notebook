@@ -121,7 +121,16 @@ svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width:
 .form-error { min-height: 20px; margin: 14px 0 0; color: var(--danger); font-size: 12px; text-align: center; }
 
 /* Application shell */
-.chat-app { width: 100%; height: 100dvh; min-height: 0; display: grid; grid-template-columns: 78px minmax(270px,340px) minmax(390px,1fr); overflow: hidden; background: var(--surface); }
+.chat-app {
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 78px minmax(270px,340px) minmax(390px,1fr);
+  grid-template-rows: minmax(0,1fr);
+  overflow: hidden;
+  background: var(--surface);
+}
 .chat-app.detail-open { grid-template-columns: 78px minmax(270px,340px) minmax(390px,1fr) minmax(0,310px); }
 .rail {
   display: flex; z-index: 8; flex-direction: column; align-items: center; padding: max(18px,env(safe-area-inset-top)) 10px max(14px,env(safe-area-inset-bottom));
@@ -140,7 +149,7 @@ svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width:
 .rail nav button b { position: absolute; top: 8px; right: 7px; width: 8px; height: 8px; border: 2px solid var(--surface-solid); border-radius: 50%; background: var(--danger); }
 .rail-bottom { display: grid; gap: 7px; width: 100%; margin-top: auto; }
 .mini-avatar { width: 38px !important; min-height: 38px !important; height: 38px; margin: 5px auto 0; border-radius: 13px !important; background: linear-gradient(145deg,var(--primary-soft),color-mix(in srgb,var(--teal) 30%,var(--surface-soft))) !important; color: var(--primary) !important; font-weight: 800; }
-.sidebar { min-width: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line); background: color-mix(in srgb,var(--surface-solid) 68%,transparent); }
+.sidebar { min-width: 0; min-height: 0; height: 100%; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid var(--line); background: color-mix(in srgb,var(--surface-solid) 68%,transparent); }
 .sidebar-head { display: flex; min-height: 92px; align-items: center; justify-content: space-between; padding: max(18px,env(safe-area-inset-top)) 22px 10px; }
 .sidebar-head h1 { margin: 0; font-size: 25px; letter-spacing: -.035em; }
 .round-button {
@@ -182,7 +191,7 @@ svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width:
 .person-actions svg { width: 15px; height: 15px; }
 
 /* Conversation */
-.conversation { position: relative; min-width: 0; min-height: 0; height: 100%; display: flex; overflow: hidden; background: color-mix(in srgb,var(--bg) 70%,var(--surface-solid)); }
+.conversation { position: relative; min-width: 0; min-height: 0; height: 100%; max-height: 100%; display: flex; overflow: hidden; background: color-mix(in srgb,var(--bg) 70%,var(--surface-solid)); }
 .conversation::before {
   content: ""; position: absolute; inset: 0; opacity: .25; pointer-events: none;
   background-image: radial-gradient(circle at center,color-mix(in srgb,var(--primary) 18%,transparent) 1px,transparent 1px);
@@ -255,7 +264,19 @@ svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width:
 .attachment-preview span { color: var(--muted); font-size: 10px; }
 .attachment-preview button { width: 30px; height: 30px; display: grid; place-items: center; border: 0; background: transparent; color: var(--muted); }
 .attachment-preview button svg { width: 15px; }
-.composer { display: flex; align-items: flex-end; gap: 8px; margin: 0 16px max(14px,env(safe-area-inset-bottom)); padding: 8px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface-solid); box-shadow: var(--shadow-soft); }
+.composer {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 0 16px max(14px,env(safe-area-inset-bottom));
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface-solid);
+  box-shadow: var(--shadow-soft);
+}
 .composer textarea { min-width: 0; min-height: 38px; max-height: 140px; flex: 1; resize: none; padding: 9px 5px; border: 0; outline: 0; background: transparent; line-height: 20px; }
 .composer-tool, .send-button { width: 38px; height: 38px; display: grid; flex: none; place-items: center; border: 0; border-radius: 13px; }
 .composer-tool { background: transparent; color: var(--muted); }
@@ -318,6 +339,7 @@ svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width:
 .online-person strong, .online-person span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .online-person span { margin-top: 3px; color: var(--muted); font-size: 10px; }
 .online-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--teal); box-shadow: 0 0 0 4px color-mix(in srgb,var(--teal) 12%,transparent); }
+.online-pending { padding: 10px 12px; border: 1px dashed var(--line); border-radius: 13px; color: var(--muted); font-size: 10px; line-height: 1.55; text-align: center; }
 .password-panel { border: 1px solid var(--line); border-radius: 18px; padding: 12px 14px; background: color-mix(in srgb,var(--surface-soft) 88%,var(--primary-soft)); }
 .password-panel summary { cursor: pointer; color: var(--muted); font-weight: 700; }
 .password-panel[open] summary { margin-bottom: 12px; }
