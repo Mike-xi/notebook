@@ -1,0 +1,30 @@
+name = "notebook-chat"
+main = "src/index.js"
+compatibility_date = "2026-07-29"
+workers_dev = true
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "notebook-chat"
+database_id = "83c63a94-c1ec-4dc0-b071-cfb69fa148c6"
+
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "cloudflare"
+
+[[durable_objects.bindings]]
+name = "CHAT_ROOMS"
+class_name = "ConversationRoom"
+
+[exports.ConversationRoom]
+type = "durable-object"
+storage = "sqlite"
+
+[vars]
+APP_NAME = "星邮"
+COOKIE_DOMAIN = ""

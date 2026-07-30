@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f7f5fb">
+  <meta name="color-scheme" content="light dark">
+  <title>星邮 · 私人社交聊天</title>
+  <link rel="stylesheet" href="/chat.css?v=20260730a">
+</head>
+<body>
+  <svg class="svg-defs" aria-hidden="true">
+    <symbol id="i-logo" viewBox="0 0 32 32"><path d="M5.5 8.5 16 3l10.5 5.5v15L16 29 5.5 23.5Z"/><path d="m6 9 10 8 10-8M16 17v12"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 18.5 3.5 21l4.2-1.3a9 9 0 1 0-2.7-1.2Z"/><path d="M8 12h.01M12 12h.01M16 12h.01"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></symbol>
+    <symbol id="i-paperclip" viewBox="0 0 24 24"><path d="m21.4 11.6-8.9 8.9a6 6 0 0 1-8.5-8.5l9.6-9.6a4 4 0 0 1 5.7 5.7l-9.6 9.6a2 2 0 0 1-2.8-2.8l8.9-8.9"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+    <symbol id="i-admin" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="M9 12h6M12 9v6"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 15H6L5 6M10 11v6M14 11v6"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></symbol>
+  </svg>
+
+  <main id="auth-view" class="auth-page">
+    <section class="auth-story">
+      <a class="auth-back" href="https://sjtu.ccwu.cc/" aria-label="返回 Xi Notebook">
+        <svg><use href="#i-back"/></svg><span>Xi Notebook</span>
+      </a>
+      <div class="story-content">
+        <div class="story-mark"><svg><use href="#i-logo"/></svg></div>
+        <p class="eyebrow">Private social space</p>
+        <h1>让消息抵达，<br><span>让关系留下。</span></h1>
+        <p>星邮是 Xi Notebook 的私人社交空间。添加好友、建立群组，在所有设备上继续同一段对话。</p>
+        <div class="story-points">
+          <span><svg><use href="#i-chat"/></svg>实时消息与历史同步</span>
+          <span><svg><use href="#i-shield"/></svg>邀请码注册与站点管理</span>
+        </div>
+      </div>
+      <p class="privacy-note">消息使用 HTTPS/WSS 传输，但不采用端到端加密；站点管理员可为安全审查访问内容。</p>
+    </section>
+
+    <section class="auth-panel">
+      <div class="auth-card">
+        <header>
+          <div class="mobile-brand"><svg><use href="#i-logo"/></svg><strong>星邮</strong></div>
+          <p class="eyebrow">Welcome to Starpost</p>
+          <h2 id="auth-title">欢迎回来</h2>
+          <p id="auth-subtitle">登录后继续你的对话。</p>
+        </header>
+        <div class="auth-tabs" role="tablist">
+          <button class="active" type="button" data-auth-tab="login">登录</button>
+          <button type="button" data-auth-tab="register">注册</button>
+        </div>
+        <form id="login-form" class="auth-form">
+          <label><span>用户名</span><input name="username" autocomplete="username" maxlength="24" required placeholder="your_name"></label>
+          <label><span>密码</span><input name="password" type="password" autocomplete="current-password" maxlength="128" required placeholder="至少 10 位"></label>
+          <button class="primary-button wide" type="submit"><span>进入星邮</span><svg><use href="#i-send"/></svg></button>
+        </form>
+        <form id="register-form" class="auth-form" hidden>
+          <div class="field-pair">
+            <label><span>用户名</span><input name="username" autocomplete="username" maxlength="24" pattern="[A-Za-z0-9_]{3,24}" required placeholder="your_name"></label>
+            <label><span>显示昵称</span><input name="displayName" autocomplete="name" maxlength="32" required placeholder="怎么称呼你"></label>
+          </div>
+          <label><span>邀请码</span><input name="invite" autocomplete="one-time-code" maxlength="80" required placeholder="由管理员提供"></label>
+          <label><span>密码</span><input name="password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required placeholder="至少 10 位"></label>
+          <label class="consent"><input name="consent" type="checkbox" required><span>我了解站点管理员可以查看并管理聊天内容。</span></label>
+          <button class="primary-button wide" type="submit"><span>创建账号</span><svg><use href="#i-plus"/></svg></button>
+        </form>
+        <p class="form-error" id="auth-error" role="alert"></p>
+      </div>
+    </section>
+  </main>
+
+  <main id="app-view" class="chat-app" hidden>
+    <aside class="rail">
+      <div class="rail-brand" title="星邮"><svg><use href="#i-logo"/></svg></div>
+      <nav aria-label="主导航">
+        <button class="active" type="button" data-view="chats" aria-label="消息"><svg><use href="#i-chat"/></svg><span>消息</span><b id="rail-unread" hidden></b></button>
+        <button type="button" data-view="contacts" aria-label="联系人"><svg><use href="#i-users"/></svg><span>联系人</span><b id="rail-requests" hidden></b></button>
+        <button type="button" data-view="profile" aria-label="我的"><svg><use href="#i-user"/></svg><span>我的</span></button>
+      </nav>
+      <div class="rail-bottom">
+        <a id="admin-link" href="/admin.html" hidden title="管理后台"><svg><use href="#i-admin"/></svg></a>
+        <a href="https://sjtu.ccwu.cc/" title="返回 Notebook"><svg><use href="#i-back"/></svg></a>
+        <button id="rail-avatar" class="mini-avatar" type="button" title="个人资料">U</button>
+      </div>
+    </aside>
+
+    <section class="sidebar" id="sidebar">
+      <header class="sidebar-head">
+        <div>
+          <p class="eyebrow" id="sidebar-eyebrow">Starpost</p>
+          <h1 id="sidebar-title">消息</h1>
+        </div>
+        <button class="round-button" id="new-group-button" type="button" title="创建群组"><svg><use href="#i-plus"/></svg></button>
+      </header>
+      <label class="search-field" id="sidebar-search-wrap">
+        <svg><use href="#i-search"/></svg>
+        <input id="sidebar-search" type="search" autocomplete="off" placeholder="搜索会话">
+      </label>
+      <div id="sidebar-content" class="sidebar-content"></div>
+    </section>
+
+    <section class="conversation" id="conversation">
+      <div class="conversation-empty" id="conversation-empty">
+        <div class="empty-orbit">
+          <i></i><i></i>
+          <span><svg><use href="#i-logo"/></svg></span>
+        </div>
+        <h2>选择一段对话</h2>
+        <p>从左侧打开好友或群组，消息会在这里实时抵达。</p>
+      </div>
+
+      <div class="conversation-active" id="conversation-active" hidden>
+        <header class="conversation-head">
+          <button class="mobile-back" id="mobile-back" type="button" aria-label="返回会话列表"><svg><use href="#i-back"/></svg></button>
+          <div class="avatar" id="chat-avatar">星</div>
+          <div class="conversation-identity">
+            <strong id="chat-title">会话</strong>
+            <span id="chat-status">正在连接…</span>
+          </div>
+          <button class="round-button" id="chat-details-button" type="button" aria-label="会话详情"><svg><use href="#i-more"/></svg></button>
+        </header>
+
+        <div class="messages" id="messages" aria-live="polite">
+          <button class="history-button" id="history-button" type="button" hidden>加载更早消息</button>
+        </div>
+        <div class="typing-line" id="typing-line" hidden></div>
+
+        <div class="attachment-preview" id="attachment-preview" hidden>
+          <svg><use href="#i-file"/></svg>
+          <div><strong id="attachment-name"></strong><span id="attachment-size"></span></div>
+          <button id="attachment-clear" type="button" aria-label="移除附件"><svg><use href="#i-close"/></svg></button>
+        </div>
+        <form class="composer" id="composer">
+          <input id="file-input" type="file" hidden>
+          <button class="composer-tool" id="attach-button" type="button" title="添加附件"><svg><use href="#i-paperclip"/></svg></button>
+          <textarea id="message-input" rows="1" maxlength="4000" placeholder="输入消息…" enterkeyhint="send"></textarea>
+          <button class="composer-tool record-button" id="record-button" type="button" title="录制语音留言"><svg><use href="#i-mic"/></svg><span></span></button>
+          <button class="send-button" type="submit" aria-label="发送"><svg><use href="#i-send"/></svg></button>
+        </form>
+      </div>
+    </section>
+
+    <aside class="detail-panel" id="detail-panel" hidden>
+      <header><h2>会话详情</h2><button id="detail-close" type="button"><svg><use href="#i-close"/></svg></button></header>
+      <div id="detail-content"></div>
+    </aside>
+  </main>
+
+  <dialog id="group-dialog" class="app-dialog">
+    <form method="dialog" id="group-form">
+      <header><div><p class="eyebrow">New group</p><h2>创建群组</h2></div><button value="cancel" type="submit"><svg><use href="#i-close"/></svg></button></header>
+      <label class="dialog-field"><span>群组名称</span><input name="title" maxlength="50" required placeholder="例如：项目讨论"></label>
+      <p class="dialog-label">选择好友</p>
+      <div class="member-picker" id="group-member-picker"></div>
+      <footer><button value="cancel" type="submit" class="text-button">取消</button><button id="group-submit" type="button" class="primary-button">创建群组</button></footer>
+    </form>
+  </dialog>
+
+  <dialog id="profile-dialog" class="app-dialog">
+    <form method="dialog" id="profile-form">
+      <header><div><p class="eyebrow">Account</p><h2>个人资料</h2></div><button value="cancel" type="submit"><svg><use href="#i-close"/></svg></button></header>
+      <div class="profile-hero"><div class="avatar large" id="profile-avatar">U</div><div><strong id="profile-username">@user</strong><span id="profile-role">成员</span></div></div>
+      <label class="dialog-field"><span>显示昵称</span><input name="displayName" maxlength="32" required></label>
+      <label class="dialog-field"><span>个人简介</span><textarea name="bio" maxlength="160" rows="3" placeholder="介绍一下自己"></textarea></label>
+      <details class="password-panel">
+        <summary>修改登录密码</summary>
+        <label class="dialog-field"><span>当前密码</span><input name="currentPassword" type="password" autocomplete="current-password" maxlength="128"></label>
+        <label class="dialog-field"><span>新密码</span><input name="newPassword" type="password" autocomplete="new-password" minlength="10" maxlength="128" placeholder="至少 10 位"></label>
+        <button id="password-save" type="button" class="secondary-button">更新密码</button>
+      </details>
+      <footer class="split-footer"><button id="logout-button" type="button" class="danger-text">退出登录</button><div><button value="cancel" type="submit" class="text-button">取消</button><button id="profile-save" type="button" class="primary-button">保存</button></div></footer>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+  <script type="module" src="/chat.js?v=20260730a"></script>
+</body>
+</html>

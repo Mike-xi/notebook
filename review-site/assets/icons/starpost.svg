@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="星邮">
+  <defs>
+    <linearGradient id="sp-bg" x1="8" y1="5" x2="58" y2="61" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7b68b5"/>
+      <stop offset="1" stop-color="#3d8b83"/>
+    </linearGradient>
+    <radialGradient id="sp-glow" cx="0" cy="0" r="1" gradientTransform="translate(17 13) rotate(48) scale(43)">
+      <stop stop-color="#fff" stop-opacity=".32"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="1" y="1" width="62" height="62" rx="15" fill="url(#sp-bg)"/>
+  <rect x="1" y="1" width="62" height="62" rx="15" fill="url(#sp-glow)"/>
+  <path d="M13 20.5 32 11l19 9.5v24L32 54 13 44.5Z" fill="none" stroke="#fff" stroke-width="3.2" stroke-linejoin="round"/>
+  <path d="m14 21 18 14 18-14M32 35v19" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="49.5" cy="13.5" r="2.5" fill="#dff7ef"/>
+</svg>

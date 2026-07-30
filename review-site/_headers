@@ -21,6 +21,10 @@
   Cache-Control: private, max-age=0, must-revalidate
 /newsnow.html
   Cache-Control: private, max-age=0, must-revalidate
+/starpost
+  Cache-Control: private, max-age=0, must-revalidate
+/starpost.html
+  Cache-Control: private, max-age=0, must-revalidate
 
 # 英汉词典分片数据：内容稳定、体积大，浏览器本地长缓存一天，避免重复下载
 /dict/*

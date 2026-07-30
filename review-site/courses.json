@@ -190,6 +190,25 @@
     ]
   },
   {
+    "file": "starpost",
+    "title": "星邮 · 私人社交聊天",
+    "subject": "社交通讯",
+    "description": "Cloudflare 原生私人社交空间 · 邀请码账号、好友申请、私聊与群组、跨设备消息历史、图片/文件/语音留言 · 响应式网页与独立入口",
+    "icon": "/assets/icons/starpost.svg",
+    "color": "#6D5AA7",
+    "kind": "html",
+    "category": "explore",
+    "link": "/starpost",
+    "tags": [
+      "聊天",
+      "好友",
+      "群组",
+      "Cloudflare Workers",
+      "Durable Objects",
+      "PWA"
+    ]
+  },
+  {
     "file": "subwar",
     "title": "深海猎杀 · 潜艇鱼雷战",
     "subject": "游戏",
