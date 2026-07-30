@@ -1,5 +1,9 @@
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+const APP_BASE = location.pathname === '/starpost-app' || location.pathname.startsWith('/starpost-app/')
+  ? '/starpost-app'
+  : '';
+const appPath = (path) => path.startsWith('/') ? `${APP_BASE}${path}` : path;
 const content = $('#admin-content');
 let currentView = 'overview';
 let users = [];
@@ -12,7 +16,7 @@ function initials(name) { return [...String(name || 'U').trim()][0]?.toUpperCase
 function formatTime(value) { return value ? new Date(value).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'; }
 function formatSize(bytes) { return bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`; }
 async function api(path, options = {}) {
-  const response = await fetch(path, {
+  const response = await fetch(appPath(path), {
     ...options,
     headers: { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...(options.headers || {}) },
     body: options.body ? JSON.stringify(options.body) : undefined,
@@ -27,8 +31,8 @@ function toast(message) {
 }
 async function init() {
   const session = await api('/api/session').catch(() => ({ user: null }));
-  if (!session.user) return location.replace('/');
-  if (session.user.role !== 'admin') return location.replace('/');
+  if (!session.user) return location.replace(appPath('/'));
+  if (session.user.role !== 'admin') return location.replace(appPath('/'));
   $('#admin-identity').textContent = `${session.user.displayName} · 管理员`;
   showView('overview');
 }

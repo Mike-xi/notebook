@@ -24,10 +24,10 @@
       <div class="copy"><strong>星邮 · 私人社交聊天</strong><span>好友、私聊、群组与跨设备消息历史</span></div>
     </div>
     <span class="status" id="status"><i></i><span>正在连接</span></span>
-    <a class="open" href="https://notebook-chat.xiaxi0694.workers.dev/" target="_blank" rel="noopener">独立打开 ↗</a>
+    <a class="open" href="/starpost-app/" target="_blank" rel="noopener">独立打开 ↗</a>
   </header>
-  <div class="fallback"><div><strong>正在打开星邮</strong><span>聊天服务独立运行于 Cloudflare。若当前浏览器限制嵌入内容，请使用右上角“独立打开”。</span></div></div>
-  <iframe id="chat-frame" src="https://notebook-chat.xiaxi0694.workers.dev/" title="星邮私人社交聊天" loading="eager" allow="microphone; clipboard-write" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+  <div class="fallback"><div><strong>正在打开星邮</strong><span>正在通过 Notebook 安全入口连接聊天服务。若当前浏览器限制嵌入内容，请使用右上角“独立打开”。</span></div></div>
+  <iframe id="chat-frame" src="/starpost-app/" title="星邮私人社交聊天" loading="eager" allow="microphone; clipboard-write" referrerpolicy="strict-origin-when-cross-origin"></iframe>
   <script>
     const frame=document.getElementById('chat-frame'),status=document.getElementById('status');
     frame.addEventListener('load',()=>{status.classList.add('ready');status.querySelector('span').textContent='已连接'},{once:true});

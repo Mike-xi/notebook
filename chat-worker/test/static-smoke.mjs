@@ -11,8 +11,16 @@ assert.equal(starpost.link, '/starpost');
 assert.equal(starpost.icon, '/assets/icons/starpost.svg');
 
 const wrapper = await readFile(new URL('starpost.html', site), 'utf8');
-assert.match(wrapper, /https:\/\/notebook-chat\.xiaxi0694\.workers\.dev\//);
+assert.match(wrapper, /src="\/starpost-app\/"/);
+assert.match(wrapper, /href="\/starpost-app\/"/);
+assert.doesNotMatch(wrapper, /workers\.dev/);
 assert.match(wrapper, /allow="microphone; clipboard-write"/);
 
+const chatScript = await readFile(new URL('../public/chat.js', import.meta.url), 'utf8');
+assert.match(chatScript, /const APP_BASE = location\.pathname/);
+assert.match(chatScript, /fetch\(appPath\(path\)/);
+assert.match(chatScript, /appPath\(`\/ws\//);
+
 await access(new URL('assets/icons/starpost.svg', site));
+await access(new URL('functions/starpost-app/[[path]].js', site));
 console.log(JSON.stringify({ ok: true, courses: courses.length, starpost: starpost.title }));

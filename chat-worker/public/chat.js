@@ -1,5 +1,9 @@
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+const APP_BASE = location.pathname === '/starpost-app' || location.pathname.startsWith('/starpost-app/')
+  ? '/starpost-app'
+  : '';
+const appPath = (path) => path.startsWith('/') ? `${APP_BASE}${path}` : path;
 
 const state = {
   user: null,
@@ -79,7 +83,7 @@ async function api(path, options = {}) {
     ? JSON.stringify(options.body)
     : options.body;
   if (body && typeof body === 'string' && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-  const result = await fetch(path, { ...options, body, headers, credentials: 'same-origin' });
+  const result = await fetch(appPath(path), { ...options, body, headers, credentials: 'same-origin' });
   const type = result.headers.get('content-type') || '';
   const data = type.includes('application/json') ? await result.json() : null;
   if (!result.ok) {
@@ -381,12 +385,13 @@ function messageHTML(message) {
   const deleted = !!message.deletedAt;
   let attachment = '';
   if (message.attachment && !deleted) {
+    const attachmentURL = appPath(message.attachment.url);
     if (message.kind === 'image') {
-      attachment = `<a class="message-attachment" href="${message.attachment.url}" target="_blank"><img src="${message.attachment.url}" alt="${escapeHTML(message.attachment.name)}" loading="lazy"></a>`;
+      attachment = `<a class="message-attachment" href="${attachmentURL}" target="_blank"><img src="${attachmentURL}" alt="${escapeHTML(message.attachment.name)}" loading="lazy"></a>`;
     } else if (message.kind === 'audio') {
-      attachment = `<div class="message-attachment"><audio controls preload="metadata" src="${message.attachment.url}"></audio></div>`;
+      attachment = `<div class="message-attachment"><audio controls preload="metadata" src="${attachmentURL}"></audio></div>`;
     } else {
-      attachment = `<a class="message-attachment file-card" href="${message.attachment.url}" target="_blank">${icon('file')}<div><strong>${escapeHTML(message.attachment.name)}</strong><span>${formatSize(message.attachment.size)}</span></div></a>`;
+      attachment = `<a class="message-attachment file-card" href="${attachmentURL}" target="_blank">${icon('file')}<div><strong>${escapeHTML(message.attachment.name)}</strong><span>${formatSize(message.attachment.size)}</span></div></a>`;
     }
   }
   const actions = own && !deleted ? `<span class="message-actions"><button data-edit-message="${message.id}" title="编辑">${icon('edit')}</button><button data-delete-message="${message.id}" title="撤回">${icon('trash')}</button></span>` : '';
@@ -447,7 +452,7 @@ function connectSocket() {
   if (!state.activeId) return;
   state.manualClose = false;
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const socket = new WebSocket(`${protocol}//${location.host}/ws/${state.activeId}`);
+  const socket = new WebSocket(`${protocol}//${location.host}${appPath(`/ws/${state.activeId}`)}`);
   state.ws = socket;
   $('#chat-status').textContent = '正在连接…';
   $('#chat-status').classList.remove('connected');
