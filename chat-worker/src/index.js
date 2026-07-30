@@ -5,7 +5,7 @@ const SESSION_SECONDS = 30 * 24 * 60 * 60;
 const MAX_MESSAGE = 4000;
 const MAX_UPLOAD = 8 * 1024 * 1024;
 const PASSWORD_ITERATIONS = 100000;
-const BUILD_VERSION = '2026.07.30-2';
+const BUILD_VERSION = '2026.07.30-3';
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,24}$/;
 
 function base64url(bytes) {
@@ -91,12 +91,14 @@ function parseCookies(request) {
 
 function sessionCookie(token, env, maxAge = SESSION_SECONDS) {
   const domain = cleanText(env.COOKIE_DOMAIN, 120);
+  const secure = env.COOKIE_SECURE !== 'false';
   return [
     `chat_session=${encodeURIComponent(token)}`,
     'Path=/',
     'HttpOnly',
-    env.COOKIE_SECURE === 'false' ? '' : 'Secure',
-    'SameSite=Lax',
+    secure ? 'Secure' : '',
+    secure ? 'SameSite=None' : 'SameSite=Lax',
+    secure ? 'Partitioned' : '',
     `Max-Age=${maxAge}`,
     domain ? `Domain=${domain}` : '',
   ].filter(Boolean).join('; ');
