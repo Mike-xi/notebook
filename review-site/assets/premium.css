@@ -288,6 +288,8 @@
 /* ---------- 课程卡：封面 + 3D 倾斜 + 全息光泽 ---------- */
 /* 经典模式不渲染封面（该规则不在 premium 门控内，作为全局默认） */
 .nb-card-cover { display: none; }
+/* 换封面按钮跟封面本身绑定：经典界面看不到封面，也就不提供换图入口 */
+.nb-cover { display: none; }
 
 :root[data-ui="premium"] .card-grid .nb-card {
   padding: 0;
@@ -322,6 +324,32 @@
   display: block;
 }
 :root[data-ui="premium"] .nb-card-cover.noimg img { display: none; }
+
+/* 更换封面（仅管理员渲染）。放左上角，避开右上角的拖拽/删除/编辑三连 */
+:root[data-ui="premium"] .nb-cover {
+  display: inline-flex;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 28px;
+  height: 28px;
+  z-index: 3;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 999px;
+  background: rgba(12, 10, 20, 0.46);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  backdrop-filter: blur(4px);
+  transition: opacity .16s ease, background .16s ease;
+}
+:root[data-ui="premium"] .nb-card:hover .nb-cover,
+:root[data-ui="premium"] .nb-cover:focus-visible { opacity: 1; }
+:root[data-ui="premium"] .nb-cover:hover { background: color-mix(in srgb, var(--accent, var(--primary)) 70%, #000); }
+:root[data-ui="premium"] .nb-cover.busy { opacity: 1; pointer-events: none; animation: nbCoverBusy .9s ease-in-out infinite; }
+@keyframes nbCoverBusy { 50% { opacity: .3; } }
 /* 无图退底时补一道极光高光，避免纯渐变太平 */
 :root[data-ui="premium"] .nb-card-cover.noimg::before {
   content: '';

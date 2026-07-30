@@ -106,6 +106,24 @@ export async function ensureDriveSharesSchema(env) {
   driveSharesReady = true;
 }
 
+let coversReady = false;
+// 管理员自定义的课程卡片封面。图片本体在 R2，这里只存元数据。
+// slug = 课程 file 去掉扩展名，与静态封面 /assets/covers/<slug>.webp 同名；
+// 有记录就覆盖静态图，删掉记录即退回静态图。
+export async function ensureCoversSchema(env) {
+  if (coversReady) return;
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS course_covers (
+       slug       TEXT PRIMARY KEY,
+       r2_key     TEXT NOT NULL,
+       mime       TEXT NOT NULL DEFAULT 'image/webp',
+       size       INTEGER NOT NULL DEFAULT 0,
+       updated_at INTEGER NOT NULL
+     )`
+  ).run();
+  coversReady = true;
+}
+
 // 通用键值偏好表（单用户）。目前用于存课程显示顺序（key=course_order）。
 let prefsReady = false;
 export async function ensurePrefsSchema(env) {

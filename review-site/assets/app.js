@@ -14,6 +14,7 @@ let searchQ = '';               // 即时搜索词（小写）
 let totalCourses = 0;           // 课程总数（空状态判断用）
 let ncCat = 'learn';            // 创建课程时选择的分类
 let isAdmin = false;            // 当前账号是否为管理员（游客只能浏览/使用，不能增删改课程）
+let customCovers = {};          // slug -> updated_at；管理员换过封面的卡片，覆盖静态 /assets/covers/
 
 // 根据角色显隐管理操作：
 // - 「创建/上传」对所有登录用户开放（游客上传进审核队列）
@@ -38,13 +39,15 @@ function detectKind(name) {
 async function loadAndRender() {
   let staticCourses = [], dynamic = [], progress = [], order = [], hidden = [], categoryOverrides = {};
   try {
-    const [c1, c2, pr, od, me] = await Promise.all([
+    const [c1, c2, pr, od, me, cv] = await Promise.all([
       fetch('/courses.json?v=' + Date.now()).then((r) => (r.ok ? r.json() : [])),   // 时间戳防 ccwu.cc 域 4h 强缓存
       fetch('/api/courses').then((r) => (r.ok ? r.json() : [])),
       fetch('/api/progress').then((r) => (r.ok ? r.json() : [])),
       fetch('/api/order').then((r) => (r.ok ? r.json() : { order: [] })),
       fetch('/api/me').then((r) => (r.ok ? r.json() : { role: 'guest' })).catch(() => ({ role: 'guest' })),
+      fetch('/api/cover?list=1').then((r) => (r.ok ? r.json() : { covers: {} })).catch(() => ({ covers: {} })),
     ]);
+    customCovers = (cv && cv.covers) || {};
     staticCourses = c1 || [];
     dynamic = c2 || [];
     progress = pr || [];
@@ -563,8 +566,92 @@ function renderAbout() {
   document.getElementById('about-note').textContent = note;
 }
 
+// ========== 更换卡片封面（仅管理员） ==========
+// 上传前在浏览器里压成 640x360 webp：尺寸统一、体积从几 MB 降到几十 KB，
+// 也绕开了 Workers 端没有图片处理能力的限制。
+async function shrinkCover(file, w = 640, h = 360) {
+  const bmp = await createImageBitmap(file);
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d');
+  const scale = Math.max(w / bmp.width, h / bmp.height);   // 按 cover 裁切，不留白边
+  const dw = bmp.width * scale, dh = bmp.height * scale;
+  ctx.drawImage(bmp, (w - dw) / 2, (h - dh) / 2, dw, dh);
+  if (bmp.close) bmp.close();
+  // 注意：不支持 webp 编码的浏览器（Safari 16 以下）会静默回退成 PNG，
+  // 所以 mime 一律以 blob.type 为准，不能写死 image/webp
+  const blob = await new Promise((r) => cv.toBlob(r, 'image/webp', 0.86));
+  if (!blob) throw new Error('图片编码失败');
+  return blob;
+}
+
+let coverPicker = null;
+function pickCover(slug, imgEl, btn) {
+  if (!coverPicker) {
+    coverPicker = document.createElement('input');
+    coverPicker.type = 'file';
+    coverPicker.accept = 'image/*';
+    coverPicker.style.display = 'none';
+    document.body.appendChild(coverPicker);
+  }
+  coverPicker.value = '';
+  coverPicker.onchange = async () => {
+    const f = coverPicker.files && coverPicker.files[0];
+    if (!f) return;
+    if (btn) btn.classList.add('busy');
+    try {
+      const blob = await shrinkCover(f);
+      const res = await fetch(`/api/cover?slug=${encodeURIComponent(slug)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': blob.type || 'image/webp' },
+        body: blob,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || '上传失败');
+      customCovers[slug] = data.updated_at;
+      if (imgEl) {
+        imgEl.parentElement.classList.remove('noimg');
+        imgEl.src = `/api/cover?slug=${encodeURIComponent(slug)}&v=${data.updated_at}`;
+      }
+      if (btn) btn.dataset.custom = '1';
+    } catch (err) {
+      alert('换封面失败：' + (err.message || err));
+    } finally {
+      if (btn) btn.classList.remove('busy');
+    }
+  };
+  coverPicker.click();
+}
+
+// 右键封面按钮 = 恢复默认封面
+document.getElementById('courses').addEventListener('contextmenu', async (e) => {
+  const btn = e.target.closest('.nb-cover');
+  if (!btn) return;
+  e.preventDefault();
+  if (!btn.dataset.custom) return;              // 本来就是默认图，无需恢复
+  if (!confirm('恢复这张卡片的默认封面？')) return;
+  const slug = String(btn.dataset.slug || '').toLowerCase();
+  try {
+    const res = await fetch(`/api/cover?slug=${encodeURIComponent(slug)}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error();
+    delete customCovers[slug];
+    await loadAndRender();
+  } catch {
+    alert('恢复默认失败，请重试');
+  }
+});
+
 // ========== 删除 / 编辑动态课程（事件委托） ==========
 document.getElementById('courses').addEventListener('click', async (e) => {
+  const cover = e.target.closest('.nb-cover');
+  if (cover) {
+    e.preventDefault();
+    e.stopPropagation();
+    const card = cover.closest('.nb-card');
+    pickCover(String(cover.dataset.slug || '').toLowerCase(),
+              card && card.querySelector('.nb-card-cover img'), cover);
+    return;
+  }
   const edit = e.target.closest('.nb-edit');
   if (edit) {
     e.preventDefault();
@@ -1013,10 +1100,18 @@ function cardHTML(c, deletable = false) {
   // 普通课程进阅读器；link 卡（云盘）直接跳到目标页面
   const href = c.link ? c.link : `/reader.html?file=${encodeURIComponent(c.file)}`;
 
-  // 封面图（仅高级界面显示，经典模式 CSS 隐藏）：/assets/covers/<file去扩展名>.webp，
-  // 加载失败退回卡片自带的 accent 渐变底
+  // 封面图（仅高级界面显示，经典模式 CSS 隐藏）：默认 /assets/covers/<file去扩展名>.webp；
+  // 管理员换过的走 /api/cover（URL 带 updated_at，改一次换一个地址，天然绕开缓存）。
+  // 两者都加载失败时退回卡片自带的 accent 渐变底。
   const coverSlug = String(c.file || '').replace(/\.[a-z0-9]+$/i, '');
-  const coverBlock = `<div class="nb-card-cover" aria-hidden="true"><img src="/assets/covers/${escapeAttr(coverSlug)}.webp?v=${COVER_ASSET_VERSION}" alt="" loading="lazy" onerror="this.parentElement.classList.add('noimg')"></div>`;
+  const coverTs = customCovers[coverSlug.toLowerCase()];
+  const coverURL = coverTs
+    ? `/api/cover?slug=${encodeURIComponent(coverSlug.toLowerCase())}&v=${coverTs}`
+    : `/assets/covers/${escapeAttr(coverSlug)}.webp?v=${COVER_ASSET_VERSION}`;
+  const coverBtn = isAdmin
+    ? `<button type="button" class="nb-cover" data-slug="${escapeAttr(coverSlug)}"${coverTs ? ' data-custom="1"' : ''} title="更换封面（右键恢复默认）" aria-label="更换封面">${ic('image', 15)}</button>`
+    : '';
+  const coverBlock = `<div class="nb-card-cover" aria-hidden="true"><img src="${escapeAttr(coverURL)}" alt="" loading="lazy" onerror="this.parentElement.classList.add('noimg')"></div>${coverBtn}`;
 
   return `
     <a class="nb-card" href="${escapeAttr(href)}"
