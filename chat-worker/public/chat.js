@@ -5,6 +5,10 @@ const APP_BASE = location.pathname === '/starpost-app' || location.pathname.star
   : '';
 const appPath = (path) => path.startsWith('/') ? `${APP_BASE}${path}` : path;
 
+const MAX_ATTACHMENT = 8 * 1024 * 1024;
+const MAX_QUEUE = 9;
+const LIST_REFRESH_MS = 15000;
+
 const state = {
   user: null,
   friends: { friends: [], incoming: [], outgoing: [], blocked: [] },
@@ -15,13 +19,16 @@ const state = {
   ws: null,
   reconnectTimer: null,
   manualClose: false,
-  pendingFile: null,
+  pendingFiles: [],
   mediaRecorder: null,
   mediaChunks: [],
   typingTimer: null,
   activeView: 'chats',
   onlineUsers: [],
   unknownOnlineCount: 0,
+  replyTo: null,
+  editing: null,
+  refreshTimer: null,
 };
 
 const authView = $('#auth-view');
@@ -35,6 +42,12 @@ const conversationActive = $('#conversation-active');
 const messagesEl = $('#messages');
 const messageInput = $('#message-input');
 const toastEl = $('#toast');
+const attachmentTray = $('#attachment-tray');
+const composerContext = $('#composer-context');
+const attachMenu = $('#attach-menu');
+const emojiPanel = $('#emoji-panel');
+const fileInput = $('#file-input');
+const dropVeil = $('#drop-veil');
 
 function icon(name) {
   return `<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
@@ -86,6 +99,39 @@ function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+}
+
+// Attachments are rendered from their MIME type, so video rides the 'file' kind
+// on the wire without needing a schema migration.
+function mediaKind(attachment, kind) {
+  const mime = attachment?.mime || '';
+  if (mime.startsWith('image/')) return 'image';
+  if (mime.startsWith('video/')) return 'video';
+  if (mime.startsWith('audio/')) return 'audio';
+  if (kind === 'image' || kind === 'audio') return kind;
+  return 'file';
+}
+
+function uploadKind(file) {
+  const type = file.type || '';
+  if (type.startsWith('image/')) return 'image';
+  if (type.startsWith('audio/')) return 'audio';
+  return 'file';
+}
+
+const PICTOGRAPHIC = /\p{Extended_Pictographic}/u;
+const EMOJI_RUN = /^(?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\p{Emoji_Component}|️|‍|\s)+$/u;
+function emojiOnly(text) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed || [...trimmed].length > 12) return false;
+  return PICTOGRAPHIC.test(trimmed) && EMOJI_RUN.test(trimmed);
+}
+
+function previewOf(message) {
+  if (!message) return '开始一段对话';
+  if (message.kind === 'system') return message.body;
+  if (message.kind === 'text') return message.body;
+  return { image: '[图片]', audio: '[语音]', file: '[文件]' }[message.kind] || '[消息]';
 }
 
 function toast(message) {
@@ -191,6 +237,27 @@ async function enterApp() {
   $('#admin-link').hidden = state.user.role !== 'admin';
   await Promise.all([loadFriends(), loadConversations()]);
   setView('chats');
+  startBackgroundRefresh();
+}
+
+// Only the open conversation has a socket, so the list and friend requests are
+// kept fresh with a light poll instead of going stale until reload.
+function startBackgroundRefresh() {
+  clearInterval(state.refreshTimer);
+  let tick = 0;
+  state.refreshTimer = setInterval(async () => {
+    if (document.hidden || !state.user) return;
+    tick += 1;
+    try {
+      await loadConversations();
+      if (tick % 3 === 0) {
+        await loadFriends();
+        if (state.activeView === 'contacts' && !sidebarSearch.value.trim()) renderContacts();
+      }
+    } catch {
+      // Transient network errors just wait for the next tick.
+    }
+  }, LIST_REFRESH_MS);
 }
 
 async function loadFriends() {
@@ -202,6 +269,9 @@ async function loadFriends() {
 async function loadConversations() {
   const data = await api('/api/conversations');
   state.conversations = data.conversations;
+  // Whatever is on screen has been read by definition.
+  const open = state.conversations.find((item) => item.id === state.activeId);
+  if (open) open.unread = 0;
   const unread = state.conversations.reduce((sum, item) => sum + item.unread, 0);
   $('#rail-unread').hidden = unread === 0;
   if (state.activeView === 'chats') renderChats();
@@ -239,9 +309,7 @@ function renderChats() {
     return;
   }
   sidebarContent.innerHTML = rows.map((item) => {
-    const preview = item.lastMessage
-      ? (item.lastMessage.kind === 'text' ? item.lastMessage.body : { image: '[图片]', audio: '[语音]', file: '[文件]' }[item.lastMessage.kind] || '[消息]')
-      : '开始一段对话';
+    const preview = previewOf(item.lastMessage);
     return `<button class="chat-item ${item.id === state.activeId ? 'active' : ''}" type="button" data-chat-id="${item.id}">
       ${avatarHTML(item.kind === 'dm' ? item.peer : null, item.title, item.kind === 'group' ? 'group' : '')}
       <span class="chat-item-main">
@@ -276,6 +344,9 @@ async function renderContacts() {
   if (state.friends.outgoing.length) {
     chunks.push(`<div class="section-caption">等待回应</div>${state.friends.outgoing.map((p) => personHTML(p, 'outgoing')).join('')}`);
   }
+  if (state.friends.blocked.length) {
+    chunks.push(`<div class="section-caption">黑名单 <b>${state.friends.blocked.length}</b></div>${state.friends.blocked.map((p) => personHTML(p, 'blocked')).join('')}`);
+  }
   sidebarContent.innerHTML = chunks.join('') || `<div class="list-empty">${icon('users')}<span>搜索用户名并发送好友申请</span></div>`;
 }
 
@@ -284,7 +355,11 @@ function personHTML(person, relation) {
   if (relation === 'incoming') {
     actions = `<button data-friend-action="accept" data-request-id="${person.requestId}" title="接受">${icon('check')}</button><button data-friend-action="reject" data-request-id="${person.requestId}" title="拒绝">${icon('close')}</button>`;
   } else if (relation === 'friend') {
-    actions = `<button data-dm-user="${person.id}" title="发消息">${icon('chat')}</button>`;
+    actions = `<button data-dm-user="${escapeHTML(person.id)}" title="发消息">${icon('chat')}</button>
+      <button data-remove-friend="${escapeHTML(person.id)}" data-name="${escapeHTML(person.displayName)}" title="删除好友">${icon('user-minus')}</button>
+      <button data-block-user="${escapeHTML(person.id)}" data-name="${escapeHTML(person.displayName)}" title="拉黑">${icon('ban')}</button>`;
+  } else if (relation === 'blocked') {
+    actions = `<button data-unblock-user="${escapeHTML(person.id)}" title="解除拉黑">${icon('check')}</button>`;
   } else if (relation === 'stranger') {
     actions = `<button data-add-user="${escapeHTML(person.username)}" title="加好友">${icon('plus')}</button>`;
   } else {
@@ -328,6 +403,44 @@ sidebarContent.addEventListener('click', async (event) => {
       return toast(error.message);
     }
   }
+  const unfriend = event.target.closest('[data-remove-friend]');
+  if (unfriend) {
+    if (!confirm(`删除好友 ${unfriend.dataset.name}？`)) return;
+    try {
+      await api('/api/friends/remove', { method: 'POST', body: { userId: unfriend.dataset.removeFriend } });
+      await Promise.all([loadFriends(), loadConversations()]);
+      renderContacts();
+      toast('已删除好友');
+    } catch (error) {
+      toast(error.message);
+    }
+    return;
+  }
+  const block = event.target.closest('[data-block-user]');
+  if (block) {
+    if (!confirm(`拉黑 ${block.dataset.name}？你们将无法互发消息。`)) return;
+    try {
+      await api('/api/friends/block', { method: 'POST', body: { userId: block.dataset.blockUser } });
+      await Promise.all([loadFriends(), loadConversations()]);
+      renderContacts();
+      toast('已拉黑');
+    } catch (error) {
+      toast(error.message);
+    }
+    return;
+  }
+  const unblock = event.target.closest('[data-unblock-user]');
+  if (unblock) {
+    try {
+      await api('/api/friends/unblock', { method: 'POST', body: { userId: unblock.dataset.unblockUser } });
+      await loadFriends();
+      renderContacts();
+      toast('已解除拉黑');
+    } catch (error) {
+      toast(error.message);
+    }
+    return;
+  }
   const action = event.target.closest('[data-friend-action]');
   if (action) {
     try {
@@ -347,9 +460,15 @@ async function openConversation(id) {
     return;
   }
   closeSocket();
+  state.replyTo = null;
+  state.editing = null;
+  messageInput.value = '';
+  autoGrow();
+  renderComposerContext();
+  clearAttachments();
   state.activeId = id;
   state.onlineUsers = [];
-  updatePresence({ membersOnline: 0, onlineUsers: [] });
+  resetPresence();
   renderChats();
   conversationEmpty.hidden = true;
   conversationActive.hidden = false;
@@ -369,7 +488,7 @@ async function openConversation(id) {
       : null;
     setAvatar($('#chat-avatar'), peer, $('#chat-title').textContent);
     $('#chat-avatar').classList.toggle('group', detail.conversation.kind === 'group');
-    renderMessages();
+    renderMessages({ stick: true });
     renderDetail();
     connectSocket();
     markRead();
@@ -380,9 +499,12 @@ async function openConversation(id) {
   }
 }
 
-function renderMessages({ preserveScroll = false } = {}) {
+function renderMessages({ preserveScroll = false, stick = false } = {}) {
   const previousHeight = messagesEl.scrollHeight;
   const previousTop = messagesEl.scrollTop;
+  // Only chase the bottom when the reader is already there — otherwise a new
+  // message would yank them out of the history they are reading.
+  const atBottom = previousHeight - previousTop - messagesEl.clientHeight < 140;
   const historyButton = `<button class="history-button" id="history-button" type="button" ${state.messages.length >= 60 ? '' : 'hidden'}>加载更早消息</button>`;
   if (!state.messages.length) {
     messagesEl.innerHTML = `${historyButton}<div class="list-empty">${icon('chat')}<span>这是对话的开始</span></div>`;
@@ -400,31 +522,67 @@ function renderMessages({ preserveScroll = false } = {}) {
   }
   messagesEl.innerHTML = historyButton + rows.join('');
   if (preserveScroll) messagesEl.scrollTop = previousTop + messagesEl.scrollHeight - previousHeight;
-  else messagesEl.scrollTop = messagesEl.scrollHeight;
+  else if (stick || atBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
+  else messagesEl.scrollTop = previousTop;
+}
+
+function quoteHTML(reply) {
+  if (!reply) return '';
+  const text = reply.deleted ? '原消息已撤回' : (reply.body || previewOf({ kind: reply.kind, body: '' }));
+  return `<button class="message-quote" type="button" data-jump-message="${escapeHTML(reply.id)}">
+    <strong>${escapeHTML(reply.displayName)}</strong><span>${escapeHTML(text)}</span>
+  </button>`;
+}
+
+function attachmentHTML(message) {
+  if (!message.attachment || message.deletedAt) return '';
+  const url = appPath(message.attachment.url);
+  const name = escapeHTML(message.attachment.name);
+  const view = mediaKind(message.attachment, message.kind);
+  if (view === 'image') {
+    return `<button class="message-attachment media" type="button" data-preview="${escapeHTML(message.id)}">
+      <img src="${url}" alt="${name}" loading="lazy">
+      <span class="media-zoom">${icon('zoom-in')}</span>
+    </button>`;
+  }
+  if (view === 'video') {
+    return `<div class="message-attachment media video">
+      <video src="${url}" preload="metadata" controls playsinline></video>
+      <button class="media-expand" type="button" data-preview="${escapeHTML(message.id)}" title="全屏预览">${icon('zoom-in')}</button>
+    </div>`;
+  }
+  if (view === 'audio') {
+    return `<div class="message-attachment"><audio controls preload="metadata" src="${url}"></audio></div>`;
+  }
+  return `<a class="message-attachment file-card" href="${url}" target="_blank" rel="noopener">${icon('file')}<div><strong>${name}</strong><span>${formatSize(message.attachment.size)}</span></div></a>`;
 }
 
 function messageHTML(message) {
+  if (message.kind === 'system' && !message.deletedAt) {
+    return `<div class="system-row" data-message-id="${escapeHTML(message.id)}"><span>${escapeHTML(message.body)}</span></div>`;
+  }
   const own = message.sender.id === state.user.id;
   const deleted = !!message.deletedAt;
-  let attachment = '';
-  if (message.attachment && !deleted) {
-    const attachmentURL = appPath(message.attachment.url);
-    if (message.kind === 'image') {
-      attachment = `<a class="message-attachment" href="${attachmentURL}" target="_blank"><img src="${attachmentURL}" alt="${escapeHTML(message.attachment.name)}" loading="lazy"></a>`;
-    } else if (message.kind === 'audio') {
-      attachment = `<div class="message-attachment"><audio controls preload="metadata" src="${attachmentURL}"></audio></div>`;
-    } else {
-      attachment = `<a class="message-attachment file-card" href="${attachmentURL}" target="_blank">${icon('file')}<div><strong>${escapeHTML(message.attachment.name)}</strong><span>${formatSize(message.attachment.size)}</span></div></a>`;
-    }
-  }
-  const actions = own && !deleted ? `<span class="message-actions"><button data-edit-message="${message.id}" title="编辑">${icon('edit')}</button><button data-delete-message="${message.id}" title="撤回">${icon('trash')}</button></span>` : '';
-  return `<div class="message-row ${own ? 'own' : ''}" data-message-id="${message.id}">
+  const attachment = attachmentHTML(message);
+  const view = message.attachment && !deleted ? mediaKind(message.attachment, message.kind) : null;
+  const mediaOnly = (view === 'image' || view === 'video') && !message.body;
+  const editable = own && !deleted && !message.attachment;
+  const actions = deleted ? '' : `<span class="message-actions">
+    <button data-reply-message="${escapeHTML(message.id)}" title="回复">${icon('reply')}</button>
+    ${editable ? `<button data-edit-message="${escapeHTML(message.id)}" title="编辑">${icon('edit')}</button>` : ''}
+    ${own ? `<button data-delete-message="${escapeHTML(message.id)}" title="撤回">${icon('trash')}</button>` : ''}
+  </span>`;
+  const bodyHTML = deleted
+    ? '<div class="message-text">消息已撤回</div>'
+    : (message.body ? `<div class="message-text${emojiOnly(message.body) ? ' jumbo' : ''}">${escapeHTML(message.body)}</div>` : '');
+  return `<div class="message-row ${own ? 'own' : ''}" data-message-id="${escapeHTML(message.id)}">
     ${!own ? `<span class="message-avatar">${avatarContent(message.sender, message.sender.displayName)}</span>` : actions}
     <div class="message-stack">
       ${!own ? `<p class="message-sender">${escapeHTML(message.sender.displayName)}</p>` : ''}
-      <div class="message-bubble ${deleted ? 'deleted' : ''}">
+      <div class="message-bubble ${deleted ? 'deleted' : ''}${mediaOnly ? ' media-only' : ''}">
+        ${quoteHTML(message.replyTo)}
         ${attachment}
-        <div class="message-text">${deleted ? '消息已撤回' : escapeHTML(message.body)}</div>
+        ${bodyHTML}
         <div class="message-meta">${message.editedAt ? '<span>已编辑</span>' : ''}<time>${formatFullTime(message.createdAt)}</time></div>
       </div>
     </div>
@@ -434,26 +592,108 @@ function messageHTML(message) {
 
 messagesEl.addEventListener('click', async (event) => {
   if (event.target.closest('#history-button')) return loadOlderMessages();
+
+  const preview = event.target.closest('[data-preview]');
+  if (preview) return openLightbox(preview.dataset.preview);
+
+  const jump = event.target.closest('[data-jump-message]');
+  if (jump) return jumpToMessage(jump.dataset.jumpMessage);
+
+  const reply = event.target.closest('[data-reply-message]');
+  if (reply) {
+    const message = state.messages.find((item) => item.id === reply.dataset.replyMessage);
+    if (!message) return;
+    state.editing = null;
+    state.replyTo = {
+      id: message.id,
+      displayName: message.sender.displayName,
+      body: message.body || previewOf(message),
+    };
+    renderComposerContext();
+    messageInput.focus();
+    return;
+  }
+
   const edit = event.target.closest('[data-edit-message]');
   if (edit) {
     const message = state.messages.find((item) => item.id === edit.dataset.editMessage);
-    const value = prompt('编辑消息', message?.body || '');
-    if (!value?.trim() || value.trim() === message?.body) return;
-    try {
-      await api(`/api/messages/${message.id}`, { method: 'PATCH', body: { body: value.trim() } });
-    } catch (error) {
-      toast(error.message);
-    }
+    if (!message) return;
+    state.replyTo = null;
+    state.editing = { id: message.id, original: message.body };
+    messageInput.value = message.body;
+    renderComposerContext();
+    autoGrow();
+    messageInput.focus();
+    messageInput.setSelectionRange(messageInput.value.length, messageInput.value.length);
+    return;
   }
+
   const remove = event.target.closest('[data-delete-message]');
-  if (remove && confirm('撤回这条消息？')) {
+  if (remove) {
+    if (!confirm('撤回这条消息？附件也会一并删除。')) return;
     try {
       await api(`/api/messages/${remove.dataset.deleteMessage}`, { method: 'DELETE' });
     } catch (error) {
       toast(error.message);
     }
+    return;
+  }
+
+  // Touch devices have no hover, so tapping a bubble reveals its actions.
+  const bubble = event.target.closest('.message-bubble');
+  if (bubble && matchMedia('(hover: none)').matches) {
+    const row = bubble.closest('.message-row');
+    const open = row.classList.contains('actions-open');
+    $$('.message-row.actions-open', messagesEl).forEach((item) => item.classList.remove('actions-open'));
+    row.classList.toggle('actions-open', !open);
   }
 });
+
+function jumpToMessage(id) {
+  const row = messagesEl.querySelector(`[data-message-id="${CSS.escape(id)}"]`);
+  if (!row) return toast('原消息不在当前加载范围内');
+  row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  row.classList.remove('flash');
+  void row.offsetWidth;
+  row.classList.add('flash');
+}
+
+function renderComposerContext() {
+  if (state.editing) {
+    composerContext.hidden = false;
+    composerContext.dataset.mode = 'edit';
+    $('#context-icon').innerHTML = icon('edit');
+    $('#context-title').textContent = '正在编辑消息';
+    $('#context-text').textContent = state.editing.original;
+    messageInput.placeholder = '修改后按 Enter 保存，Esc 取消';
+    return;
+  }
+  if (state.replyTo) {
+    composerContext.hidden = false;
+    composerContext.dataset.mode = 'reply';
+    $('#context-icon').innerHTML = icon('reply');
+    $('#context-title').textContent = `回复 ${state.replyTo.displayName}`;
+    $('#context-text').textContent = state.replyTo.body;
+    messageInput.placeholder = '输入消息…';
+    return;
+  }
+  composerContext.hidden = true;
+  composerContext.dataset.mode = '';
+  messageInput.placeholder = '输入消息…';
+}
+
+function clearComposerContext() {
+  const wasEditing = !!state.editing;
+  state.replyTo = null;
+  state.editing = null;
+  if (wasEditing) {
+    messageInput.value = '';
+    autoGrow();
+  }
+  renderComposerContext();
+}
+
+$('#context-cancel').addEventListener('click', clearComposerContext);
 
 async function loadOlderMessages() {
   const first = state.messages[0];
@@ -469,6 +709,17 @@ async function loadOlderMessages() {
   } catch (error) {
     toast(error.message);
   }
+}
+
+// The status line must not claim "已连接" before the socket is actually open —
+// that made the composer look ready while sending still failed.
+function resetPresence() {
+  state.onlineUsers = [];
+  state.unknownOnlineCount = 0;
+  $('#chat-status').textContent = '正在连接…';
+  $('#chat-status').classList.remove('connected');
+  $('#online-count').textContent = '0';
+  $('#online-button').hidden = true;
 }
 
 function updatePresence(data) {
@@ -533,10 +784,20 @@ function connectSocket() {
     } else if (data.type === 'message') {
       if (!state.messages.some((item) => item.id === data.message.id)) {
         state.messages.push(data.message);
-        renderMessages();
-        markRead();
-        loadConversations();
+        renderMessages({ stick: data.message.sender.id === state.user.id });
+        // Mark first, then refresh: the other order raced and left the open
+        // conversation showing an unread badge for your own message.
+        markRead().then(loadConversations);
       }
+    } else if (data.type === 'members-changed') {
+      if (data.removedUserId === state.user.id) leaveActiveConversation('你已被移出群组');
+      else refreshActiveDetail();
+    } else if (data.type === 'conversation-renamed') {
+      $('#chat-title').textContent = data.title;
+      loadConversations();
+      refreshActiveDetail();
+    } else if (data.type === 'conversation-removed') {
+      leaveActiveConversation('该会话已被删除');
     } else if (data.type === 'message-updated') {
       const message = state.messages.find((item) => item.id === data.id);
       if (message) {
@@ -620,35 +881,77 @@ messageInput.addEventListener('keydown', (event) => {
 
 $('#composer').addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (!state.activeId || state.ws?.readyState !== WebSocket.OPEN) return toast('聊天连接尚未就绪');
   const body = messageInput.value.trim();
-  if (!body && !state.pendingFile) return;
+
+  if (state.editing) {
+    if (!body) return toast('消息不能为空');
+    const { id, original } = state.editing;
+    if (body === original) return clearComposerContext();
+    try {
+      await api(`/api/messages/${id}`, { method: 'PATCH', body: { body } });
+      clearComposerContext();
+    } catch (error) {
+      toast(error.message);
+    }
+    return;
+  }
+
+  if (!state.activeId) return;
+  if (!body && !state.pendingFiles.length) return;
   const submit = $('.send-button', event.currentTarget);
   submit.disabled = true;
+  const replyTo = state.replyTo?.id || null;
   try {
-    let attachment = null;
-    let kind = 'text';
-    if (state.pendingFile) {
-      const file = state.pendingFile;
-      attachment = await uploadFile(file);
-      kind = file.type.startsWith('image/') ? 'image' : file.type.startsWith('audio/') ? 'audio' : 'file';
+    // Opening a conversation and typing immediately is normal; give the socket
+    // a moment to finish its handshake instead of rejecting the message.
+    if (!await socketReady()) throw new Error('聊天连接尚未就绪，请稍后重试');
+    if (!state.pendingFiles.length) {
+      sendOverSocket({ body, kind: 'text', attachmentId: null, replyTo });
+    } else {
+      // Each attachment becomes its own message; the typed text rides with the first.
+      const files = [...state.pendingFiles];
+      for (let index = 0; index < files.length; index += 1) {
+        const file = files[index];
+        const attachment = await uploadFile(file);
+        sendOverSocket({
+          body: index === 0 ? body : '',
+          kind: uploadKind(file),
+          attachmentId: attachment.id,
+          replyTo: index === 0 ? replyTo : null,
+        });
+      }
     }
-    state.ws.send(JSON.stringify({
-      type: 'message',
-      conversationId: state.activeId,
-      body,
-      kind,
-      attachmentId: attachment?.id || null,
-    }));
     messageInput.value = '';
     autoGrow();
-    clearAttachment();
+    clearAttachments();
+    state.replyTo = null;
+    renderComposerContext();
   } catch (error) {
     toast(error.message);
   } finally {
     submit.disabled = false;
   }
 });
+
+function socketReady(timeout = 5000) {
+  if (state.ws?.readyState === WebSocket.OPEN) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const timer = setInterval(() => {
+      if (state.ws?.readyState === WebSocket.OPEN) {
+        clearInterval(timer);
+        resolve(true);
+      } else if (Date.now() - started > timeout) {
+        clearInterval(timer);
+        resolve(false);
+      }
+    }, 80);
+  });
+}
+
+function sendOverSocket(payload) {
+  state.ws.send(JSON.stringify({ type: 'message', conversationId: state.activeId, ...payload }));
+}
 
 async function uploadFile(file) {
   const result = await api(`/api/conversations/${state.activeId}/uploads`, {
@@ -659,25 +962,251 @@ async function uploadFile(file) {
   return result.attachment;
 }
 
-$('#attach-button').addEventListener('click', () => $('#file-input').click());
-$('#file-input').addEventListener('change', (event) => {
-  const file = event.target.files[0];
-  if (!file) return;
-  if (file.size > 8 * 1024 * 1024) return toast('附件不能超过 8 MB');
-  setAttachment(file);
+/* Attachment queue ------------------------------------------------------- */
+
+const PICK_PRESETS = {
+  image: { accept: 'image/*' },
+  video: { accept: 'video/*' },
+  audio: { accept: 'audio/*' },
+  file: { accept: '' },
+  camera: { accept: 'image/*,video/*', capture: 'environment' },
+};
+const thumbURLs = new WeakMap();
+
+function thumbFor(file) {
+  if (!/^(image|video)\//.test(file.type || '')) return '';
+  if (!thumbURLs.has(file)) thumbURLs.set(file, URL.createObjectURL(file));
+  return thumbURLs.get(file);
+}
+
+function releaseThumb(file) {
+  const url = thumbURLs.get(file);
+  if (url) {
+    URL.revokeObjectURL(url);
+    thumbURLs.delete(file);
+  }
+}
+
+function openFilePicker(kind = 'file') {
+  const preset = PICK_PRESETS[kind] || PICK_PRESETS.file;
+  fileInput.accept = preset.accept;
+  if (preset.capture) fileInput.setAttribute('capture', preset.capture);
+  else fileInput.removeAttribute('capture');
+  fileInput.value = '';
+  fileInput.click();
+}
+
+function addFiles(files) {
+  const incoming = [...(files || [])].filter(Boolean);
+  if (!incoming.length) return;
+  const accepted = [];
+  for (const file of incoming) {
+    if (state.pendingFiles.length + accepted.length >= MAX_QUEUE) {
+      toast(`一次最多添加 ${MAX_QUEUE} 个附件`);
+      break;
+    }
+    if (file.size > MAX_ATTACHMENT) {
+      toast(`「${file.name}」超过 8 MB，已跳过`);
+      continue;
+    }
+    accepted.push(file);
+  }
+  if (!accepted.length) return;
+  state.pendingFiles = [...state.pendingFiles, ...accepted];
+  renderAttachments();
+}
+
+function renderAttachments() {
+  const files = state.pendingFiles;
+  attachmentTray.hidden = !files.length;
+  if (!files.length) {
+    attachmentTray.innerHTML = '';
+    return;
+  }
+  attachmentTray.innerHTML = files.map((file, index) => {
+    const thumb = thumbFor(file);
+    const visual = thumb
+      ? (file.type.startsWith('video/')
+        ? `<video src="${thumb}" muted preload="metadata"></video><i class="tray-badge">${icon('video')}</i>`
+        : `<img src="${thumb}" alt="">`)
+      : icon(file.type.startsWith('audio/') ? 'mic' : 'file');
+    return `<div class="tray-item" title="${escapeHTML(file.name)}">
+      <span class="tray-thumb">${visual}</span>
+      <span class="tray-copy"><strong>${escapeHTML(file.name)}</strong><span>${formatSize(file.size)} · ${escapeHTML(file.type || '文件')}</span></span>
+      <button type="button" data-remove-file="${index}" aria-label="移除">${icon('close')}</button>
+    </div>`;
+  }).join('');
+}
+
+function clearAttachments() {
+  state.pendingFiles.forEach(releaseThumb);
+  state.pendingFiles = [];
+  fileInput.value = '';
+  renderAttachments();
+}
+
+attachmentTray.addEventListener('click', (event) => {
+  const remove = event.target.closest('[data-remove-file]');
+  if (!remove) return;
+  const index = Number(remove.dataset.removeFile);
+  const [file] = state.pendingFiles.splice(index, 1);
+  if (file) releaseThumb(file);
+  renderAttachments();
 });
-function setAttachment(file) {
-  state.pendingFile = file;
-  $('#attachment-preview').hidden = false;
-  $('#attachment-name').textContent = file.name;
-  $('#attachment-size').textContent = `${formatSize(file.size)} · ${file.type || '文件'}`;
+
+fileInput.addEventListener('change', (event) => {
+  addFiles(event.target.files);
+  event.target.value = '';
+});
+
+/* Popovers: attachment menu and emoji picker ----------------------------- */
+
+function closePopovers(except = null) {
+  for (const [panel, trigger] of [[attachMenu, $('#attach-button')], [emojiPanel, $('#emoji-button')]]) {
+    if (panel === except) continue;
+    panel.hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
+  }
 }
-function clearAttachment() {
-  state.pendingFile = null;
-  $('#file-input').value = '';
-  $('#attachment-preview').hidden = true;
+
+function togglePopover(panel, trigger) {
+  const next = panel.hidden;
+  closePopovers(next ? panel : null);
+  panel.hidden = !next;
+  trigger.setAttribute('aria-expanded', String(next));
+  return next;
 }
-$('#attachment-clear').addEventListener('click', clearAttachment);
+
+$('#attach-button').addEventListener('click', (event) => {
+  event.stopPropagation();
+  togglePopover(attachMenu, event.currentTarget);
+});
+
+attachMenu.addEventListener('click', (event) => {
+  const pick = event.target.closest('[data-pick]');
+  if (!pick) return;
+  closePopovers();
+  openFilePicker(pick.dataset.pick);
+});
+
+const EMOJI_GROUPS = [
+  { key: 'recent', label: '最近', tab: '🕘', emojis: [] },
+  { key: 'smiley', label: '表情', tab: '😀', emojis: '😀 😃 😄 😁 😆 😅 🤣 😂 🙂 🙃 😉 😊 😇 🥰 😍 🤩 😘 😗 😚 😋 😛 😜 🤪 😝 🤗 🤭 🤫 🤔 🤐 😐 😑 😶 😏 😒 🙄 😬 😔 😪 🤤 😴 😷 🤒 🤕 🤢 🥵 🥶 😵 🤯 🤠 🥳 😎 🤓 🧐 😕 😟 🙁 😮 😯 😲 😳 🥺 😦 😧 😨 😰 😥 😢 😭 😱 😖 😣 😞 😓 😩 😫 🥱 😤 😡 😠 🤬 😈 💀 👻 👽 🤖 💩' },
+  { key: 'gesture', label: '手势', tab: '👍', emojis: '👍 👎 👌 🤌 ✌️ 🤞 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ ✋ 🤚 🖐 🖖 👋 🤝 🙏 💪 🦾 ✍️ 👏 🙌 👐 🤲 🫶 💅 👀 👁 👄 🫰 🫡 🤝' },
+  { key: 'heart', label: '心情', tab: '❤️', emojis: '❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💯 💢 💥 💫 💦 💨 💬 💭 💤 ✨ 🌟 ⭐ 🔥 🎉 🎊 🎈 🎁 🏆 🥇 🎯 🍀' },
+  { key: 'animal', label: '动物', tab: '🐶', emojis: '🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🙈 🙉 🙊 🐔 🐧 🐦 🐤 🦆 🦅 🦉 🦇 🐺 🐗 🐴 🦄 🐝 🐛 🦋 🐌 🐞 🐢 🐍 🐙 🦑 🦀 🐟 🐬 🐳 🦈 🐊 🐆 🦓 🦍 🐘 🦛 🐪 🦒 🐇 🌸 🌻 🌵 🌊' },
+  { key: 'food', label: '食物', tab: '🍎', emojis: '🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍒 🍑 🥭 🍍 🥥 🥝 🍅 🍆 🥑 🥦 🥬 🥒 🌽 🥕 🧄 🧅 🥔 🥐 🍞 🥖 🧀 🥚 🍳 🥞 🧇 🥓 🍔 🍟 🍕 🌭 🥪 🌮 🌯 🥗 🍝 🍜 🍲 🍣 🍱 🍤 🍙 🍚 🍢 🍡 🍧 🍨 🍦 🍰 🎂 🧁 🍫 🍬 🍭 🍮 🥛 ☕ 🍵 🧋 🍺 🍻 🥂 🍷' },
+  { key: 'thing', label: '物品', tab: '💡', emojis: '⌚ 📱 💻 ⌨️ 🖥 🖨 🖱 💾 📷 📹 🎥 📞 ☎️ 📺 📻 🎙 ⏰ ⏳ 📡 🔋 🔌 💡 🔦 🕯 🧯 💸 💵 💰 💳 💎 ⚖️ 🔧 🔨 🛠 🔩 ⚙️ 🧰 🧲 💊 💉 🩹 🌡 🧹 🧺 🧻 🛁 🧼 🔑 🚪 🛋 🛏 🧸 🖼 🛍 🎒 👑 👓 🕶 📚 📖 📝 ✏️ 📌 📎 🗂 📅 📈 📉 🔍 🔒 🔓' },
+  { key: 'symbol', label: '符号', tab: '✅', emojis: '✅ ❌ ⭕ ❗ ❓ ⚠️ 🚫 ♻️ ⚡ 🔔 🔕 🎵 🎶 ➕ ➖ ➗ ✖️ ♾ 💲 ™️ ©️ ®️ 🔢 🆕 🆓 🆗 🆙 🆘 ⬆️ ⬇️ ⬅️ ➡️ ↕️ ↔️ 🔄 🔃 🔙 🔚 🔛 🔜 🔝 ⏩ ⏪ ▶️ ◀️ ⏸ ⏹ ⏺ 🔴 🟠 🟡 🟢 🔵 🟣 ⚫ ⚪ 🟥 🟧 🟨 🟩 🟦 🟪' },
+].map((group) => ({ ...group, emojis: Array.isArray(group.emojis) ? group.emojis : group.emojis.split(' ') }));
+
+const RECENT_KEY = 'starpost-emoji-recent';
+let emojiGroup = 'smiley';
+
+function recentEmoji() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed.slice(0, 32) : [];
+  } catch {
+    return [];
+  }
+}
+
+function pushRecentEmoji(emoji) {
+  const next = [emoji, ...recentEmoji().filter((item) => item !== emoji)].slice(0, 32);
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  } catch {
+    // Private-mode storage failures should never break sending a message.
+  }
+}
+
+function renderEmojiPanel() {
+  $('#emoji-tabs').innerHTML = EMOJI_GROUPS.map((group) => `
+    <button type="button" class="${group.key === emojiGroup ? 'active' : ''}" data-emoji-group="${group.key}" title="${group.label}">${group.tab}</button>
+  `).join('');
+  const group = EMOJI_GROUPS.find((item) => item.key === emojiGroup) || EMOJI_GROUPS[1];
+  const emojis = group.key === 'recent' ? recentEmoji() : group.emojis;
+  $('#emoji-grid').innerHTML = emojis.length
+    ? emojis.map((emoji) => `<button type="button" data-emoji="${escapeHTML(emoji)}">${escapeHTML(emoji)}</button>`).join('')
+    : '<p class="emoji-empty">还没有用过的表情</p>';
+}
+
+function insertEmoji(emoji) {
+  const start = messageInput.selectionStart ?? messageInput.value.length;
+  const end = messageInput.selectionEnd ?? start;
+  messageInput.value = messageInput.value.slice(0, start) + emoji + messageInput.value.slice(end);
+  const caret = start + emoji.length;
+  messageInput.focus();
+  messageInput.setSelectionRange(caret, caret);
+  autoGrow();
+  pushRecentEmoji(emoji);
+}
+
+$('#emoji-button').addEventListener('click', (event) => {
+  event.stopPropagation();
+  if (togglePopover(emojiPanel, event.currentTarget)) renderEmojiPanel();
+});
+
+emojiPanel.addEventListener('click', (event) => {
+  event.stopPropagation();
+  const tab = event.target.closest('[data-emoji-group]');
+  if (tab) {
+    emojiGroup = tab.dataset.emojiGroup;
+    renderEmojiPanel();
+    return;
+  }
+  const pick = event.target.closest('[data-emoji]');
+  if (pick) {
+    insertEmoji(pick.dataset.emoji);
+    if (emojiGroup === 'recent') renderEmojiPanel();
+  }
+});
+
+document.addEventListener('click', () => closePopovers());
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  if (!attachMenu.hidden || !emojiPanel.hidden) {
+    closePopovers();
+    return;
+  }
+  if (!$('#lightbox').hidden) closeLightbox();
+  else if (state.editing || state.replyTo) clearComposerContext();
+});
+
+/* Paste and drag-and-drop ------------------------------------------------ */
+
+messageInput.addEventListener('paste', (event) => {
+  const files = [...(event.clipboardData?.files || [])];
+  if (!files.length) return;
+  event.preventDefault();
+  addFiles(files);
+});
+
+let dragDepth = 0;
+const conversationEl = $('#conversation');
+conversationEl.addEventListener('dragenter', (event) => {
+  if (!state.activeId || !event.dataTransfer?.types?.includes('Files')) return;
+  event.preventDefault();
+  dragDepth += 1;
+  dropVeil.hidden = false;
+});
+conversationEl.addEventListener('dragover', (event) => {
+  if (!state.activeId || !event.dataTransfer?.types?.includes('Files')) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'copy';
+});
+conversationEl.addEventListener('dragleave', () => {
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (!dragDepth) dropVeil.hidden = true;
+});
+conversationEl.addEventListener('drop', (event) => {
+  if (!state.activeId) return;
+  event.preventDefault();
+  dragDepth = 0;
+  dropVeil.hidden = true;
+  addFiles(event.dataTransfer?.files);
+});
 
 $('#record-button').addEventListener('click', async () => {
   if (state.mediaRecorder?.state === 'recording') {
@@ -694,7 +1223,7 @@ $('#record-button').addEventListener('click', async () => {
     state.mediaRecorder.addEventListener('stop', () => {
       const blob = new Blob(state.mediaChunks, { type: state.mediaRecorder.mimeType || 'audio/webm' });
       const extension = blob.type.includes('mp4') ? 'm4a' : 'webm';
-      setAttachment(new File([blob], `语音留言-${Date.now()}.${extension}`, { type: blob.type }));
+      addFiles([new File([blob], `语音留言-${Date.now()}.${extension}`, { type: blob.type })]);
       stream.getTracks().forEach((track) => track.stop());
       $('#record-button').classList.remove('recording');
       toast('录音完成，点击发送');
@@ -707,6 +1236,173 @@ $('#record-button').addEventListener('click', async () => {
   }
 });
 
+/* Lightbox --------------------------------------------------------------- */
+
+const lightbox = $('#lightbox');
+const lightboxCanvas = $('#lightbox-canvas');
+const viewer = { items: [], index: 0, scale: 1, x: 0, y: 0, panning: false, originX: 0, originY: 0 };
+
+function previewableMessages() {
+  return state.messages.filter((message) => !message.deletedAt && message.attachment
+    && ['image', 'video'].includes(mediaKind(message.attachment, message.kind)));
+}
+
+function openLightbox(messageId) {
+  viewer.items = previewableMessages();
+  const index = viewer.items.findIndex((item) => item.id === messageId);
+  if (index < 0) return;
+  viewer.index = index;
+  lightbox.hidden = false;
+  document.body.classList.add('lightbox-open');
+  renderLightbox();
+}
+
+function closeLightbox() {
+  lightbox.hidden = true;
+  document.body.classList.remove('lightbox-open');
+  lightboxCanvas.innerHTML = '';
+  viewer.items = [];
+}
+
+function renderLightbox() {
+  const message = viewer.items[viewer.index];
+  if (!message) return closeLightbox();
+  const url = appPath(message.attachment.url);
+  const kind = mediaKind(message.attachment, message.kind);
+  viewer.scale = 1;
+  viewer.x = 0;
+  viewer.y = 0;
+  lightboxCanvas.innerHTML = kind === 'video'
+    ? `<video src="${url}" controls playsinline></video>`
+    : `<img src="${url}" alt="${escapeHTML(message.attachment.name)}" draggable="false">`;
+  lightbox.classList.toggle('is-video', kind === 'video');
+  $('#lightbox-name').textContent = message.attachment.name;
+  $('#lightbox-meta').textContent = [
+    message.sender.displayName,
+    formatSize(message.attachment.size),
+    `${viewer.index + 1} / ${viewer.items.length}`,
+  ].join(' · ');
+  const download = $('#lightbox-download');
+  download.href = url;
+  download.setAttribute('download', message.attachment.name);
+  const multiple = viewer.items.length > 1;
+  $('#lightbox-prev').hidden = !multiple;
+  $('#lightbox-next').hidden = !multiple;
+  $('#lightbox-strip').hidden = !multiple;
+  applyViewerTransform();
+  renderLightboxStrip();
+}
+
+function renderLightboxStrip() {
+  $('#lightbox-strip').innerHTML = viewer.items.map((item, index) => {
+    const url = appPath(item.attachment.url);
+    const active = index === viewer.index ? ' class="active"' : '';
+    const inner = mediaKind(item.attachment, item.kind) === 'video'
+      ? `<video src="${url}" preload="metadata" muted></video>`
+      : `<img src="${url}" alt="" loading="lazy">`;
+    return `<button type="button" data-strip="${index}"${active}>${inner}</button>`;
+  }).join('');
+}
+
+function applyViewerTransform() {
+  const media = lightboxCanvas.firstElementChild;
+  if (media) {
+    media.style.transform = `translate(${viewer.x}px, ${viewer.y}px) scale(${viewer.scale})`;
+    media.style.cursor = viewer.scale > 1 ? 'grab' : 'zoom-in';
+  }
+  $('#lightbox-scale').textContent = `${Math.round(viewer.scale * 100)}%`;
+}
+
+// Zoom keeps the point under the cursor anchored, which is what makes pinching
+// into a detail of a screenshot feel right.
+function zoomAt(nextScale, clientX, clientY) {
+  const rect = lightboxCanvas.getBoundingClientRect();
+  const scale = Math.min(6, Math.max(1, nextScale));
+  const cx = clientX - rect.left - rect.width / 2;
+  const cy = clientY - rect.top - rect.height / 2;
+  const ratio = scale / viewer.scale;
+  viewer.x = cx - ratio * (cx - viewer.x);
+  viewer.y = cy - ratio * (cy - viewer.y);
+  viewer.scale = scale;
+  if (scale === 1) {
+    viewer.x = 0;
+    viewer.y = 0;
+  }
+  applyViewerTransform();
+}
+
+function stepLightbox(delta) {
+  if (viewer.items.length < 2) return;
+  viewer.index = (viewer.index + delta + viewer.items.length) % viewer.items.length;
+  renderLightbox();
+}
+
+$('#lightbox-close').addEventListener('click', closeLightbox);
+$('#lightbox-prev').addEventListener('click', () => stepLightbox(-1));
+$('#lightbox-next').addEventListener('click', () => stepLightbox(1));
+$('#lightbox-zoom-in').addEventListener('click', () => zoomAt(viewer.scale * 1.4, innerWidth / 2, innerHeight / 2));
+$('#lightbox-zoom-out').addEventListener('click', () => zoomAt(viewer.scale / 1.4, innerWidth / 2, innerHeight / 2));
+$('#lightbox-reset').addEventListener('click', () => zoomAt(1, innerWidth / 2, innerHeight / 2));
+$('#lightbox-strip').addEventListener('click', (event) => {
+  const pick = event.target.closest('[data-strip]');
+  if (!pick) return;
+  viewer.index = Number(pick.dataset.strip);
+  renderLightbox();
+});
+
+// The media element fills the stage and letterboxes itself, so "did the click
+// land on the picture?" has to be answered from the contained rectangle.
+function pointInMedia(event) {
+  const media = lightboxCanvas.firstElementChild;
+  if (!media) return false;
+  const rect = media.getBoundingClientRect();
+  const natural = media.tagName === 'IMG'
+    ? { width: media.naturalWidth, height: media.naturalHeight }
+    : { width: media.videoWidth || 16, height: media.videoHeight || 9 };
+  if (!natural.width || !natural.height) return true;
+  const ratio = Math.min(rect.width / natural.width, rect.height / natural.height);
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  return Math.abs(event.clientX - centerX) <= (natural.width * ratio) / 2
+    && Math.abs(event.clientY - centerY) <= (natural.height * ratio) / 2;
+}
+
+$('#lightbox-stage').addEventListener('click', (event) => {
+  if (event.target.closest('button, a')) return;
+  if (!pointInMedia(event)) closeLightbox();
+});
+lightboxCanvas.addEventListener('dblclick', (event) => {
+  zoomAt(viewer.scale > 1 ? 1 : 2.5, event.clientX, event.clientY);
+});
+lightboxCanvas.addEventListener('wheel', (event) => {
+  if (lightbox.hidden) return;
+  event.preventDefault();
+  zoomAt(viewer.scale * (event.deltaY < 0 ? 1.18 : 1 / 1.18), event.clientX, event.clientY);
+}, { passive: false });
+lightboxCanvas.addEventListener('pointerdown', (event) => {
+  if (viewer.scale <= 1 || event.target.tagName === 'VIDEO') return;
+  viewer.panning = true;
+  viewer.originX = event.clientX - viewer.x;
+  viewer.originY = event.clientY - viewer.y;
+  lightboxCanvas.setPointerCapture(event.pointerId);
+});
+lightboxCanvas.addEventListener('pointermove', (event) => {
+  if (!viewer.panning) return;
+  viewer.x = event.clientX - viewer.originX;
+  viewer.y = event.clientY - viewer.originY;
+  applyViewerTransform();
+});
+for (const type of ['pointerup', 'pointercancel']) {
+  lightboxCanvas.addEventListener(type, () => { viewer.panning = false; });
+}
+document.addEventListener('keydown', (event) => {
+  if (lightbox.hidden) return;
+  if (event.key === 'ArrowLeft') stepLightbox(-1);
+  else if (event.key === 'ArrowRight') stepLightbox(1);
+  else if (event.key === '+' || event.key === '=') zoomAt(viewer.scale * 1.4, innerWidth / 2, innerHeight / 2);
+  else if (event.key === '-') zoomAt(viewer.scale / 1.4, innerWidth / 2, innerHeight / 2);
+});
+
 function renderDetail() {
   const detail = state.activeDetail;
   if (!detail) return;
@@ -715,17 +1411,132 @@ function renderDetail() {
   const peer = detail.conversation.kind === 'dm'
     ? detail.members.find((member) => member.id !== state.user.id)
     : null;
+  const isGroup = detail.conversation.kind === 'group';
+  const me = detail.members.find((member) => member.id === state.user.id);
+  const manages = isGroup && ['owner', 'admin'].includes(me?.memberRole);
+  const isOwner = isGroup && me?.memberRole === 'owner';
   $('#detail-content').innerHTML = `
     <div class="detail-hero">
-      ${avatarHTML(peer, title, detail.conversation.kind === 'group' ? 'group' : '')}
+      ${avatarHTML(peer, title, isGroup ? 'group' : '')}
       <h3>${escapeHTML(title)}</h3>
-      <p>${detail.conversation.kind === 'group' ? `${detail.members.length} 位成员` : '私人对话'}</p>
+      <p>${isGroup ? `${detail.members.length} 位成员` : `@${escapeHTML(peer?.username || '')}`}</p>
+      ${isGroup && manages ? `<button class="ghost-button" type="button" data-detail-action="rename">${icon('edit')}<span>修改群名</span></button>` : ''}
     </div>
-    <div class="section-caption">成员</div>
-    <div class="member-list">${detail.members.map((member) => `
-      <div class="member-line">${avatarHTML(member, member.displayName)}<div><strong>${escapeHTML(member.displayName)}</strong><span>@${escapeHTML(member.username)}${member.memberRole !== 'member' ? ` · ${member.memberRole === 'owner' ? '群主' : '管理员'}` : ''}</span></div></div>
-    `).join('')}</div>`;
+    ${isGroup ? `<div class="section-caption">成员 <b>${detail.members.length}</b></div>` : '<div class="section-caption">对话成员</div>'}
+    <div class="member-list">${detail.members.map((member) => {
+      // Roles only mean something in a group; a DM has no owner to advertise.
+      const role = !isGroup ? '' : member.memberRole === 'owner' ? '群主' : member.memberRole === 'admin' ? '管理员' : '';
+      const removable = manages && member.id !== state.user.id && member.memberRole !== 'owner';
+      return `<div class="member-line">
+        ${avatarHTML(member, member.displayName)}
+        <div><strong>${escapeHTML(member.displayName)}</strong><span>@${escapeHTML(member.username)}${role ? ` · ${role}` : ''}</span></div>
+        ${removable ? `<button class="line-action" type="button" data-remove-member="${escapeHTML(member.id)}" data-name="${escapeHTML(member.displayName)}" title="移出群组">${icon('user-minus')}</button>` : ''}
+      </div>`;
+    }).join('')}</div>
+    <div class="detail-actions">
+      ${manages ? `<button class="ghost-button" type="button" data-detail-action="invite">${icon('user-plus')}<span>邀请好友入群</span></button>` : ''}
+      ${isGroup && !isOwner ? `<button class="ghost-button danger" type="button" data-detail-action="leave">${icon('exit')}<span>退出群组</span></button>` : ''}
+      ${isOwner ? `<button class="ghost-button danger" type="button" data-detail-action="disband">${icon('trash')}<span>解散群组</span></button>` : ''}
+      ${!isGroup && peer ? `<button class="ghost-button danger" type="button" data-detail-action="block" data-user="${escapeHTML(peer.id)}">${icon('ban')}<span>拉黑 ${escapeHTML(peer.displayName)}</span></button>` : ''}
+    </div>`;
 }
+
+$('#detail-content').addEventListener('click', async (event) => {
+  const remove = event.target.closest('[data-remove-member]');
+  if (remove) {
+    if (!confirm(`把 ${remove.dataset.name} 移出群组？`)) return;
+    try {
+      await api(`/api/conversations/${state.activeId}/members/${remove.dataset.removeMember}`, { method: 'DELETE' });
+      await refreshActiveDetail();
+      toast('成员已移出');
+    } catch (error) {
+      toast(error.message);
+    }
+    return;
+  }
+  const action = event.target.closest('[data-detail-action]')?.dataset.detailAction;
+  if (!action) return;
+  try {
+    if (action === 'rename') {
+      const title = prompt('新的群组名称', state.activeDetail?.conversation.title || '');
+      if (!title?.trim()) return;
+      await api(`/api/conversations/${state.activeId}`, { method: 'PATCH', body: { title: title.trim() } });
+      await refreshActiveDetail();
+      await loadConversations();
+      toast('群名已更新');
+    } else if (action === 'invite') {
+      openInviteDialog();
+    } else if (action === 'leave') {
+      if (!confirm('退出这个群组？')) return;
+      await api(`/api/conversations/${state.activeId}/members/${state.user.id}`, { method: 'DELETE' });
+      await leaveActiveConversation('已退出群组');
+    } else if (action === 'disband') {
+      if (!confirm('解散群组？所有消息和附件都会被删除。')) return;
+      await api(`/api/conversations/${state.activeId}`, { method: 'DELETE' });
+      await leaveActiveConversation('群组已解散');
+    } else if (action === 'block') {
+      if (!confirm('拉黑后你们将无法互发消息，确定继续？')) return;
+      await api('/api/friends/block', { method: 'POST', body: { userId: event.target.closest('[data-detail-action]').dataset.user } });
+      await loadFriends();
+      toast('已拉黑');
+    }
+  } catch (error) {
+    toast(error.message);
+  }
+});
+
+async function refreshActiveDetail() {
+  if (!state.activeId) return;
+  try {
+    state.activeDetail = await api(`/api/conversations/${state.activeId}`);
+    const summary = state.conversations.find((item) => item.id === state.activeId);
+    $('#chat-title').textContent = summary?.title || state.activeDetail.conversation.title || '会话';
+    renderDetail();
+  } catch {
+    // The conversation may have disappeared underneath us; the list refresh handles it.
+  }
+}
+
+async function leaveActiveConversation(message) {
+  closeSocket();
+  state.activeId = null;
+  state.activeDetail = null;
+  state.messages = [];
+  conversationActive.hidden = true;
+  conversationEmpty.hidden = false;
+  appView.classList.remove('mobile-chat-open', 'detail-open');
+  $('#detail-panel').hidden = true;
+  await loadConversations();
+  toast(message);
+}
+
+function openInviteDialog() {
+  const present = new Set((state.activeDetail?.members || []).map((member) => member.id));
+  const candidates = state.friends.friends.filter((person) => !present.has(person.id));
+  if (!candidates.length) return toast('没有可邀请的好友了');
+  $('#invite-member-picker').innerHTML = candidates.map((person) => `
+    <label class="pick-line">${avatarHTML(person, person.displayName)}<span><strong>${escapeHTML(person.displayName)}</strong><br><small>@${escapeHTML(person.username)}</small></span><input type="checkbox" name="invite-member" value="${escapeHTML(person.id)}"></label>
+  `).join('');
+  $('#invite-dialog').showModal();
+}
+
+$('#invite-submit').addEventListener('click', async () => {
+  const ids = $$('input[name="invite-member"]:checked', $('#invite-form')).map((input) => input.value);
+  if (!ids.length) return toast('请至少选择一位好友');
+  setButtonBusy($('#invite-submit'), true);
+  try {
+    for (const id of ids) {
+      await api(`/api/conversations/${state.activeId}/members`, { method: 'POST', body: { userId: id } });
+    }
+    $('#invite-dialog').close();
+    await refreshActiveDetail();
+    toast('已加入群组');
+  } catch (error) {
+    toast(error.message);
+  } finally {
+    setButtonBusy($('#invite-submit'), false);
+  }
+});
 
 $('#chat-details-button').addEventListener('click', () => {
   $('#detail-panel').hidden = false;

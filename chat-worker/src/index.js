@@ -7,7 +7,7 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 const MAX_AVATAR = 2 * 1024 * 1024;
 const AVATAR_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const PASSWORD_ITERATIONS = 100000;
-const BUILD_VERSION = '2026.07.30-5';
+const BUILD_VERSION = '2026.07.31-1';
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,24}$/;
 
 function base64url(bytes) {
@@ -190,17 +190,70 @@ async function isMember(env, conversationId, userId) {
   `).bind(conversationId, userId).first();
 }
 
+async function dmPeer(env, conversationId, userId) {
+  return env.DB.prepare(`
+    SELECT u.* FROM conversation_members cm JOIN users u ON u.id = cm.user_id
+    WHERE cm.conversation_id = ? AND cm.user_id != ? LIMIT 1
+  `).bind(conversationId, userId).first();
+}
+
+async function blockedBetween(env, a, b) {
+  return env.DB.prepare(`
+    SELECT blocker_id FROM blocks
+    WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)
+  `).bind(a, b, b, a).first();
+}
+
+// Every write that touches a conversation's message log is funnelled through its
+// Durable Object so sequence numbers stay collision-free.
+async function roomFetch(env, conversationId, path, payload) {
+  return env.CHAT_ROOMS.getByName(conversationId).fetch(new Request(`https://room.internal${path}`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }));
+}
+
+async function roomBroadcast(env, conversationId, payload) {
+  await roomFetch(env, conversationId, '/broadcast', payload);
+}
+
+async function postSystemMessage(env, conversationId, actorId, body) {
+  await roomFetch(env, conversationId, '/system', { conversationId, actorId, body });
+}
+
+// Attachments live in R2; dropping the rows alone would leak objects forever.
+async function purgeAttachments(env, rows) {
+  const keys = (rows || []).map((row) => row.object_key).filter(Boolean);
+  if (!keys.length) return;
+  await env.FILES.delete(keys);
+}
+
 async function getMessageRows(env, conversationId, before = Number.MAX_SAFE_INTEGER, limit = 60) {
   const result = await env.DB.prepare(`
     SELECT m.*, u.username, u.display_name, u.avatar_key, u.avatar_updated_at,
-           a.file_name, a.mime, a.size
+           a.file_name, a.mime, a.size,
+           r.body AS reply_body, r.kind AS reply_kind, r.deleted_at AS reply_deleted_at,
+           ru.display_name AS reply_display_name
     FROM messages m
     JOIN users u ON u.id = m.sender_id
     LEFT JOIN attachments a ON a.id = m.attachment_id
+    LEFT JOIN messages r ON r.id = m.reply_to
+    LEFT JOIN users ru ON ru.id = r.sender_id
     WHERE m.conversation_id = ? AND m.seq < ?
     ORDER BY m.seq DESC LIMIT ?
   `).bind(conversationId, before, Math.min(Math.max(limit, 1), 100)).all();
   return (result.results || []).reverse().map(formatMessage);
+}
+
+function replyPreview(row) {
+  if (!row?.reply_to) return null;
+  return {
+    id: row.reply_to,
+    displayName: row.reply_display_name || '用户',
+    kind: row.reply_kind || 'text',
+    body: row.reply_deleted_at ? '' : (row.reply_body || ''),
+    deleted: !!row.reply_deleted_at,
+  };
 }
 
 function formatMessage(row) {
@@ -223,7 +276,7 @@ function formatMessage(row) {
       size: row.size,
       url: `/media/${row.attachment_id}`,
     } : null,
-    replyTo: row.reply_to || null,
+    replyTo: replyPreview(row),
     createdAt: row.created_at,
     editedAt: row.edited_at || null,
     deletedAt: row.deleted_at || null,
@@ -699,10 +752,94 @@ async function handleConversations(request, env, pathname, url) {
     if (!await env.DB.prepare('SELECT 1 FROM friendships WHERE user_a = ? AND user_b = ?').bind(a, b).first()) {
       return failure('只能邀请好友加入群组', 403);
     }
-    await env.DB.prepare(`
+    const added = await env.DB.prepare('SELECT display_name FROM users WHERE id = ?').bind(targetId).first();
+    if (!added) return failure('找不到该用户', 404);
+    const result = await env.DB.prepare(`
       INSERT OR IGNORE INTO conversation_members (conversation_id, user_id, role, joined_at)
       VALUES (?, ?, 'member', ?)
     `).bind(conversationId, targetId, Date.now()).run();
+    if (result.meta?.changes) {
+      await postSystemMessage(env, conversationId, user.id, `${user.display_name} 邀请 ${added.display_name} 加入了群组`);
+      await roomBroadcast(env, conversationId, { type: 'members-changed' });
+    }
+    return response({ ok: true });
+  }
+
+  const memberMatch = pathname.match(/^\/api\/conversations\/([^/]+)\/members\/([^/]+)$/);
+  if (memberMatch && request.method === 'DELETE') {
+    const [, conversationId, targetId] = memberMatch;
+    const membership = await isMember(env, conversationId, user.id);
+    if (!membership) return failure('无权访问此会话', 403);
+    if (membership.kind !== 'group') return failure('私聊不能移除成员');
+    const leaving = targetId === user.id;
+    if (!leaving && !['owner', 'admin'].includes(membership.role)) return failure('需要群管理员权限', 403);
+    const target = await env.DB.prepare(`
+      SELECT cm.role, u.display_name FROM conversation_members cm
+      JOIN users u ON u.id = cm.user_id
+      WHERE cm.conversation_id = ? AND cm.user_id = ?
+    `).bind(conversationId, targetId).first();
+    if (!target) return failure('该成员不在群组中', 404);
+    if (!leaving && target.role === 'owner') return failure('不能移除群主', 403);
+
+    await env.DB.prepare('DELETE FROM conversation_members WHERE conversation_id = ? AND user_id = ?')
+      .bind(conversationId, targetId).run();
+
+    const remaining = await env.DB.prepare(`
+      SELECT user_id FROM conversation_members WHERE conversation_id = ? ORDER BY joined_at LIMIT 1
+    `).bind(conversationId).first();
+    if (!remaining) {
+      // Last member walked out: drop the room and its objects instead of orphaning them.
+      const rows = await env.DB.prepare('SELECT object_key FROM attachments WHERE conversation_id = ?')
+        .bind(conversationId).all();
+      await purgeAttachments(env, rows.results);
+      await env.DB.prepare('DELETE FROM conversations WHERE id = ?').bind(conversationId).run();
+      await audit(env, user.id, 'delete_conversation', 'conversation', conversationId, 'last member left');
+      return response({ ok: true, removed: true });
+    }
+    if (target.role === 'owner') {
+      await env.DB.batch([
+        env.DB.prepare("UPDATE conversation_members SET role = 'owner' WHERE conversation_id = ? AND user_id = ?")
+          .bind(conversationId, remaining.user_id),
+        env.DB.prepare('UPDATE conversations SET owner_id = ? WHERE id = ?').bind(remaining.user_id, conversationId),
+      ]);
+    }
+    await postSystemMessage(env, conversationId, user.id, leaving
+      ? `${user.display_name} 退出了群组`
+      : `${user.display_name} 把 ${target.display_name} 移出了群组`);
+    await roomBroadcast(env, conversationId, { type: 'members-changed', removedUserId: targetId });
+    await audit(env, user.id, leaving ? 'leave_group' : 'remove_member', 'conversation', conversationId, targetId);
+    return response({ ok: true });
+  }
+
+  if (detailMatch && request.method === 'PATCH') {
+    const conversationId = detailMatch[1];
+    const membership = await isMember(env, conversationId, user.id);
+    if (!membership) return failure('无权访问此会话', 403);
+    if (membership.kind !== 'group') return failure('私聊不能重命名');
+    if (!['owner', 'admin'].includes(membership.role)) return failure('需要群管理员权限', 403);
+    const body = await readJSON(request);
+    const title = cleanText(body.title, 50);
+    if (!title) return failure('请输入群组名称');
+    if (title === membership.title) return response({ ok: true });
+    await env.DB.prepare('UPDATE conversations SET title = ? WHERE id = ?').bind(title, conversationId).run();
+    await postSystemMessage(env, conversationId, user.id, `${user.display_name} 把群名改为「${title}」`);
+    await roomBroadcast(env, conversationId, { type: 'conversation-renamed', title });
+    return response({ ok: true, title });
+  }
+
+  if (detailMatch && request.method === 'DELETE') {
+    const conversationId = detailMatch[1];
+    const membership = await isMember(env, conversationId, user.id);
+    if (!membership && user.role !== 'admin') return failure('无权访问此会话', 403);
+    if (membership && membership.kind === 'group' && membership.role !== 'owner' && user.role !== 'admin') {
+      return failure('只有群主可以解散群组', 403);
+    }
+    const rows = await env.DB.prepare('SELECT object_key FROM attachments WHERE conversation_id = ?')
+      .bind(conversationId).all();
+    await purgeAttachments(env, rows.results);
+    await roomBroadcast(env, conversationId, { type: 'conversation-removed', conversationId });
+    await env.DB.prepare('DELETE FROM conversations WHERE id = ?').bind(conversationId).run();
+    await audit(env, user.id, 'delete_conversation', 'conversation', conversationId);
     return response({ ok: true });
   }
 
@@ -723,21 +860,25 @@ async function handleMessages(request, env, pathname) {
     const editedAt = Date.now();
     await env.DB.prepare('UPDATE messages SET body = ?, edited_at = ? WHERE id = ?')
       .bind(text, editedAt, message.id).run();
-    await env.CHAT_ROOMS.getByName(message.conversation_id).fetch(new Request('https://room.internal/broadcast', {
-      method: 'POST',
-      body: JSON.stringify({ type: 'message-updated', id: message.id, body: text, editedAt }),
-    }));
+    await roomBroadcast(env, message.conversation_id, {
+      type: 'message-updated', id: message.id, body: text, editedAt,
+    });
     return response({ ok: true });
   }
   if (request.method === 'DELETE') {
     if (message.sender_id !== user.id && user.role !== 'admin') return failure('无权撤回此消息', 403);
     const deletedAt = Date.now();
-    await env.DB.prepare('UPDATE messages SET body = ?, deleted_at = ? WHERE id = ?')
+    const attachment = message.attachment_id
+      ? await env.DB.prepare('SELECT * FROM attachments WHERE id = ?').bind(message.attachment_id).first()
+      : null;
+    await env.DB.prepare('UPDATE messages SET body = ?, attachment_id = NULL, deleted_at = ? WHERE id = ?')
       .bind('', deletedAt, message.id).run();
-    await env.CHAT_ROOMS.getByName(message.conversation_id).fetch(new Request('https://room.internal/broadcast', {
-      method: 'POST',
-      body: JSON.stringify({ type: 'message-deleted', id: message.id, deletedAt }),
-    }));
+    if (attachment) {
+      // The row has to go after the message stops referencing it (FK), the object with it.
+      await env.DB.prepare('DELETE FROM attachments WHERE id = ?').bind(attachment.id).run();
+      await purgeAttachments(env, [attachment]);
+    }
+    await roomBroadcast(env, message.conversation_id, { type: 'message-deleted', id: message.id, deletedAt });
     return response({ ok: true });
   }
   return null;
@@ -977,6 +1118,20 @@ export class ConversationRoom extends DurableObject {
       this.broadcast(payload);
       return new Response(null, { status: 204 });
     }
+    if (request.method === 'POST' && url.pathname === '/system') {
+      const { conversationId, actorId, body } = await request.json();
+      const sender = await this.env.DB.prepare('SELECT id, display_name FROM users WHERE id = ?')
+        .bind(actorId).first();
+      const message = await this.storeMessage({
+        conversationId,
+        senderId: actorId,
+        kind: 'system',
+        body: cleanText(body, 200),
+        sender: { id: actorId, displayName: sender?.display_name || '系统', avatarUrl: null },
+      });
+      this.broadcast({ type: 'message', message });
+      return new Response(null, { status: 204 });
+    }
     if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket') {
       return new Response('Expected WebSocket', { status: 426 });
     }
@@ -1017,6 +1172,13 @@ export class ConversationRoom extends DurableObject {
       socket.send(JSON.stringify({ type: 'error', message: '你已不在这个会话中' }));
       return;
     }
+    if (membership.kind === 'dm') {
+      const peer = await dmPeer(this.env, conversationId, session.userId);
+      if (peer && await blockedBetween(this.env, session.userId, peer.id)) {
+        socket.send(JSON.stringify({ type: 'error', message: '你们之间已拉黑，无法继续发送消息' }));
+        return;
+      }
+    }
     const body = String(incoming.body || '').trim().slice(0, MAX_MESSAGE);
     const kind = ['text', 'image', 'file', 'audio'].includes(incoming.kind) ? incoming.kind : 'text';
     const attachmentId = incoming.attachmentId ? String(incoming.attachmentId) : null;
@@ -1034,6 +1196,37 @@ export class ConversationRoom extends DurableObject {
         return;
       }
     }
+    // A quote only counts when it points at a live message in this same room.
+    let replyTo = null;
+    if (incoming.replyTo) {
+      const quoted = await this.env.DB.prepare(`
+        SELECT m.id, m.kind, m.body, m.deleted_at, u.display_name
+        FROM messages m JOIN users u ON u.id = m.sender_id
+        WHERE m.id = ? AND m.conversation_id = ?
+      `).bind(String(incoming.replyTo), conversationId).first();
+      if (quoted) {
+        replyTo = {
+          id: quoted.id,
+          displayName: quoted.display_name,
+          kind: quoted.kind,
+          body: quoted.deleted_at ? '' : quoted.body,
+          deleted: !!quoted.deleted_at,
+        };
+      }
+    }
+    const message = await this.storeMessage({
+      conversationId,
+      senderId: session.userId,
+      kind,
+      body,
+      attachment,
+      replyTo,
+      sender: { id: session.userId, displayName: session.displayName, avatarUrl: session.avatarUrl || null },
+    });
+    this.broadcast({ type: 'message', message });
+  }
+
+  async storeMessage({ conversationId, senderId, kind, body, attachment = null, replyTo = null, sender }) {
     const seqRow = await this.env.DB.prepare(`
       SELECT COALESCE(MAX(seq), 0) + 1 AS next_seq FROM messages WHERE conversation_id = ?
     `).bind(conversationId).first();
@@ -1045,14 +1238,14 @@ export class ConversationRoom extends DurableObject {
         INSERT INTO messages
         (id, conversation_id, seq, sender_id, kind, body, attachment_id, reply_to, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(id, conversationId, seq, session.userId, kind, body, attachmentId, incoming.replyTo || null, createdAt),
+      `).bind(id, conversationId, seq, senderId, kind, body, attachment?.id || null, replyTo?.id || null, createdAt),
       this.env.DB.prepare('UPDATE conversations SET updated_at = ? WHERE id = ?').bind(createdAt, conversationId),
     ]);
-    const message = {
+    return {
       id,
       conversationId,
       seq,
-      sender: { id: session.userId, displayName: session.displayName, avatarUrl: session.avatarUrl || null },
+      sender,
       kind,
       body,
       attachment: attachment ? {
@@ -1062,12 +1255,11 @@ export class ConversationRoom extends DurableObject {
         size: attachment.size,
         url: `/media/${attachment.id}`,
       } : null,
-      replyTo: incoming.replyTo || null,
+      replyTo,
       createdAt,
       editedAt: null,
       deletedAt: null,
     };
-    this.broadcast({ type: 'message', message });
   }
 
   webSocketClose(socket) {

@@ -5,6 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --local",
+    "dev:test": "wrangler dev --local --port 8791 --compatibility-date 2026-07-15 --persist-to .wrangler/test-state",
+    "test:db": "wrangler d1 execute notebook-chat --local --file=schema.sql --persist-to .wrangler/test-state -y",
+    "test:e2e": "playwright test -c playwright.config.mjs",
+    "test:tour": "node test/e2e/tour.mjs",
     "deploy": "wrangler deploy",
     "check": "node --check src/index.js"
   },

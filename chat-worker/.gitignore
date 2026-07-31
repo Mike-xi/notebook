@@ -2,3 +2,7 @@
 .dry-run/
 .wrangler/
 node_modules/
+test-results/
+playwright-report/
+test/e2e/.accounts.json
+test/e2e/shots/
