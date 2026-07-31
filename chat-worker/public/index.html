@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#f7f5fb">
   <meta name="color-scheme" content="light dark">
   <title>星邮 · 私人社交聊天</title>
-  <link rel="stylesheet" href="./chat.css?v=20260731a">
+  <link rel="stylesheet" href="./chat.css?v=20260731b">
 </head>
 <body>
   <svg class="svg-defs" aria-hidden="true">
@@ -79,7 +79,7 @@
         </div>
         <form id="login-form" class="auth-form">
           <label><span>用户名</span><input name="username" autocomplete="username" maxlength="24" required placeholder="your_name"></label>
-          <label><span>密码</span><input name="password" type="password" autocomplete="current-password" maxlength="128" required placeholder="至少 10 位"></label>
+          <label><span>密码</span><input name="password" type="password" autocomplete="current-password" maxlength="128" required placeholder="至少 6 位"></label>
           <button class="primary-button wide" type="submit"><span>进入星邮</span><svg><use href="#i-send"/></svg></button>
         </form>
         <form id="register-form" class="auth-form" hidden>
@@ -88,7 +88,7 @@
             <label><span>显示昵称</span><input name="displayName" autocomplete="name" maxlength="32" required placeholder="怎么称呼你"></label>
           </div>
           <label><span>邀请码</span><input name="invite" autocomplete="one-time-code" maxlength="80" required placeholder="由管理员提供"></label>
-          <label><span>密码</span><input name="password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required placeholder="至少 10 位"></label>
+          <label><span>密码</span><input name="password" type="password" autocomplete="new-password" minlength="6" maxlength="128" required placeholder="至少 6 位"></label>
           <label class="consent"><input name="consent" type="checkbox" required><span>我了解站点管理员可以查看并管理聊天内容。</span></label>
           <button class="primary-button wide" type="submit"><span>创建账号</span><svg><use href="#i-plus"/></svg></button>
         </form>
@@ -224,7 +224,7 @@
       <details class="password-panel">
         <summary>修改登录密码</summary>
         <label class="dialog-field"><span>当前密码</span><input name="currentPassword" type="password" autocomplete="current-password" maxlength="128"></label>
-        <label class="dialog-field"><span>新密码</span><input name="newPassword" type="password" autocomplete="new-password" minlength="10" maxlength="128" placeholder="至少 10 位"></label>
+        <label class="dialog-field"><span>新密码</span><input name="newPassword" type="password" autocomplete="new-password" minlength="6" maxlength="128" placeholder="至少 6 位"></label>
         <button id="password-save" type="button" class="secondary-button">更新密码</button>
       </details>
       <footer class="split-footer"><button id="logout-button" type="button" class="danger-text">退出登录</button><div><button value="cancel" type="submit" class="text-button">取消</button><button id="profile-save" type="button" class="primary-button">保存</button></div></footer>
@@ -267,6 +267,6 @@
   </div>
 
   <div class="toast" id="toast" role="status" hidden></div>
-  <script type="module" src="./chat.js?v=20260731a"></script>
+  <script type="module" src="./chat.js?v=20260731b"></script>
 </body>
 </html>

@@ -83,7 +83,15 @@ export async function openChatWith(page, title) {
 export async function sendText(page, text) {
   await page.locator('#message-input').fill(text);
   await page.locator('#message-input').press('Enter');
-  await page.locator('.message-bubble', { hasText: text }).last().waitFor();
+  try {
+    await page.locator('.message-bubble', { hasText: text }).last().waitFor({ timeout: 15000 });
+  } catch {
+    // A bare "not visible" timeout hides why the send was refused.
+    const toast = await page.locator('#toast').textContent();
+    const value = await page.locator('#message-input').inputValue();
+    const status = await page.locator('#chat-status').textContent();
+    throw new Error(`发送「${text}」失败 · toast=${JSON.stringify(toast)} · 输入框=${JSON.stringify(value)} · 状态=${JSON.stringify(status)}`);
+  }
 }
 
 export function bubbles(page) {

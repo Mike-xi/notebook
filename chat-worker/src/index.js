@@ -7,8 +7,12 @@ const MAX_UPLOAD = 8 * 1024 * 1024;
 const MAX_AVATAR = 2 * 1024 * 1024;
 const AVATAR_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const PASSWORD_ITERATIONS = 100000;
-const BUILD_VERSION = '2026.07.31-1';
+const BUILD_VERSION = '2026.07.31-2';
 const USERNAME_RE = /^[a-zA-Z0-9_]{3,24}$/;
+const MIN_PASSWORD = 6;
+const LOGIN_MAX_FAILURES = 8;
+const LOGIN_WINDOW_MS = 10 * 60 * 1000;
+const LOGIN_LOCK_MS = 60 * 1000;
 
 function base64url(bytes) {
   let binary = '';
@@ -217,6 +221,13 @@ async function roomBroadcast(env, conversationId, payload) {
   await roomFetch(env, conversationId, '/broadcast', payload);
 }
 
+// Passwords may be as short as 6 characters, so online guessing has to cost
+// something: repeated failures for one username get a short cooldown.
+async function loginGuard(env, key, failed = null) {
+  const result = await roomFetch(env, 'login-guard', '/guard', { key, failed });
+  return result.json();
+}
+
 async function postSystemMessage(env, conversationId, actorId, body) {
   await roomFetch(env, conversationId, '/system', { conversationId, actorId, body });
 }
@@ -301,7 +312,7 @@ async function handleAuth(request, env, pathname) {
     const usernameNorm = normalizeUsername(username);
     const password = String(body.password || '');
     if (!USERNAME_RE.test(username)) return failure('用户名需为 3–24 位字母、数字或下划线');
-    if (password.length < 10 || password.length > 128) return failure('密码至少 10 位，最多 128 位');
+    if (password.length < MIN_PASSWORD || password.length > 128) return failure('密码至少 6 位，最多 128 位');
     const derived = await passwordHash(password);
     const id = crypto.randomUUID();
     const now = Date.now();
@@ -323,7 +334,7 @@ async function handleAuth(request, env, pathname) {
     const password = String(body.password || '');
     const invite = cleanText(body.invite, 80).toUpperCase();
     if (!USERNAME_RE.test(username)) return failure('用户名需为 3–24 位字母、数字或下划线');
-    if (password.length < 10 || password.length > 128) return failure('密码至少 10 位，最多 128 位');
+    if (password.length < MIN_PASSWORD || password.length > 128) return failure('密码至少 6 位，最多 128 位');
     if (!invite) return failure('请输入邀请码');
     const inviteHash = await sha256(invite);
     const invitation = await env.DB.prepare(`
@@ -351,14 +362,24 @@ async function handleAuth(request, env, pathname) {
 
   if (pathname === '/api/login' && request.method === 'POST') {
     const body = await readJSON(request);
+    const guardKey = normalizeUsername(body.username) || 'unknown';
+    const guard = await loginGuard(env, guardKey);
+    if (guard.locked) {
+      return failure(`登录尝试过于频繁，请 ${guard.retryAfter} 秒后再试`, 429, 'too_many_attempts');
+    }
     const user = await env.DB.prepare('SELECT * FROM users WHERE username_norm = ?')
       .bind(normalizeUsername(body.username)).first();
-    if (!user) return failure('用户名或密码不正确', 401, 'invalid_credentials');
+    if (!user) {
+      await loginGuard(env, guardKey, true);
+      return failure('用户名或密码不正确', 401, 'invalid_credentials');
+    }
     const derived = await passwordHash(String(body.password || ''), user.password_salt);
     if (!constantTimeEqual(derived.hash, user.password_hash)) {
+      await loginGuard(env, guardKey, true);
       return failure('用户名或密码不正确', 401, 'invalid_credentials');
     }
     if (user.status !== 'active') return failure('账号已被停用', 403, 'account_disabled');
+    await loginGuard(env, guardKey, false);
     const token = await createSession(env, user.id);
     await env.DB.prepare('UPDATE users SET last_seen_at = ? WHERE id = ?').bind(Date.now(), user.id).run();
     return response({ user: publicUser(user) }, 200, { 'Set-Cookie': sessionCookie(token, env) });
@@ -429,7 +450,7 @@ async function handleAuth(request, env, pathname) {
     const current = await passwordHash(String(body.currentPassword || ''), user.password_salt);
     if (!constantTimeEqual(current.hash, user.password_hash)) return failure('当前密码不正确', 403);
     const next = String(body.newPassword || '');
-    if (next.length < 10 || next.length > 128) return failure('新密码至少 10 位，最多 128 位');
+    if (next.length < MIN_PASSWORD || next.length > 128) return failure('新密码至少 6 位，最多 128 位');
     const derived = await passwordHash(next);
     await env.DB.batch([
       env.DB.prepare('UPDATE users SET password_salt = ?, password_hash = ? WHERE id = ?')
@@ -595,7 +616,11 @@ async function conversationSummary(env, user) {
       ownerId: row.owner_id,
       role: row.member_role,
       peer: publicUser(peer),
-      lastMessage: row.last_body ? { body: row.last_body, kind: row.last_kind, createdAt: row.last_message_at } : null,
+      // Presence of a message, not of its text: an image or file has an empty
+      // body and used to make the row read "开始一段对话" forever.
+      lastMessage: row.last_message_at
+        ? { body: row.last_body || '', kind: row.last_kind || 'text', createdAt: row.last_message_at }
+        : null,
       unread: Math.max(0, Number(row.max_seq || 0) - Number(row.last_read_seq || 0)),
       updatedAt: row.updated_at,
     });
@@ -678,7 +703,15 @@ async function handleConversations(request, env, pathname, url) {
     const conversationId = messagesMatch[1];
     if (!await isMember(env, conversationId, user.id) && user.role !== 'admin') return failure('无权查看此会话', 403);
     const before = Number(url.searchParams.get('before')) || Number.MAX_SAFE_INTEGER;
-    return response({ messages: await getMessageRows(env, conversationId, before, 60) });
+    const [messages, reads] = await Promise.all([
+      getMessageRows(env, conversationId, before, 60),
+      env.DB.prepare('SELECT user_id, last_read_seq FROM conversation_members WHERE conversation_id = ?')
+        .bind(conversationId).all(),
+    ]);
+    return response({
+      messages,
+      reads: (reads.results || []).map((row) => ({ userId: row.user_id, seq: row.last_read_seq })),
+    });
   }
 
   const detailMatch = pathname.match(/^\/api\/conversations\/([^/]+)$/);
@@ -714,6 +747,15 @@ async function handleConversations(request, env, pathname, url) {
       UPDATE conversation_members SET last_read_seq = MAX(last_read_seq, ?)
       WHERE conversation_id = ? AND user_id = ?
     `).bind(seq, conversationId, user.id).run();
+    const current = await env.DB.prepare(`
+      SELECT last_read_seq FROM conversation_members WHERE conversation_id = ? AND user_id = ?
+    `).bind(conversationId, user.id).first();
+    // Let the other side's read receipt update without waiting for a poll.
+    await roomBroadcast(env, conversationId, {
+      type: 'read',
+      userId: user.id,
+      seq: Number(current?.last_read_seq || seq),
+    });
     return response({ ok: true });
   }
 
@@ -1117,6 +1159,27 @@ export class ConversationRoom extends DurableObject {
       const payload = await request.json();
       this.broadcast(payload);
       return new Response(null, { status: 204 });
+    }
+    if (request.method === 'POST' && url.pathname === '/guard') {
+      const { key, failed } = await request.json();
+      const now = Date.now();
+      const slot = `guard:${key}`;
+      const record = (await this.ctx.storage.get(slot)) || { failures: 0, since: now, lockedUntil: 0 };
+      if (record.lockedUntil && record.lockedUntil <= now) Object.assign(record, { failures: 0, since: now, lockedUntil: 0 });
+      if (now - record.since > LOGIN_WINDOW_MS) Object.assign(record, { failures: 0, since: now });
+      if (failed === false) {
+        await this.ctx.storage.delete(slot);
+        return Response.json({ locked: false, retryAfter: 0 });
+      }
+      if (failed === true && record.lockedUntil <= now) {
+        record.failures += 1;
+        if (record.failures >= LOGIN_MAX_FAILURES) {
+          Object.assign(record, { failures: 0, since: now, lockedUntil: now + LOGIN_LOCK_MS });
+        }
+        await this.ctx.storage.put(slot, record);
+      }
+      const locked = record.lockedUntil > now;
+      return Response.json({ locked, retryAfter: locked ? Math.ceil((record.lockedUntil - now) / 1000) : 0 });
     }
     if (request.method === 'POST' && url.pathname === '/system') {
       const { conversationId, actorId, body } = await request.json();

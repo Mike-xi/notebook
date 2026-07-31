@@ -15,7 +15,9 @@ const state = {
   conversations: [],
   activeId: null,
   activeDetail: null,
+  activeKind: 'dm',
   messages: [],
+  reads: {},
   ws: null,
   reconnectTimer: null,
   manualClose: false,
@@ -262,8 +264,7 @@ function startBackgroundRefresh() {
 
 async function loadFriends() {
   state.friends = await api('/api/friends');
-  const count = state.friends.incoming.length;
-  $('#rail-requests').hidden = count === 0;
+  updateBadges();
 }
 
 async function loadConversations() {
@@ -271,9 +272,8 @@ async function loadConversations() {
   state.conversations = data.conversations;
   // Whatever is on screen has been read by definition.
   const open = state.conversations.find((item) => item.id === state.activeId);
-  if (open) open.unread = 0;
-  const unread = state.conversations.reduce((sum, item) => sum + item.unread, 0);
-  $('#rail-unread').hidden = unread === 0;
+  if (open && !document.hidden) open.unread = 0;
+  updateBadges();
   if (state.activeView === 'chats') renderChats();
 }
 
@@ -384,6 +384,9 @@ sidebarContent.addEventListener('click', async (event) => {
   const dm = event.target.closest('[data-dm-user]');
   if (dm) {
     try {
+      // Creating the room is async; drop the previous room's "已连接" now so
+      // nothing (and nobody) treats the composer as ready in the meantime.
+      resetPresence();
       const data = await api('/api/conversations/dm', { method: 'POST', body: { userId: dm.dataset.dmUser } });
       await loadConversations();
       setView('chats');
@@ -454,6 +457,18 @@ sidebarContent.addEventListener('click', async (event) => {
   }
 });
 
+// Switching conversations used to wait on two round trips before drawing
+// anything. Now the header comes from the list we already have, the socket
+// dials in parallel, and cached history paints immediately while it refreshes.
+const historyCache = new Map();
+
+function paintConversationHeader(summary) {
+  const title = summary?.title || '会话';
+  $('#chat-title').textContent = title;
+  setAvatar($('#chat-avatar'), summary?.kind === 'dm' ? summary.peer : null, title);
+  $('#chat-avatar').classList.toggle('group', summary?.kind === 'group');
+}
+
 async function openConversation(id) {
   if (state.activeId === id && state.ws?.readyState === WebSocket.OPEN) {
     appView.classList.add('mobile-chat-open');
@@ -467,36 +482,63 @@ async function openConversation(id) {
   renderComposerContext();
   clearAttachments();
   state.activeId = id;
+  state.activeDetail = null;
   state.onlineUsers = [];
   resetPresence();
   renderChats();
   conversationEmpty.hidden = true;
   conversationActive.hidden = false;
   appView.classList.add('mobile-chat-open');
-  messagesEl.innerHTML = '<button class="history-button" id="history-button" type="button" hidden>加载更早消息</button><div class="list-empty"><span>正在加载消息…</span></div>';
-  try {
-    const [detail, history] = await Promise.all([
-      api(`/api/conversations/${id}`),
-      api(`/api/conversations/${id}/messages`),
-    ]);
-    state.activeDetail = detail;
-    state.messages = history.messages;
-    const summary = state.conversations.find((item) => item.id === id);
-    $('#chat-title').textContent = summary?.title || detail.conversation.title || '会话';
-    const peer = detail.conversation.kind === 'dm'
-      ? detail.members.find((member) => member.id !== state.user.id)
-      : null;
-    setAvatar($('#chat-avatar'), peer, $('#chat-title').textContent);
-    $('#chat-avatar').classList.toggle('group', detail.conversation.kind === 'group');
+
+  const summary = state.conversations.find((item) => item.id === id);
+  state.activeKind = summary?.kind || 'dm';
+  paintConversationHeader(summary);
+
+  const cached = historyCache.get(id);
+  if (cached) {
+    state.messages = cached.messages;
+    state.reads = cached.reads;
     renderMessages({ stick: true });
-    renderDetail();
-    connectSocket();
+    renderReadReceipt();
+  } else {
+    state.messages = [];
+    state.reads = {};
+    messagesEl.innerHTML = `<button class="history-button" id="history-button" type="button" hidden>加载更早消息</button>
+      <div class="messages-skeleton">${'<span></span>'.repeat(5)}</div>`;
+  }
+
+  connectSocket();
+  // Keep an already-open detail panel in sync with the new conversation.
+  if (!$('#detail-panel').hidden) {
+    ensureDetail().then(renderDetail).catch(() => {});
+  }
+
+  try {
+    const history = await api(`/api/conversations/${id}/messages`);
+    if (state.activeId !== id) return;
+    // Anything that arrived over the socket while this request was in flight
+    // must survive it, otherwise a message sent right after opening vanishes.
+    const known = new Set(history.messages.map((message) => message.id));
+    const live = state.messages.filter((message) => !known.has(message.id));
+    state.messages = [...history.messages, ...live].sort((a, b) => a.seq - b.seq);
+    state.reads = Object.fromEntries((history.reads || []).map((item) => [item.userId, item.seq]));
+    historyCache.set(id, { messages: state.messages, reads: state.reads });
+    renderMessages({ stick: !cached });
+    renderReadReceipt();
     markRead();
   } catch (error) {
+    if (state.activeId !== id) return;
     toast(error.message);
     conversationActive.hidden = true;
     conversationEmpty.hidden = false;
   }
+}
+
+// Member details are only needed by the detail panel, so they load on demand.
+async function ensureDetail() {
+  if (state.activeDetail || !state.activeId) return state.activeDetail;
+  state.activeDetail = await api(`/api/conversations/${state.activeId}`);
+  return state.activeDetail;
 }
 
 function renderMessages({ preserveScroll = false, stick = false } = {}) {
@@ -705,7 +747,10 @@ async function loadOlderMessages() {
       return toast('已经到最早一条消息了');
     }
     state.messages = [...data.messages, ...state.messages];
+    const cached = historyCache.get(state.activeId);
+    if (cached) cached.messages = state.messages;
     renderMessages({ preserveScroll: true });
+    renderReadReceipt();
   } catch (error) {
     toast(error.message);
   }
@@ -785,10 +830,15 @@ function connectSocket() {
       if (!state.messages.some((item) => item.id === data.message.id)) {
         state.messages.push(data.message);
         renderMessages({ stick: data.message.sender.id === state.user.id });
-        // Mark first, then refresh: the other order raced and left the open
-        // conversation showing an unread badge for your own message.
-        markRead().then(loadConversations);
+        renderReadReceipt();
+        // Only claim it was read when the tab is actually in front; otherwise
+        // let the badge stand until the user comes back.
+        if (document.hidden && data.message.sender.id !== state.user.id) loadConversations();
+        else markRead().then(loadConversations);
       }
+    } else if (data.type === 'read') {
+      state.reads[data.userId] = Math.max(state.reads[data.userId] || 0, Number(data.seq) || 0);
+      renderReadReceipt();
     } else if (data.type === 'members-changed') {
       if (data.removedUserId === state.user.id) leaveActiveConversation('你已被移出群组');
       else refreshActiveDetail();
@@ -847,17 +897,49 @@ $('#online-button').addEventListener('click', () => {
   $('#online-dialog').showModal();
 });
 
+// The rail dot is derived from the whole list, so it has to be recomputed
+// wherever unread counts change — otherwise it stayed lit after reading.
+function updateBadges() {
+  const unread = state.conversations.reduce((sum, item) => sum + (item.unread || 0), 0);
+  $('#rail-unread').hidden = unread === 0;
+  $('#rail-requests').hidden = state.friends.incoming.length === 0;
+}
+
 async function markRead() {
   const last = state.messages.at(-1);
   if (!last || !state.activeId) return;
+  const conversationId = state.activeId;
   try {
-    await api(`/api/conversations/${state.activeId}/read`, { method: 'POST', body: { seq: last.seq } });
-    const summary = state.conversations.find((item) => item.id === state.activeId);
+    await api(`/api/conversations/${conversationId}/read`, { method: 'POST', body: { seq: last.seq } });
+    const summary = state.conversations.find((item) => item.id === conversationId);
     if (summary) summary.unread = 0;
+    state.reads[state.user.id] = Math.max(state.reads[state.user.id] || 0, last.seq);
     renderChats();
+    updateBadges();
   } catch {
     // Reading markers are best effort.
   }
+}
+
+/* Read receipts ---------------------------------------------------------- */
+
+function renderReadReceipt() {
+  messagesEl.querySelectorAll('.read-receipt').forEach((node) => node.remove());
+  const mine = [...state.messages].reverse()
+    .find((message) => message.kind !== 'system' && !message.deletedAt && message.sender.id === state.user.id);
+  if (!mine) return;
+  const others = Object.entries(state.reads).filter(([id]) => id !== state.user.id);
+  if (!others.length) return;
+  const seen = others.filter(([, seq]) => Number(seq) >= mine.seq).length;
+  const row = messagesEl.querySelector(`[data-message-id="${CSS.escape(mine.id)}"]`);
+  if (!row) return;
+  const label = state.activeKind === 'group'
+    ? (seen ? `${seen}/${others.length} 人已读` : '未读')
+    : (seen ? '已读' : '未读');
+  const node = document.createElement('span');
+  node.className = `read-receipt${seen ? ' seen' : ''}`;
+  node.textContent = label;
+  row.querySelector('.message-stack')?.append(node);
 }
 
 function autoGrow() {
@@ -1486,7 +1568,8 @@ $('#detail-content').addEventListener('click', async (event) => {
 });
 
 async function refreshActiveDetail() {
-  if (!state.activeId) return;
+  // Nothing to refresh until the detail panel has actually pulled members.
+  if (!state.activeId || !state.activeDetail) return;
   try {
     state.activeDetail = await api(`/api/conversations/${state.activeId}`);
     const summary = state.conversations.find((item) => item.id === state.activeId);
@@ -1499,6 +1582,7 @@ async function refreshActiveDetail() {
 
 async function leaveActiveConversation(message) {
   closeSocket();
+  historyCache.delete(state.activeId);
   state.activeId = null;
   state.activeDetail = null;
   state.messages = [];
@@ -1538,9 +1622,19 @@ $('#invite-submit').addEventListener('click', async () => {
   }
 });
 
-$('#chat-details-button').addEventListener('click', () => {
+$('#chat-details-button').addEventListener('click', async () => {
   $('#detail-panel').hidden = false;
   appView.classList.add('detail-open');
+  if (!state.activeDetail) {
+    $('#detail-content').innerHTML = '<div class="list-empty"><span>正在加载…</span></div>';
+    try {
+      await ensureDetail();
+    } catch (error) {
+      $('#detail-content').innerHTML = `<div class="list-empty"><span>${escapeHTML(error.message)}</span></div>`;
+      return;
+    }
+  }
+  renderDetail();
 });
 $('#detail-close').addEventListener('click', () => {
   $('#detail-panel').hidden = true;
@@ -1564,6 +1658,7 @@ $('#group-submit').addEventListener('click', async () => {
   if (!title || !memberIds.length) return toast('填写群名并选择至少一位好友');
   setButtonBusy($('#group-submit'), true);
   try {
+    resetPresence();
     const data = await api('/api/conversations/group', { method: 'POST', body: { title, memberIds } });
     $('#group-dialog').close();
     await loadConversations();
@@ -1699,8 +1794,8 @@ $('#password-save').addEventListener('click', async () => {
   const form = $('#profile-form');
   const currentPassword = form.elements.currentPassword.value;
   const newPassword = form.elements.newPassword.value;
-  if (!currentPassword || newPassword.length < 10) {
-    return toast('请填写当前密码，新密码至少 10 位');
+  if (!currentPassword || newPassword.length < 6) {
+    return toast('请填写当前密码，新密码至少 6 位');
   }
   setButtonBusy($('#password-save'), true);
   try {
@@ -1724,8 +1819,11 @@ $('#logout-button').addEventListener('click', async () => {
   location.reload();
 });
 
-window.addEventListener('visibilitychange', () => {
-  if (!document.hidden && state.activeId) markRead();
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden || !state.user) return;
+  // Coming back to the tab is the moment the messages were really seen.
+  if (state.activeId) markRead().then(loadConversations);
+  else loadConversations().catch(() => {});
 });
 window.addEventListener('beforeunload', closeSocket);
 

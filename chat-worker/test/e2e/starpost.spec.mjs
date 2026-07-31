@@ -14,10 +14,18 @@ test.describe.serial('星邮 Starpost', () => {
   let bob;
   let promptAnswer = '';
 
-  function wireDialogs(page) {
+  // STARPOST_DEBUG=1 echoes console output and socket frames while debugging.
+  function wireDialogs(page, label) {
     page.on('dialog', async (dialog) => {
       if (dialog.type() === 'prompt') await dialog.accept(promptAnswer);
       else await dialog.accept();
+    });
+    if (!process.env.STARPOST_DEBUG) return;
+    page.on('console', (message) => console.log(`[${label} console]`, message.text()));
+    page.on('pageerror', (error) => console.log(`[${label} pageerror]`, error.message));
+    page.on('websocket', (socket) => {
+      socket.on('framesent', (frame) => console.log(`[${label} →]`, String(frame.payload).slice(0, 160)));
+      socket.on('framereceived', (frame) => console.log(`[${label} ←]`, String(frame.payload).slice(0, 160)));
     });
   }
 
@@ -26,8 +34,8 @@ test.describe.serial('星邮 Starpost', () => {
     bobContext = await browser.newContext();
     alice = await aliceContext.newPage();
     bob = await bobContext.newPage();
-    wireDialogs(alice);
-    wireDialogs(bob);
+    wireDialogs(alice, "alice");
+    wireDialogs(bob, "bob");
     await login(alice, accounts.alice);
     await login(bob, accounts.bob);
   });
@@ -175,6 +183,47 @@ test.describe.serial('星邮 Starpost', () => {
     expect(response.status()).toBe(404);
   });
 
+  test('已读回执：对方看过之后显示已读', async () => {
+    await bob.locator('[data-view="chats"]').click();
+    await bob.locator('.chat-item', { hasText: accounts.alice.displayName }).first().click();
+    await bob.locator('#chat-status.connected').waitFor();
+
+    await alice.locator('[data-view="chats"]').click();
+    await alice.locator('.chat-item', { hasText: accounts.bob.displayName }).first().click();
+    await alice.locator('#chat-status.connected').waitFor();
+    await sendText(alice, '这条应该会显示已读');
+
+    await expect(alice.locator('.read-receipt')).toHaveText('已读');
+    await expect(alice.locator('.read-receipt')).toHaveCount(1);
+  });
+
+  test('列表预览不会把图片消息显示成“开始一段对话”', async () => {
+    await alice.locator('#file-input').setInputFiles([imageFixture('preview.png', 180, [40, 180, 160])]);
+    await alice.locator('.send-button').click();
+    await expect(alice.locator('.message-attachment.media img').last()).toBeVisible();
+    await expect(alice.locator('.chat-item.active p')).toHaveText('[图片]');
+    await expect(alice.locator('.chat-item', { hasText: '开始一段对话' })).toHaveCount(0);
+  });
+
+  test('切回已看过的会话直接出内容，不再空等接口', async () => {
+    await alice.locator('#new-group-button').click();
+    await alice.locator('#group-form input[name="title"]').fill('缓存验证组');
+    await alice.locator(`#group-member-picker input[value="${accounts.bob.id}"]`).check();
+    await alice.locator('#group-submit').click();
+    await expect(alice.locator('#chat-title')).toHaveText('缓存验证组');
+    await alice.locator('#chat-status.connected').waitFor();
+    await sendText(alice, '群里的第一条');
+
+    await alice.locator('.chat-item', { hasText: accounts.bob.displayName }).first().click();
+    await expect(alice.locator('.message-bubble', { hasText: '这条应该会显示已读' })).toBeVisible();
+
+    // Second visit paints from cache: the message is on screen before the
+    // refresh request settles, so no skeleton should ever appear.
+    await alice.locator('.chat-item', { hasText: '缓存验证组' }).click();
+    await expect(alice.locator('.message-bubble', { hasText: '群里的第一条' })).toBeVisible();
+    await expect(alice.locator('.messages-skeleton')).toHaveCount(0);
+  });
+
   test('群组：创建、改名、踢人、解散', async () => {
     await alice.locator('[data-view="chats"]').click();
     await alice.locator('#new-group-button').click();
@@ -203,6 +252,39 @@ test.describe.serial('星邮 Starpost', () => {
     await alice.locator('[data-detail-action="disband"]').click();
     await expect(alice.locator('#toast')).toContainText('群组已解散');
     await expect(alice.locator('.chat-item', { hasText: '改名后的小组' })).toHaveCount(0);
+  });
+
+  // Runs as carol so the shared alice/bob credentials stay usable elsewhere.
+  test('6 位密码可用，且连续失败会被临时锁住', async ({ browser }) => {
+    const shortPassword = 'six666';
+    const context = await browser.newContext();
+    const carol = await context.newPage();
+    await login(carol, accounts.carol);
+
+    await carol.locator('[data-view="profile"]').click();
+    await carol.locator('.password-panel summary').click();
+    await carol.locator('#profile-form input[name="currentPassword"]').fill(accounts.carol.password);
+    await carol.locator('#profile-form input[name="newPassword"]').fill(shortPassword);
+    await carol.locator('#password-save').click();
+    await expect(carol.locator('#toast')).toContainText('密码已更新');
+
+    const attempt = (password) => context.request.post('/api/login', {
+      data: { username: accounts.carol.username, password },
+      failOnStatusCode: false,
+    });
+    expect((await attempt(shortPassword)).status()).toBe(200);
+
+    let lastStatus = 0;
+    for (let round = 0; round < 9; round += 1) {
+      lastStatus = (await attempt('wrong-password')).status();
+    }
+    expect(lastStatus).toBe(429);
+
+    // Even the right password is refused while the cooldown holds.
+    const blocked = await attempt(shortPassword);
+    expect(blocked.status()).toBe(429);
+    expect((await blocked.json()).message).toContain('过于频繁');
+    await context.close();
   });
 
   test('拉黑后无法继续发消息，解除后恢复', async () => {
