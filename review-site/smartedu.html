@@ -96,6 +96,12 @@
         <p class="muted" style="margin:11px 0 0">↑ 按住它，拖到上方书签栏</p>
       </div>
       <div class="note">看不到书签栏？按 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> 打开。</div>
+      <div class="note" style="background:var(--chip);border-color:var(--border)">
+        <strong>当前版本 <span id="ver">v2</span>。</strong>
+        书签里存的是代码快照，<strong>不会跟着本页自动更新</strong>。
+        如果下载面板标题栏显示的版本号比这里低，或者遇到「查不到这本教材的信息」这类旧文案，
+        说明书签是旧的 —— 把上面的按钮<strong>重新拖一次</strong>覆盖掉即可。
+      </div>
       <details style="margin-top:12px">
         <summary>拖不动 / 点了没反应？用控制台方式（一定能成）</summary>
         <p class="muted" style="margin-top:9px">
@@ -137,6 +143,9 @@
 
 <script type="text/plain" id="payload">
 (function(){
+  // 书签里存的是代码快照，不会跟着网站更新。版本号显示在面板标题栏，
+  // 和页面上标注的当前版本对不上，就说明书签是旧的、需要重拖一次。
+  var VER='v2';
   var PANEL_ID='__smartedu_dl_panel__';
   var old=document.getElementById(PANEL_ID);
   if(old){ old.style.display='flex'; return; }
@@ -167,6 +176,7 @@
     +'font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;display:flex;flex-direction:column;overflow:hidden}'
     +'#'+PANEL_ID+' .hd{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #e3e6ea;background:#fafbfc}'
     +'#'+PANEL_ID+' .hd b{font-size:14.5px}'
+    +'#'+PANEL_ID+' .ver{margin-left:7px;margin-right:auto;font-size:11px;color:#8a919b;border:1px solid #e3e6ea;border-radius:999px;padding:1px 7px}'
     +'#'+PANEL_ID+' .x{cursor:pointer;border:none;background:transparent;font-size:19px;line-height:1;color:#6b7280;padding:0 4px}'
     +'#'+PANEL_ID+' .bd{padding:14px}'
     +'#'+PANEL_ID+' textarea{width:100%;height:86px;resize:vertical;border:1px solid #d8dce1;border-radius:8px;padding:9px;'
@@ -184,7 +194,7 @@
   var st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
 
   var p=document.createElement('div'); p.id=PANEL_ID;
-  p.innerHTML='<div class="hd"><b>📥 教材下载器</b><button class="x" title="关闭">&times;</button></div>'
+  p.innerHTML='<div class="hd"><b>📥 教材下载器</b><span class="ver">'+VER+'</span><button class="x" title="关闭">&times;</button></div>'
     +'<div class="bd">'
     +'<div style="color:#6b7280;font-size:12.5px;margin-bottom:7px">教材 / 课程网址，一行一个</div>'
     +'<textarea spellcheck="false"></textarea>'
