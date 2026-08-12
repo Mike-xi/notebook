@@ -73,7 +73,7 @@
 
   <main>
     <p class="muted" style="margin:0 0 16px">
-      把智慧教育平台的电子教材存成本地 PDF，支持一次下一整套。免费公共资源，下的是你账号本来就能看的内容。
+      把智慧教育平台的电子教材和课程资源存成本地 PDF，支持一次下一整套。免费公共资源，下的是你账号本来就能看的内容。
     </p>
 
     <div class="card">
@@ -110,18 +110,23 @@
     </div>
 
     <div class="card">
-      <div class="step"><div class="num">3</div><h2>下载课本</h2></div>
+      <div class="step"><div class="num">3</div><h2>下载</h2></div>
       <ol>
         <li>在<strong>智慧教育平台的任意页面</strong>点书签栏里的「📥 教材下载器」。</li>
-        <li>右下角弹出下载面板，当前教材的网址已自动填好。</li>
-        <li>想下别的书就把教材网址粘进去，<strong>一行一个可批量下载</strong>。</li>
+        <li>右下角弹出下载面板，当前页面的网址已自动填好。</li>
+        <li>想下别的就把网址粘进去，<strong>一行一个可批量下载</strong>。</li>
         <li>点「开始下载」，PDF 存进浏览器默认下载文件夹。</li>
       </ol>
       <hr>
+      <p class="muted" style="margin:0 0 10px"><strong>两类网址都认：</strong></p>
+      <p class="muted break" style="margin:0 0 10px">
+        <strong>教材</strong>（整本电子课本，一个 PDF）<br>
+        <code>https://basic.smartedu.cn/tchMaterial/detail?…&amp;contentId=708256b6-…</code>
+      </p>
       <p class="muted break" style="margin:0">
-        教材网址长这样：<br>
-        <code>https://basic.smartedu.cn/tchMaterial/detail?contentType=assets_document&amp;contentId=708256b6-…</code><br>
-        只贴中间那串 <code>contentId</code> 也认。
+        <strong>课程</strong>（同步课堂，自动把课件、教学设计、学习任务单、课后练习一次全下）<br>
+        <code>https://basic.smartedu.cn/syncClassroom/classActivity?activityId=b1a405c2-…</code><br>
+        课件下到的是平台转好的 PDF —— 平台不提供原始 pptx。视频课程是 m3u8 流，不支持。
       </p>
     </div>
 
@@ -181,7 +186,7 @@
   var p=document.createElement('div'); p.id=PANEL_ID;
   p.innerHTML='<div class="hd"><b>📥 教材下载器</b><button class="x" title="关闭">&times;</button></div>'
     +'<div class="bd">'
-    +'<div style="color:#6b7280;font-size:12.5px;margin-bottom:7px">教材网址或 contentId，一行一个</div>'
+    +'<div style="color:#6b7280;font-size:12.5px;margin-bottom:7px">教材 / 课程网址，一行一个</div>'
     +'<textarea spellcheck="false"></textarea>'
     +'<button class="go">开始下载</button>'
     +'<div class="log"></div>'
@@ -192,7 +197,14 @@
   p.querySelector('.x').onclick=function(){ p.style.display='none'; };
 
   var UUID=/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
-  var here=(location.href.match(UUID)||[])[0];
+  // 课程页网址里有好几个 uuid（activityId/chapterId/teachingmaterialId），必须挑对那个
+  function idOf(t){
+    var m=String(t).match(/(?:activityId|contentId)=([0-9a-fA-F-]{36})/);
+    if(m) return m[1].toLowerCase();
+    m=String(t).match(UUID);
+    return m ? m[0].toLowerCase() : null;
+  }
+  var here=idOf(location.href);
   if(here) ta.value=location.href;
 
   function row(label){
@@ -210,37 +222,70 @@
   function safe(n){ return String(n).replace(/[\\\/:*?"<>|]/g,'_').replace(/\s+/g,' ').trim(); }
   function mb(n){ return (n/1048576).toFixed(2)+' MB'; }
 
-  async function meta(cid){
+  // 课程页（同步课堂）里各类子资源的中文名，用作文件名后缀
+  var TYPE_LABEL={
+    coursewares:'课件',
+    lesson_plandesign:'教学设计',
+    learning_task:'学习任务单',
+    after_class_exercise:'课后练习'
+  };
+
+  async function json(path){
     var hosts=['s-file-1','s-file-2','s-file-3'];
     for(var i=0;i<hosts.length;i++){
       try{
-        var r=await fetch('https://'+hosts[i]+'.ykt.cbern.com.cn/zxx/ndrv2/resources/tch_material/details/'+cid+'.json');
+        var r=await fetch('https://'+hosts[i]+'.ykt.cbern.com.cn'+path);
         if(r.ok) return await r.json();
       }catch(e){}
     }
-    throw new Error('查不到这本教材的信息，确认下网址对不对');
+    return null;
   }
 
-  async function grab(cid, ui, auth){
-    var d=await meta(cid);
-    var title=d.title||cid;
-    ui.name(title);
-    var item=(d.ti_items||[]).filter(function(it){
-      return it.ti_format==='pdf' || /\.pdf($|\?)/i.test(String((it.ti_storages||[])[0]||''));
+  function pdfOf(items){
+    return (items||[]).filter(function(t){
+      return (t.ti_format==='pdf' || /\.pdf($|\?)/i.test(String((t.ti_storages||[])[0]||'')))
+        && (t.ti_storages||[]).length;
     })[0];
-    if(!item) throw new Error('这个资源里没有 PDF');
-    var total=item.ti_size||0, urls=item.ti_storages||[], res=null, lastErr='';
+  }
 
-    for(var i=0;i<urls.length;i++){
+  // 一个 id 可能是教材（一个 PDF），也可能是课程页（课件/教学设计/任务单/练习 各一个 PDF）
+  async function resolve(id){
+    var d=await json('/zxx/ndrv2/resources/tch_material/details/'+id+'.json');
+    if(d){
+      var it=pdfOf(d.ti_items);
+      if(it) return { title:d.title||id, files:[{label:'', size:it.ti_size||0, urls:it.ti_storages}] };
+    }
+
+    var L=await json('/zxx/ndrv2/national_lesson/resources/details/'+id+'.json');
+    if(L){
+      var title=(L.global_title&&L.global_title['zh-CN'])||L.title||id;
+      var rel=(L.relations||{}).national_course_resource||[];
+      var files=[], video=false;
+      rel.forEach(function(x){
+        if(x.resource_type_code==='micro_lesson_video'){ video=true; return; }
+        var it=pdfOf(x.ti_items);
+        if(it) files.push({
+          label:TYPE_LABEL[x.resource_type_code]||x.resource_type_code,
+          size:it.ti_size||0, urls:it.ti_storages
+        });
+      });
+      return { title:title, files:files, video:video };
+    }
+    return null;
+  }
+
+  async function fetchPdf(f, ui, auth){
+    var res=null, lastErr='';
+    for(var i=0;i<f.urls.length;i++){
       try{
-        var r=await fetch(urls[i],{headers:{'X-ND-AUTH':'MAC id="'+auth+'",nonce="0",mac="0"'}});
+        var r=await fetch(f.urls[i],{headers:{'X-ND-AUTH':'MAC id="'+auth+'",nonce="0",mac="0"'}});
         if(r.ok){ res=r; break; }
         lastErr='HTTP '+r.status+((r.status===401||r.status===403)?'（登录过期，回平台刷新页面再试）':'');
       }catch(e){ lastErr=e.message; }
     }
     if(!res) throw new Error(lastErr||'下载失败');
 
-    var got=0, chunks=[], rd=res.body.getReader();
+    var total=f.size, got=0, chunks=[], rd=res.body.getReader();
     for(;;){
       var s=await rd.read();
       if(s.done) break;
@@ -253,7 +298,7 @@
 
     var a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
-    a.download=safe(title)+'.pdf';
+    a.download=safe(f.name)+'.pdf';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function(){ URL.revokeObjectURL(a.href); },60000);
     ui.pct(1); ui.msg('✓ 已保存 '+a.download+'（'+mb(blob.size)+'）');
@@ -268,16 +313,33 @@
     }
     var ids=[], seen={};
     ta.value.split(/[\s,;]+/).forEach(function(t){
-      var m=t.match(UUID);
-      if(m && !seen[m[0]]){ seen[m[0]]=1; ids.push(m[0]); }
+      var id=idOf(t);
+      if(id && !seen[id]){ seen[id]=1; ids.push(id); }
     });
-    if(!ids.length){ row('没有输入').msg('没认出教材网址或 contentId',true); return; }
+    if(!ids.length){ row('没有输入').msg('没认出教材/课程网址里的 id',true); return; }
 
     go.disabled=true; go.textContent='下载中…';
     for(var i=0;i<ids.length;i++){
-      var ui=row(ids[i]);
-      try{ await grab(ids[i], ui, auth); }
-      catch(e){ ui.msg('✗ '+e.message,true); }
+      var head=row(ids[i]);
+      var info;
+      try{ info=await resolve(ids[i]); }
+      catch(e){ head.msg('✗ '+e.message,true); continue; }
+
+      if(!info){ head.msg('✗ 查不到这个资源，确认下网址对不对',true); continue; }
+      head.name(info.title);
+      if(!info.files.length){
+        head.msg(info.video ? '✗ 只有视频（m3u8），没有可下载的 PDF' : '✗ 这个资源里没有 PDF', true);
+        continue;
+      }
+      head.msg('找到 '+info.files.length+' 个 PDF'+(info.video?'（视频课程不支持，已跳过）':''));
+
+      for(var k=0;k<info.files.length;k++){
+        var f=info.files[k];
+        f.name=info.title+(f.label?' - '+f.label:'');
+        var ui=row(f.name);
+        try{ await fetchPdf(f, ui, auth); }
+        catch(e){ ui.msg('✗ '+e.message,true); }
+      }
     }
     go.disabled=false; go.textContent='开始下载';
   };
