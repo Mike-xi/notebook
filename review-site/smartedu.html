@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>教材下载器</title>
+  <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613c">
+  <style>
+    :root {
+      --bg:#f3f4f6; --fg:#1c1b1f; --muted:#6b7280; --card:#ffffff; --border:#e3e6eb;
+      --accent:#2F6FED; --chip:#eef0f4; --warn-bg:#fff8e6; --warn-bd:#f0d38a; --ok:#16a34a;
+    }
+    body.dark {
+      --bg:#0f1115; --fg:#e6e1e5; --muted:#9aa0a6; --card:#1a1d23; --border:#2a2e36;
+      --accent:#8AB0FF; --chip:#23262e; --warn-bg:#2a2413; --warn-bd:#5c4d1e; --ok:#4ade80;
+    }
+    * { box-sizing:border-box; }
+    [hidden] { display:none !important; }
+    html, body { margin:0; min-height:100%; }
+    body {
+      background:var(--bg); color:var(--fg);
+      font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      font-size:15px; line-height:1.7;
+    }
+    header {
+      position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:10px; padding:11px 14px;
+      background:var(--card); border-bottom:1px solid var(--border);
+    }
+    header .back { text-decoration:none; color:var(--fg); font-size:20px; line-height:1; padding:4px 6px; border-radius:8px; }
+    header .back:hover { background:var(--chip); }
+    header .title { font-weight:700; font-size:16px; flex:1 1 auto; }
+    header .title small { font-weight:500; color:var(--muted); font-size:12px; margin-left:6px; }
+
+    main { max-width:720px; margin:0 auto; padding:18px 14px 48px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:18px 20px; margin-bottom:14px; }
+    .step { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+    .num { flex:0 0 25px; height:25px; border-radius:50%; background:var(--accent); color:#fff;
+           display:grid; place-items:center; font-size:12.5px; font-weight:700; }
+    body.dark .num { color:#0f1115; }
+    .step h2 { font-size:15.5px; margin:0; font-weight:650; }
+    p { margin:0 0 10px; }
+    .muted { color:var(--muted); font-size:13.5px; }
+    .row { display:flex; gap:9px; flex-wrap:wrap; align-items:center; }
+    .btn {
+      display:inline-block; background:var(--accent); color:#fff; border:none; border-radius:10px;
+      padding:9px 17px; font-size:14.5px; font-weight:600; text-decoration:none; cursor:pointer; font-family:inherit;
+    }
+    body.dark .btn { color:#0f1115; }
+    .btn.ghost { background:transparent; color:var(--fg); border:1px solid var(--border); }
+    .btn:hover { filter:brightness(1.07); }
+    .drag { border:2px dashed var(--border); border-radius:14px; padding:20px; text-align:center; margin:12px 0 4px; }
+    .bm {
+      display:inline-block; background:var(--accent); color:#fff; border-radius:10px; padding:11px 20px;
+      font-size:15px; font-weight:700; text-decoration:none; cursor:grab; user-select:none;
+    }
+    body.dark .bm { color:#0f1115; }
+    .bm:active { cursor:grabbing; }
+    .note { background:var(--warn-bg); border:1px solid var(--warn-bd); border-radius:11px; padding:10px 14px; font-size:13.5px; margin-top:12px; }
+    code, kbd { background:var(--chip); border:1px solid var(--border); border-radius:5px; padding:1px 6px;
+                font-family:ui-monospace,"SFMono-Regular",Consolas,monospace; font-size:12.5px; }
+    ol { padding-left:21px; margin:6px 0; } li { margin:4px 0; }
+    hr { border:none; border-top:1px solid var(--border); margin:16px 0; }
+    details summary { cursor:pointer; color:var(--muted); font-size:13.5px; }
+    #ok { color:var(--ok); font-size:13.5px; font-weight:600; }
+    .break { word-break:break-all; }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="back" href="/" title="返回">‹</a>
+    <div class="title">教材下载器 <small>国家中小学智慧教育平台</small></div>
+  </header>
+
+  <main>
+    <p class="muted" style="margin:0 0 16px">
+      把智慧教育平台的电子教材存成本地 PDF，支持一次下一整套。免费公共资源，下的是你账号本来就能看的内容。
+    </p>
+
+    <div class="card">
+      <div class="step"><div class="num">1</div><h2>登录智慧教育平台</h2></div>
+      <p class="muted">下载要用到你账号的访问令牌。已经登录过就直接看第 2 步。</p>
+      <div class="row">
+        <a class="btn" href="https://basic.smartedu.cn/" target="_blank" rel="noopener">打开智慧教育平台</a>
+        <a class="btn ghost" href="https://auth.smartedu.cn/uias/login" target="_blank" rel="noopener">直接去登录页</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="step"><div class="num">2</div><h2>装一次下载器</h2></div>
+      <p class="muted">
+        平台服务器只允许自家域名跨域取文件，所以下载动作必须跑在平台页面上。
+        把下面的按钮<strong>拖到浏览器书签栏</strong>就装好了，只需一次。
+      </p>
+      <div class="drag">
+        <a class="bm" id="bm" href="#">📥 教材下载器</a>
+        <p class="muted" style="margin:11px 0 0">↑ 按住它，拖到上方书签栏</p>
+      </div>
+      <div class="note">看不到书签栏？按 <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd> 打开。</div>
+      <details style="margin-top:12px">
+        <summary>拖不动 / 点了没反应？用控制台方式（一定能成）</summary>
+        <p class="muted" style="margin-top:9px">
+          在智慧教育平台页面上按 <kbd>F12</kbd> → 切到 <strong>Console</strong> → 粘贴代码 → 回车。
+          首次可能需要按提示手动输入 <code>allow pasting</code> 再回车解锁粘贴。
+        </p>
+        <div class="row">
+          <button class="btn" id="copy">复制控制台代码</button>
+          <span id="ok" hidden>✓ 已复制</span>
+        </div>
+      </details>
+    </div>
+
+    <div class="card">
+      <div class="step"><div class="num">3</div><h2>下载课本</h2></div>
+      <ol>
+        <li>在<strong>智慧教育平台的任意页面</strong>点书签栏里的「📥 教材下载器」。</li>
+        <li>右下角弹出下载面板，当前教材的网址已自动填好。</li>
+        <li>想下别的书就把教材网址粘进去，<strong>一行一个可批量下载</strong>。</li>
+        <li>点「开始下载」，PDF 存进浏览器默认下载文件夹。</li>
+      </ol>
+      <hr>
+      <p class="muted break" style="margin:0">
+        教材网址长这样：<br>
+        <code>https://basic.smartedu.cn/tchMaterial/detail?contentType=assets_document&amp;contentId=708256b6-…</code><br>
+        只贴中间那串 <code>contentId</code> 也认。
+      </p>
+    </div>
+
+    <p class="muted" style="text-align:center; margin-top:20px">
+      下载报 401/403 → 登录过期了，回平台刷新一下页面再试。
+    </p>
+  </main>
+
+<script type="text/plain" id="payload">
+(function(){
+  var PANEL_ID='__smartedu_dl_panel__';
+  var old=document.getElementById(PANEL_ID);
+  if(old){ old.style.display='flex'; return; }
+
+  if(!/(^|\.)smartedu\.cn$/.test(location.hostname)){
+    alert('请先打开国家中小学智慧教育平台的页面（basic.smartedu.cn），再点这个书签。');
+    return;
+  }
+
+  function getToken(){
+    for(var i=0;i<localStorage.length;i++){
+      var k=localStorage.key(i), v=localStorage.getItem(k);
+      if(!v||v.indexOf('access_token')<0) continue;
+      try{
+        var o=JSON.parse(v);
+        if(typeof o.value==='string') o=JSON.parse(o.value);
+        if(o&&o.access_token) return o.access_token;
+      }catch(e){
+        var m=v.match(/"access_token"\s*:\s*"([^"]+)"/);
+        if(m) return m[1];
+      }
+    }
+    return null;
+  }
+
+  var css='#'+PANEL_ID+'{position:fixed;right:20px;bottom:20px;z-index:2147483647;width:430px;max-width:calc(100vw - 40px);'
+    +'background:#fff;color:#1b1d21;border:1px solid #e3e6ea;border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.22);'
+    +'font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;display:flex;flex-direction:column;overflow:hidden}'
+    +'#'+PANEL_ID+' .hd{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #e3e6ea;background:#fafbfc}'
+    +'#'+PANEL_ID+' .hd b{font-size:14.5px}'
+    +'#'+PANEL_ID+' .x{cursor:pointer;border:none;background:transparent;font-size:19px;line-height:1;color:#6b7280;padding:0 4px}'
+    +'#'+PANEL_ID+' .bd{padding:14px}'
+    +'#'+PANEL_ID+' textarea{width:100%;height:86px;resize:vertical;border:1px solid #d8dce1;border-radius:8px;padding:9px;'
+    +'font:12.5px/1.55 ui-monospace,Consolas,monospace;color:#1b1d21;background:#fff;box-sizing:border-box}'
+    +'#'+PANEL_ID+' .go{margin-top:10px;width:100%;border:none;border-radius:8px;background:#2f6fed;color:#fff;'
+    +'padding:10px;font-size:14.5px;font-weight:600;cursor:pointer;font-family:inherit}'
+    +'#'+PANEL_ID+' .go:disabled{background:#9db5e8;cursor:default}'
+    +'#'+PANEL_ID+' .log{margin-top:12px;max-height:210px;overflow:auto;font-size:12.5px}'
+    +'#'+PANEL_ID+' .it{padding:7px 0;border-top:1px solid #eef0f2}'
+    +'#'+PANEL_ID+' .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+    +'#'+PANEL_ID+' .bar{height:5px;border-radius:3px;background:#eceff3;overflow:hidden;margin-top:5px}'
+    +'#'+PANEL_ID+' .fill{height:100%;width:0;background:#2f6fed;transition:width .18s}'
+    +'#'+PANEL_ID+' .st{color:#6b7280;font-size:11.5px;margin-top:3px}'
+    +'#'+PANEL_ID+' .err{color:#dc2626}';
+  var st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
+
+  var p=document.createElement('div'); p.id=PANEL_ID;
+  p.innerHTML='<div class="hd"><b>📥 教材下载器</b><button class="x" title="关闭">&times;</button></div>'
+    +'<div class="bd">'
+    +'<div style="color:#6b7280;font-size:12.5px;margin-bottom:7px">教材网址或 contentId，一行一个</div>'
+    +'<textarea spellcheck="false"></textarea>'
+    +'<button class="go">开始下载</button>'
+    +'<div class="log"></div>'
+    +'</div>';
+  document.body.appendChild(p);
+
+  var ta=p.querySelector('textarea'), go=p.querySelector('.go'), log=p.querySelector('.log');
+  p.querySelector('.x').onclick=function(){ p.style.display='none'; };
+
+  var UUID=/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+  var here=(location.href.match(UUID)||[])[0];
+  if(here) ta.value=location.href;
+
+  function row(label){
+    var d=document.createElement('div'); d.className='it';
+    d.innerHTML='<div class="nm"></div><div class="bar"><div class="fill"></div></div><div class="st"></div>';
+    d.querySelector('.nm').textContent=label;
+    log.appendChild(d); log.scrollTop=log.scrollHeight;
+    return {
+      name:function(t){ d.querySelector('.nm').textContent=t; },
+      pct:function(f){ d.querySelector('.fill').style.width=Math.max(0,Math.min(100,f*100))+'%'; },
+      msg:function(t,bad){ var s=d.querySelector('.st'); s.textContent=t; s.className='st'+(bad?' err':''); }
+    };
+  }
+
+  function safe(n){ return String(n).replace(/[\\\/:*?"<>|]/g,'_').replace(/\s+/g,' ').trim(); }
+  function mb(n){ return (n/1048576).toFixed(2)+' MB'; }
+
+  async function meta(cid){
+    var hosts=['s-file-1','s-file-2','s-file-3'];
+    for(var i=0;i<hosts.length;i++){
+      try{
+        var r=await fetch('https://'+hosts[i]+'.ykt.cbern.com.cn/zxx/ndrv2/resources/tch_material/details/'+cid+'.json');
+        if(r.ok) return await r.json();
+      }catch(e){}
+    }
+    throw new Error('查不到这本教材的信息，确认下网址对不对');
+  }
+
+  async function grab(cid, ui, auth){
+    var d=await meta(cid);
+    var title=d.title||cid;
+    ui.name(title);
+    var item=(d.ti_items||[]).filter(function(it){
+      return it.ti_format==='pdf' || /\.pdf($|\?)/i.test(String((it.ti_storages||[])[0]||''));
+    })[0];
+    if(!item) throw new Error('这个资源里没有 PDF');
+    var total=item.ti_size||0, urls=item.ti_storages||[], res=null, lastErr='';
+
+    for(var i=0;i<urls.length;i++){
+      try{
+        var r=await fetch(urls[i],{headers:{'X-ND-AUTH':'MAC id="'+auth+'",nonce="0",mac="0"'}});
+        if(r.ok){ res=r; break; }
+        lastErr='HTTP '+r.status+((r.status===401||r.status===403)?'（登录过期，回平台刷新页面再试）':'');
+      }catch(e){ lastErr=e.message; }
+    }
+    if(!res) throw new Error(lastErr||'下载失败');
+
+    var got=0, chunks=[], rd=res.body.getReader();
+    for(;;){
+      var s=await rd.read();
+      if(s.done) break;
+      chunks.push(s.value); got+=s.value.length;
+      if(total){ ui.pct(got/total); ui.msg(mb(got)+' / '+mb(total)); }
+      else{ ui.msg(mb(got)); }
+    }
+    var blob=new Blob(chunks,{type:'application/pdf'});
+    if(total && blob.size!==total) throw new Error('大小对不上（'+blob.size+' ≠ '+total+'），可能没下完');
+
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=safe(title)+'.pdf';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); },60000);
+    ui.pct(1); ui.msg('✓ 已保存 '+a.download+'（'+mb(blob.size)+'）');
+  }
+
+  go.onclick=async function(){
+    var auth=getToken();
+    log.innerHTML='';
+    if(!auth){
+      row('未登录').msg('localStorage 里没有 access_token，请先登录智慧教育平台再试',true);
+      return;
+    }
+    var ids=[], seen={};
+    ta.value.split(/[\s,;]+/).forEach(function(t){
+      var m=t.match(UUID);
+      if(m && !seen[m[0]]){ seen[m[0]]=1; ids.push(m[0]); }
+    });
+    if(!ids.length){ row('没有输入').msg('没认出教材网址或 contentId',true); return; }
+
+    go.disabled=true; go.textContent='下载中…';
+    for(var i=0;i<ids.length;i++){
+      var ui=row(ids[i]);
+      try{ await grab(ids[i], ui, auth); }
+      catch(e){ ui.msg('✗ '+e.message,true); }
+    }
+    go.disabled=false; go.textContent='开始下载';
+  };
+})();
+</script>
+
+<script>
+  // 主题跟随站点（与 board.js 一致）
+  (function theme(){
+    let t='auto';
+    try { t = localStorage.getItem('nb-theme') || 'auto'; } catch {}
+    const dark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+    document.body.classList.toggle('dark', dark);
+  })();
+
+  const src = document.getElementById('payload').textContent.trim();
+  document.getElementById('bm').href = 'javascript:' + encodeURIComponent(src);
+
+  const ok = document.getElementById('ok');
+  document.getElementById('copy').onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(src);
+    } catch {
+      // 剪贴板 API 不可用时退回 execCommand
+      const t = document.createElement('textarea');
+      t.value = src; t.style.position = 'fixed'; t.style.opacity = '0';
+      document.body.appendChild(t); t.select();
+      try { document.execCommand('copy'); } catch {}
+      t.remove();
+    }
+    ok.hidden = false;
+    setTimeout(() => { ok.hidden = true; }, 2000);
+  };
+</script>
+</body>
+</html>
