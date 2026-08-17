@@ -10,7 +10,7 @@ const KEY = 'course_order';
 
 export async function onRequestGet({ env }) {
   await ensurePrefsSchema(env);
-  const rows = await env.DB.prepare("SELECT key, value FROM prefs WHERE key IN (?, 'hidden_courses', 'category_overrides')").bind(KEY).all();
+  const rows = await env.DB.prepare("SELECT key, value FROM prefs WHERE key IN (?, 'hidden_courses', 'category_overrides', 'course_meta')").bind(KEY).all();
   const map = {};
   for (const r of (rows.results || [])) map[r.key] = r.value;
   const parseList = (v) => {
@@ -22,10 +22,12 @@ export async function onRequestGet({ env }) {
     catch { return {}; }
   };
   // order：显示顺序；hidden：被删除的静态课程；categories：拖拽改分类的覆盖 {file: category}
+  // meta：重命名/简介/图标的覆盖 {file: {title, description, icon}}，见 api/course-meta.js
   return Response.json({
     order: parseList(map[KEY]),
     hidden: parseList(map['hidden_courses']),
     categories: parseMap(map['category_overrides']),
+    meta: parseMap(map['course_meta']),
   });
 }
 

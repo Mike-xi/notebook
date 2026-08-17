@@ -41,10 +41,10 @@
   // art 是缩略图的 CSS 近似，画的是各着色器的主色调，不额外起 WebGL 预览
   const BUILTIN = [
     { id: 'none', label: '素色', art: 'none' },
-    { id: 'mesh', label: '流光', art: 'mesh' },
     { id: 'aurora', label: '极光', art: 'aurora' },
-    { id: 'silk', label: '丝绸', art: 'silk' },
-    { id: 'nebula', label: '星海', art: 'nebula' },
+    { id: 'blinds', label: '百叶窗', art: 'blinds' },
+    { id: 'waves', label: '波纹', art: 'waves' },
+    { id: 'terrain', label: '地形', art: 'terrain' },
   ];
 
   let customs = [];      // [{id,label,mime,updated_at}]

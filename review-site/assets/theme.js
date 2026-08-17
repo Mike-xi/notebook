@@ -2,15 +2,26 @@
 (function () {
   const THEME_KEY = 'nb-theme';
   const BG_KEY = 'nb-background';
+  const OPACITY_KEY = 'nb-bg-opacity';
   const PREF_KEY = 'appearance:home';
   const THEME_ORDER = ['auto', 'light', 'dark'];
   // 内置 5 套；另外允许 custom:<id> 形式的自定义图片背景（最多 3 张，见 api/background.js）
-  const BG_BUILTIN = ['none', 'mesh', 'aurora', 'silk', 'nebula'];
-  // 老配置迁移：balatro 已下线，就近映射到 silk，用户的选择不会莫名其妙被清掉
-  const BG_ALIAS = { balatro: 'silk', plain: 'none' };
+  const BG_BUILTIN = ['none', 'aurora', 'blinds', 'waves', 'terrain'];
+  // 老配置迁移：下线的 id 就近映射，用户的选择不会莫名其妙被清掉
+  const BG_ALIAS = {
+    balatro: 'waves', plain: 'none',
+    mesh: 'aurora', silk: 'waves', nebula: 'terrain',
+  };
   const isCustomBg = (v) => typeof v === 'string' && /^custom:[a-z0-9-]{1,40}$/.test(v);
   const validBg = (v) => BG_BUILTIN.includes(v) || isCustomBg(v);
   const normBg = (v) => (BG_ALIAS[v] || v);
+  // 背景浓淡：0.15~1，落到 CSS 变量 --nb-bg-opacity（画布层和图片层都吃它）
+  const OPACITY_MIN = 0.15, OPACITY_MAX = 1, OPACITY_DEFAULT = 0.55;
+  const clampOpacity = (v) => {
+    const n = Number(v);
+    if (!isFinite(n)) return OPACITY_DEFAULT;
+    return Math.min(OPACITY_MAX, Math.max(OPACITY_MIN, Math.round(n * 100) / 100));
+  };
   const ICON = { auto: '🌗', light: '☀️', dark: '🌙' };
   const LABEL = {
     auto: '主题：跟随系统（点击切到浅色）',
@@ -31,6 +42,27 @@
     if (validBg(value)) return value;
     localStorage.setItem(BG_KEY, 'none');
     return 'none';
+  }
+
+  function opacityPref() {
+    const raw = localStorage.getItem(OPACITY_KEY);
+    return raw == null ? OPACITY_DEFAULT : clampOpacity(raw);
+  }
+
+  function applyOpacity(value) {
+    document.documentElement.style.setProperty('--nb-bg-opacity', String(value));
+    document.querySelectorAll('[data-bg-opacity]').forEach((el) => {
+      if (el.value !== String(value)) el.value = String(value);
+    });
+    window.dispatchEvent(new CustomEvent('nb-background-opacity', { detail: { opacity: value } }));
+  }
+
+  function setOpacity(value, userAction = true) {
+    const v = clampOpacity(value);
+    localStorage.setItem(OPACITY_KEY, String(v));
+    if (userAction) dirty = true;
+    applyOpacity(v);
+    if (userAction) queuePersist();
   }
 
   function effective(pref) {
@@ -79,7 +111,7 @@
   }
 
   function snapshot() {
-    return { theme: themePref(), background: backgroundPref() };
+    return { theme: themePref(), background: backgroundPref(), bgOpacity: opacityPref() };
   }
 
   async function persist() {
@@ -141,6 +173,7 @@
         return;
       }
       if (THEME_ORDER.includes(remote.theme)) setTheme(remote.theme, false);
+      if (remote.bgOpacity != null) setOpacity(remote.bgOpacity, false);
       if (validBg(normBg(remote.background))) {
         setBackground(remote.background, false);
       } else {
@@ -169,8 +202,21 @@
       button.__nbBackgroundWired = true;
       button.addEventListener('click', () => setBackground(button.getAttribute('data-bg-set')));
     });
+    document.querySelectorAll('[data-bg-opacity]').forEach((input) => {
+      if (input.__nbOpacityWired) return;
+      input.__nbOpacityWired = true;
+      // input 事件实时改画面，change 才落库，免得拖一下发几十个请求
+      input.addEventListener('input', () => {
+        const v = clampOpacity(input.value);
+        localStorage.setItem(OPACITY_KEY, String(v));
+        dirty = true;
+        document.documentElement.style.setProperty('--nb-bg-opacity', String(v));
+      });
+      input.addEventListener('change', () => setOpacity(input.value));
+    });
     updateThemeButtons(themePref());
     updateBackgroundButtons(backgroundPref());
+    applyOpacity(opacityPref());
   }
 
   mql.addEventListener('change', () => {
@@ -182,6 +228,7 @@
   });
 
   applyTheme(themePref());
+  applyOpacity(opacityPref());
   applyBackground(backgroundPref());
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
   else wire();
@@ -194,9 +241,12 @@
     get effective() { return effective(themePref()); },
     get pref() { return themePref(); },
     get background() { return backgroundPref(); },
+    get bgOpacity() { return opacityPref(); },
+    OPACITY_MIN, OPACITY_MAX, OPACITY_DEFAULT,
     apply: () => applyTheme(themePref()),
     set: setTheme,
     setBackground,
+    setOpacity,
     sync: queuePersist,
     flush: persist,
   };

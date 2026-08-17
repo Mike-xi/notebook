@@ -453,7 +453,7 @@
       document.querySelectorAll('#courses .nb-card').forEach(function (orig) {
         if (tab && tab !== 'all' && (orig.dataset.category || 'learn') !== tab) return;
         var c = orig.cloneNode(true);
-        c.querySelectorAll('.nb-del, .nb-edit, .nb-drag').forEach(function (b) { b.remove(); });
+        c.querySelectorAll('.nb-more, .nb-drag').forEach(function (b) { b.remove(); });
         c.style.display = '';
         ['--px', '--py', '--rx', '--ry', '--lift', '--holo'].forEach(function (v) { c.style.removeProperty(v); });
         var idx = cards.length;
@@ -576,7 +576,7 @@
           var o = pool[i];
           if (tab !== 'all' && (o.dataset.category || 'learn') !== tab) continue;
           var c = o.cloneNode(true);
-          c.querySelectorAll('.nb-del, .nb-edit, .nb-drag').forEach(function (b) { b.remove(); });
+          c.querySelectorAll('.nb-more, .nb-drag').forEach(function (b) { b.remove(); });
           c.style.display = '';
           ['--px', '--py', '--rx', '--ry', '--lift', '--holo'].forEach(function (v) { c.style.removeProperty(v); });
           c.setAttribute('data-fallback', '1');

@@ -8,13 +8,26 @@
     // 首屏前定主题，避免浅/深闪烁；完整逻辑在 theme.js
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
     // 背景也先从本机缓存恢复；登录后 theme.js 会用当前密码用户的云端偏好校准。
-    (function(){try{var b=localStorage.getItem('nb-background')||'none';if(b==='balatro')b='silk';var a=['none','mesh','aurora','silk','nebula'];var ok=a.indexOf(b)>=0||/^custom:[a-z0-9-]{1,40}$/.test(b);document.documentElement.dataset.bg=ok?b:'none';}catch(e){document.documentElement.dataset.bg='none';}})();
+    (function(){try{var b=localStorage.getItem('nb-background')||'none';var M={balatro:'waves',plain:'none',mesh:'aurora',silk:'waves',nebula:'terrain'};if(M[b])b=M[b];var a=['none','aurora','blinds','waves','terrain'];var ok=a.indexOf(b)>=0||/^custom:[a-z0-9-]{1,40}$/.test(b);document.documentElement.dataset.bg=ok?b:'none';var o=parseFloat(localStorage.getItem('nb-bg-opacity'));document.documentElement.style.setProperty('--nb-bg-opacity',String(isFinite(o)?Math.min(1,Math.max(.15,o)):.55));}catch(e){document.documentElement.dataset.bg='none';}})();
     // 界面风格（高级/经典）同样首屏前定，避免 Dock/经典顶栏互闪；完整逻辑在 premium.js
     (function(){try{var u=localStorage.getItem('nb-ui-level');document.documentElement.dataset.ui=(u==='classic')?'classic':'premium';}catch(e){document.documentElement.dataset.ui='premium';}})();
+    // 首屏数据预取：这几个请求本来要等 app.js（60KB）下载 + 解析完才发得出去，
+    // 白白多等一个来回。这里在解析 <head> 时就发出去，app.js 直接复用这些 Promise。
+    (function(){
+      var g=function(u){return fetch(u,{headers:{Accept:'application/json'}}).then(function(r){return r.ok?r.json():null}).catch(function(){return null})};
+      window.__nbBoot={
+        courses: g('/courses.json?v='+Date.now()),
+        dynamic: g('/api/courses'),
+        progress: g('/api/progress'),
+        order:   g('/api/order'),
+        me:      g('/api/me'),
+        covers:  g('/api/cover?list=1')
+      };
+    })();
   </script>
   <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613d">
-  <link rel="stylesheet" href="/assets/style.css?v=20260817a">
-  <link rel="stylesheet" href="/assets/premium.css?v=20260817a">
+  <link rel="stylesheet" href="/assets/style.css?v=20260817h">
+  <link rel="stylesheet" href="/assets/premium.css?v=20260817h">
 </head>
 <body class="home">
   <header class="topbar">
@@ -74,6 +87,11 @@
             <span class="sm-label">页面背景 <em class="sm-count" id="bg-count"></em></span>
             <!-- 手风琴：悬停展开一格看大图，点选生效。面板由 appearance.js 渲染 -->
             <div class="bg-accordion" id="bg-accordion" role="listbox" aria-label="页面背景"></div>
+            <div class="bg-opacity" id="bg-opacity-row">
+              <label for="bg-opacity">浓淡</label>
+              <input type="range" id="bg-opacity" data-bg-opacity min="0.15" max="1" step="0.05"
+                     aria-label="背景浓淡">
+            </div>
             <p class="sm-hint" id="bg-hint">5 张内置 + 最多 3 张自选，点 ＋ 传自己的图</p>
             <input type="file" id="bg-file" accept="image/png,image/jpeg,image/webp,image/avif" hidden>
           </div>
@@ -88,6 +106,7 @@
           </div>
           <div class="sm-divider"></div>
           <button class="sm-item" id="review-item" role="menuitem" style="display:none"><span class="sm-ic ic" data-icon="tray" data-icon-size="18"></span><span>内容审核</span><span class="sm-badge" id="review-badge" hidden>0</span></button>
+          <button class="sm-item" id="logins-btn" role="menuitem"><span class="sm-ic ic" data-icon="list" data-icon-size="18"></span><span>登录日志</span></button>
           <button class="sm-item" id="about-btn" role="menuitem"><span class="sm-ic ic" data-icon="sparkle" data-icon-size="18"></span><span>关于</span></button>
           <button class="sm-item sm-danger" id="logout-btn" role="menuitem"><span class="sm-ic ic" data-icon="signout" data-icon-size="18"></span><span>退出登录</span></button>
         </div>
@@ -243,12 +262,13 @@
     </div>
   </div>
 
-  <script src="/assets/icons.js?v=20260616a"></script>
-  <script src="/assets/theme.js?v=20260817a"></script>
-  <script src="/assets/backgrounds.js?v=20260817a"></script>
-  <script src="/assets/appearance.js?v=20260817a"></script>
-  <script src="/assets/md.js?v=20260608d"></script>
-  <script src="/assets/app.js?v=20260817a"></script>
-  <script src="/assets/premium.js?v=20260817a"></script>
+  <script src="/assets/icons.js?v=20260616a" defer></script>
+  <script src="/assets/theme.js?v=20260817e" defer></script>
+  <script src="/assets/backgrounds.js?v=20260817e" defer></script>
+  <script src="/assets/gooey.js?v=20260817e" defer></script>
+  <script src="/assets/appearance.js?v=20260817e" defer></script>
+  <script src="/assets/md.js?v=20260608d" defer></script>
+  <script src="/assets/app.js?v=20260817h" defer></script>
+  <script src="/assets/premium.js?v=20260817e" defer></script>
 </body>
 </html>

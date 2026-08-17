@@ -42,8 +42,12 @@ export async function onRequestPost({ request, env }) {
 
   const owner = await hashOwnerId(pw);
   const token = await createSessionToken(env, role, owner);
-  // 记录登录日志（仅时间 + 浏览器标识，不存 IP）；失败不影响登录
-  await logEvent(env, 'login', `${role} · ${(request.headers.get('User-Agent') || '').slice(0, 100)}`);
+  // 登录日志：角色 · 大致位置 · 浏览器标识。位置取自 Cloudflare 边缘给的 request.cf，
+  // 只有城市/国家，**不记录 IP**。三段用 ' · ' 分隔，/api/logins 按这个格式解析。
+  const cf = request.cf || {};
+  const place = [cf.city, cf.country].filter(Boolean).join(', ') || '未知';
+  const ua = (request.headers.get('User-Agent') || '').slice(0, 160);
+  await logEvent(env, 'login', `${role} · ${place} · ${ua}`);
   return new Response(JSON.stringify({ ok: true, role }), {
     headers: {
       'Content-Type': 'application/json',

@@ -15,6 +15,7 @@ let totalCourses = 0;           // 课程总数（空状态判断用）
 let ncCat = 'learn';            // 创建课程时选择的分类
 let isAdmin = false;            // 当前账号是否为管理员（游客只能浏览/使用，不能增删改课程）
 let customCovers = {};          // slug -> updated_at；管理员换过封面的卡片，覆盖静态 /assets/covers/
+let courseMeta = {};            // file -> {title, description, icon}；「更多选项」里改过的覆盖
 
 // 根据角色显隐管理操作：
 // - 「创建/上传」对所有登录用户开放（游客上传进审核队列）
@@ -39,13 +40,23 @@ function detectKind(name) {
 async function loadAndRender() {
   let staticCourses = [], dynamic = [], progress = [], order = [], hidden = [], categoryOverrides = {};
   try {
+    // index.html 的 <head> 里已经把这几个请求发出去了（window.__nbBoot），直接复用；
+    // 首次渲染之后 __nbBoot 会被清掉，后续刷新走正常请求。
+    const boot = window.__nbBoot;
+    window.__nbBoot = null;
+    const req = (key, url, fallback) => {
+      const p = boot && boot[key];
+      const got = p || fetch(url, { headers: { Accept: 'application/json' } })
+        .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      return got.then((v) => (v == null ? fallback : v));
+    };
     const [c1, c2, pr, od, me, cv] = await Promise.all([
-      fetch('/courses.json?v=' + Date.now()).then((r) => (r.ok ? r.json() : [])),   // 时间戳防 ccwu.cc 域 4h 强缓存
-      fetch('/api/courses').then((r) => (r.ok ? r.json() : [])),
-      fetch('/api/progress').then((r) => (r.ok ? r.json() : [])),
-      fetch('/api/order').then((r) => (r.ok ? r.json() : { order: [] })),
-      fetch('/api/me').then((r) => (r.ok ? r.json() : { role: 'guest' })).catch(() => ({ role: 'guest' })),
-      fetch('/api/cover?list=1').then((r) => (r.ok ? r.json() : { covers: {} })).catch(() => ({ covers: {} })),
+      req('courses', '/courses.json?v=' + Date.now(), []),   // 时间戳防 ccwu.cc 域 4h 强缓存
+      req('dynamic', '/api/courses', []),
+      req('progress', '/api/progress', []),
+      req('order', '/api/order', { order: [] }),
+      req('me', '/api/me', { role: 'guest' }),
+      req('covers', '/api/cover?list=1', { covers: {} }),
     ]);
     customCovers = (cv && cv.covers) || {};
     staticCourses = c1 || [];
@@ -54,6 +65,7 @@ async function loadAndRender() {
     order = (od && od.order) || [];
     hidden = (od && od.hidden) || [];
     categoryOverrides = (od && od.categories) || {};
+    courseMeta = (od && od.meta) || {};
     isAdmin = (me && me.role) === 'admin';
     // 身份广播给设置面板的身份卡（appearance.js）。role: guest / friend / admin
     window.NBMe = me || { role: 'guest', level: 1, name: '访客' };
@@ -73,6 +85,16 @@ async function loadAndRender() {
   for (const c of courses) {
     const ov = categoryOverrides[c.file];
     if (ov && ['learn', 'explore', 'play'].includes(ov)) c.category = ov;
+  }
+
+  // 叠加「更多选项」里改过的标题/简介/图标（course_meta，见 api/course-meta.js）。
+  // 静态课程写在 git 的 courses.json 里改不动，所以统一走这层覆盖。
+  for (const c of courses) {
+    const m = courseMeta[c.file];
+    if (!m) continue;
+    if (m.title) c.title = m.title;
+    if (m.description) c.description = m.description;
+    if (m.icon) c.icon = m.icon;
   }
 
   const progressMap = {};
@@ -588,8 +610,23 @@ async function shrinkCover(file, w = 640, h = 360) {
   return blob;
 }
 
+// 自定义图标：正方形、留白不裁切（logo 类图片裁掉边就认不出来了）
+async function shrinkIcon(file, size = 160) {
+  const bmp = await createImageBitmap(file);
+  const cv = document.createElement('canvas');
+  cv.width = size; cv.height = size;
+  const ctx = cv.getContext('2d');
+  const scale = Math.min(size / bmp.width, size / bmp.height);
+  const dw = bmp.width * scale, dh = bmp.height * scale;
+  ctx.drawImage(bmp, (size - dw) / 2, (size - dh) / 2, dw, dh);
+  if (bmp.close) bmp.close();
+  const blob = await new Promise((r) => cv.toBlob(r, 'image/webp', 0.9));
+  if (!blob) throw new Error('图片编码失败');
+  return blob;
+}
+
 let coverPicker = null;
-function pickCover(slug, imgEl, btn) {
+function pickCover(slug, imgEl, btn, onDone) {
   if (!coverPicker) {
     coverPicker = document.createElement('input');
     coverPicker.type = 'file';
@@ -617,6 +654,7 @@ function pickCover(slug, imgEl, btn) {
         imgEl.src = `/api/cover?slug=${encodeURIComponent(slug)}&v=${data.updated_at}`;
       }
       if (btn) btn.dataset.custom = '1';
+      if (onDone) onDone(data.updated_at);
     } catch (err) {
       alert('换封面失败：' + (err.message || err));
     } finally {
@@ -626,59 +664,298 @@ function pickCover(slug, imgEl, btn) {
   coverPicker.click();
 }
 
-// 右键封面按钮 = 恢复默认封面
-document.getElementById('courses').addEventListener('contextmenu', async (e) => {
-  const btn = e.target.closest('.nb-cover');
-  if (!btn) return;
-  e.preventDefault();
-  if (!btn.dataset.custom) return;              // 本来就是默认图，无需恢复
-  if (!confirm('恢复这张卡片的默认封面？')) return;
-  const slug = String(btn.dataset.slug || '').toLowerCase();
-  try {
-    const res = await fetch(`/api/cover?slug=${encodeURIComponent(slug)}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error();
-    delete customCovers[slug];
-    await loadAndRender();
-  } catch {
-    alert('恢复默认失败，请重试');
-  }
-});
-
-// ========== 删除 / 编辑动态课程（事件委托） ==========
-document.getElementById('courses').addEventListener('click', async (e) => {
-  const cover = e.target.closest('.nb-cover');
-  if (cover) {
-    e.preventDefault();
-    e.stopPropagation();
-    const card = cover.closest('.nb-card');
-    pickCover(String(cover.dataset.slug || '').toLowerCase(),
-              card && card.querySelector('.nb-card-cover img'), cover);
-    return;
-  }
-  const edit = e.target.closest('.nb-edit');
-  if (edit) {
-    e.preventDefault();
-    e.stopPropagation();
-    location.href = `/editor.html?file=${encodeURIComponent(edit.dataset.file)}`;
-    return;
-  }
-  const del = e.target.closest('.nb-del');
-  if (!del) return;
+// ========== 课程「更多选项」弹窗（事件委托） ==========
+// 卡片上原本有删除/编辑/换封面三个角标，且删除只有部分卡片有；现在统一收进这个
+// 弹窗，每张卡都有，卡片角上只留「更多 + 拖动」两个手柄。
+document.getElementById('courses').addEventListener('click', (e) => {
+  const more = e.target.closest('.nb-more');
+  if (!more) return;
   e.preventDefault();
   e.stopPropagation();
-  if (!confirm('删除这个课程？将一并清除它的阅读进度与书签，且不可恢复。')) return;
-  try {
-    const res = await fetch('/api/courses', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ file: del.dataset.file }),
-    });
-    if (!res.ok) throw new Error();
-    await loadAndRender();
-  } catch {
-    alert('删除失败，请重试');
-  }
+  openCourseOptions(more.dataset.file);
 });
+
+const EMOJI_PRESETS = [
+  '📘', '📗', '📕', '📙', '📓', '📔', '📝', '✏️', '🖊️', '📄',
+  '🧮', '📐', '📊', '📈', '🔬', '🔭', '⚗️', '🧪', '🧬', '⚛️',
+  '💻', '⌨️', '🖥️', '🧠', '🤖', '🛰️', '🚀', '⚙️', '🔧', '🔌',
+  '🌊', '⛵', '🚢', '🛥️', '🐋', '🧭', '🗺️', '🌍', '🌡️', '🧊',
+  '🎯', '🎮', '🎲', '🃏', '🏀', '⚽', '🎹', '🎧', '🎬', '🎨',
+  '📚', '🏫', '🎓', '💡', '🔍', '⭐', '🔥', '💎', '🏆', '🧩',
+];
+
+let courseModal = null;
+let coIconPicker = null;
+
+function openCourseOptions(file) {
+  const c = allCoursesMap.get(file);
+  if (!c) return;
+  const slug = String(file || '').replace(/\.[a-z0-9]+$/i, '').toLowerCase();
+  const coverTs = customCovers[slug];
+  const coverURL = coverTs
+    ? `/api/cover?slug=${encodeURIComponent(slug)}&v=${coverTs}`
+    : `/assets/covers/${slug}.webp?v=${COVER_ASSET_VERSION}`;
+  const cat = c.category || 'learn';
+
+  if (!courseModal) {
+    courseModal = document.createElement('div');
+    courseModal.className = 'modal-overlay';
+    courseModal.id = 'course-options';
+    document.body.appendChild(courseModal);
+    courseModal.addEventListener('click', (e) => {
+      if (e.target === courseModal) closeCourseOptions();
+    });
+  }
+
+  courseModal.innerHTML = `
+    <div class="modal co-modal" role="dialog" aria-modal="true" aria-label="课程选项">
+      <h3>课程选项</h3>
+
+      <label class="field">
+        <span>课程名称</span>
+        <input type="text" id="co-title" maxlength="80" autocomplete="off">
+      </label>
+
+      <label class="field">
+        <span>简介</span>
+        <textarea id="co-desc" rows="2" maxlength="160" placeholder="鼠标移到卡片上才会显示"></textarea>
+      </label>
+
+      <div class="field">
+        <span>分类</span>
+        <div class="seg" role="group" aria-label="课程分类">
+          <button type="button" class="seg-btn${cat === 'learn' ? ' active' : ''}" data-co-cat="learn">Learn</button>
+          <button type="button" class="seg-btn${cat === 'explore' ? ' active' : ''}" data-co-cat="explore">Explore</button>
+          <button type="button" class="seg-btn${cat === 'play' ? ' active' : ''}" data-co-cat="play">Play</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span>封面</span>
+        <div class="co-cover">
+          <img id="co-cover-img" src="${escapeAttr(coverURL)}" alt="" onerror="this.classList.add('noimg')">
+          <div class="co-cover-acts">
+            <button type="button" class="btn-soft" id="co-cover-pick">更换封面</button>
+            <button type="button" class="btn-soft co-reset" id="co-cover-reset"${coverTs ? '' : ' disabled'}>恢复默认</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <span>图标</span>
+        <div class="co-icon-row">
+          <span class="co-icon-now" id="co-icon-now"></span>
+          <button type="button" class="btn-soft" id="co-icon-upload">上传图片</button>
+          <button type="button" class="btn-soft co-reset" id="co-icon-reset">恢复默认</button>
+        </div>
+        <div class="co-emoji" id="co-emoji" role="listbox" aria-label="选择图标">
+          ${EMOJI_PRESETS.map((x) => `<button type="button" class="co-em" data-em="${escapeAttr(x)}">${escapeHTML(x)}</button>`).join('')}
+        </div>
+      </div>
+
+      <div class="modal-actions co-actions">
+        <button type="button" class="btn-danger" id="co-delete">删除课程</button>
+        <span class="co-spacer"></span>
+        <button type="button" class="btn-ghost" id="co-cancel">取消</button>
+        <button type="button" class="btn-primary" id="co-save">保存</button>
+      </div>
+    </div>`;
+
+  const $ = (id) => courseModal.querySelector('#' + id);
+  // 输入框里放「当前生效值」；清空并保存＝清掉覆盖、回到原始值
+  $('co-title').value = c.title || '';
+  $('co-desc').value = c.description || '';
+
+  let pendingIcon = c.icon || '📄';
+  let pendingCat = cat;
+  function paintIcon() {
+    const el = $('co-icon-now');
+    if (isIconImage(pendingIcon)) {
+      el.innerHTML = `<img src="${escapeAttr(pendingIcon)}" alt="">`;
+    } else {
+      el.textContent = pendingIcon;
+    }
+    courseModal.querySelectorAll('.co-em').forEach((b) => {
+      b.classList.toggle('on', b.dataset.em === pendingIcon);
+    });
+  }
+  paintIcon();
+
+  courseModal.querySelectorAll('[data-co-cat]').forEach((b) => {
+    b.addEventListener('click', () => {
+      pendingCat = b.dataset.coCat;
+      courseModal.querySelectorAll('[data-co-cat]').forEach((x) => x.classList.toggle('active', x === b));
+    });
+  });
+  courseModal.querySelectorAll('.co-em').forEach((b) => {
+    b.addEventListener('click', () => { pendingIcon = b.dataset.em; paintIcon(); });
+  });
+
+  $('co-cover-pick').addEventListener('click', () => {
+    pickCover(slug, $('co-cover-img'), null, (ts) => {
+      $('co-cover-reset').disabled = false;
+      $('co-cover-img').classList.remove('noimg');
+    });
+  });
+  $('co-cover-reset').addEventListener('click', async () => {
+    if (!confirm('恢复这张卡片的默认封面？')) return;
+    try {
+      const res = await fetch(`/api/cover?slug=${encodeURIComponent(slug)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error();
+      delete customCovers[slug];
+      $('co-cover-img').src = `/assets/covers/${slug}.webp?v=${COVER_ASSET_VERSION}`;
+      $('co-cover-reset').disabled = true;
+    } catch { alert('恢复默认失败，请重试'); }
+  });
+
+  // 自定义图标复用封面那张表，slug 加 icon- 前缀，不用另开存储
+  $('co-icon-upload').addEventListener('click', () => {
+    if (!coIconPicker) {
+      coIconPicker = document.createElement('input');
+      coIconPicker.type = 'file';
+      coIconPicker.accept = 'image/*';
+      coIconPicker.style.display = 'none';
+      document.body.appendChild(coIconPicker);
+    }
+    coIconPicker.value = '';
+    coIconPicker.onchange = async () => {
+      const f = coIconPicker.files && coIconPicker.files[0];
+      if (!f) return;
+      try {
+        const blob = await shrinkIcon(f);
+        const iconSlug = 'icon-' + slug;
+        const res = await fetch(`/api/cover?slug=${encodeURIComponent(iconSlug)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': blob.type || 'image/webp' },
+          body: blob,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || '上传失败');
+        pendingIcon = `/api/cover?slug=${encodeURIComponent(iconSlug)}&v=${data.updated_at}`;
+        paintIcon();
+      } catch (err) { alert('上传图标失败：' + (err.message || err)); }
+    };
+    coIconPicker.click();
+  });
+  $('co-icon-reset').addEventListener('click', () => { pendingIcon = ''; paintIcon(); });
+
+  $('co-cancel').addEventListener('click', closeCourseOptions);
+  $('co-save').addEventListener('click', async () => {
+    const btn = $('co-save');
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/course-meta', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          file,
+          title: $('co-title').value,
+          description: $('co-desc').value,
+          icon: pendingIcon,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || '保存失败');
+      if (pendingCat !== cat) recategorize(file, pendingCat);
+      closeCourseOptions();
+      await loadAndRender();
+    } catch (err) {
+      alert('保存失败：' + (err.message || err));
+      btn.disabled = false;
+    }
+  });
+
+  $('co-delete').addEventListener('click', async () => {
+    if (!confirm('删除这个课程？将一并清除它的阅读进度与书签，且不可恢复。')) return;
+    try {
+      const res = await fetch('/api/courses', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file }),
+      });
+      if (!res.ok) throw new Error();
+      closeCourseOptions();
+      await loadAndRender();
+    } catch { alert('删除失败，请重试'); }
+  });
+
+  courseModal.hidden = false;
+  courseModal.classList.add('open');
+  if (window.NBGooey) NBGooey.enhanceAll(courseModal);
+  setTimeout(() => $('co-title').focus(), 30);
+  document.addEventListener('keydown', escCourseOptions);
+}
+
+// ========== 登录日志 ==========
+// 三级都能看：管理员看全部身份，一二级只看自己那一级（后端过滤，见 api/logins.js）。
+// 只有大致城市，没有 IP —— 登录时压根没记 IP。
+let loginsModal = null;
+function fmtWhen(ts) {
+  const d = new Date(ts);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+async function openLogins() {
+  if (!loginsModal) {
+    loginsModal = document.createElement('div');
+    loginsModal.className = 'modal-overlay';
+    loginsModal.id = 'logins-modal';
+    document.body.appendChild(loginsModal);
+    loginsModal.addEventListener('click', (e) => { if (e.target === loginsModal) closeLogins(); });
+  }
+  loginsModal.innerHTML = `<div class="modal lg-modal" role="dialog" aria-modal="true" aria-label="登录日志">
+    <h3>登录日志</h3><p class="lg-loading">正在读取…</p></div>`;
+  loginsModal.hidden = false;
+  document.addEventListener('keydown', escLogins);
+
+  let data;
+  try {
+    const res = await fetch('/api/logins?limit=60', { headers: { Accept: 'application/json' } });
+    data = res.ok ? await res.json() : null;
+  } catch { data = null; }
+
+  const box = loginsModal.querySelector('.lg-modal');
+  if (!data) {
+    box.innerHTML = `<h3>登录日志</h3><p class="lg-loading">读取失败，请稍后重试。</p>
+      <div class="modal-actions co-actions"><span class="co-spacer"></span>
+      <button type="button" class="btn-ghost" data-lg-close>关闭</button></div>`;
+  } else {
+    const rows = data.items.map((it) => `<tr>
+        <td><span class="lg-role lg-${escapeAttr(it.role)}">${escapeHTML(it.roleName)}</span></td>
+        <td>${escapeHTML(it.device)}</td>
+        <td>${escapeHTML(it.place)}</td>
+        <td class="lg-when">${escapeHTML(fmtWhen(it.at))}</td>
+      </tr>`).join('');
+    box.innerHTML = `<h3>登录日志</h3>
+      <p class="lg-scope">${data.scope === 'all' ? '管理员视角：显示全部身份的登录记录' : '只显示你这一级身份的登录记录'} · 仅记录大致城市，不记录 IP</p>
+      <div class="lg-wrap">
+        <table class="lg-table">
+          <thead><tr><th>身份</th><th>设备</th><th>位置</th><th>时间</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="4" class="lg-empty">还没有记录</td></tr>'}</tbody>
+        </table>
+      </div>
+      <div class="modal-actions co-actions"><span class="co-spacer"></span>
+        <button type="button" class="btn-ghost" data-lg-close>关闭</button></div>`;
+  }
+  box.querySelectorAll('[data-lg-close]').forEach((b) => b.addEventListener('click', closeLogins));
+}
+function escLogins(e) { if (e.key === 'Escape') closeLogins(); }
+function closeLogins() {
+  if (!loginsModal) return;
+  loginsModal.hidden = true;
+  document.removeEventListener('keydown', escLogins);
+}
+const loginsBtn = document.getElementById('logins-btn');
+if (loginsBtn) loginsBtn.addEventListener('click', openLogins);
+
+function escCourseOptions(e) { if (e.key === 'Escape') closeCourseOptions(); }
+function closeCourseOptions() {
+  if (!courseModal) return;
+  courseModal.classList.remove('open');
+  courseModal.hidden = true;
+  document.removeEventListener('keydown', escCourseOptions);
+}
 
 // ========== 课程排序（拖拽，鼠标 + 触屏） ==========
 // 顺序按 file 持久化到 /api/order；未在已存顺序中的（如新建课程）排在最前。
@@ -1079,14 +1356,10 @@ function cardHTML(c, deletable = false) {
   // link 卡（如「云盘」）是固定入口，不提供删除/编辑，避免误隐藏
   const isLinkCard = !!c.link;
 
-  // 删除/编辑/拖动排序均为管理操作：游客（isAdmin=false）一律不渲染这些控件
-  const delBtn = (deletable && isAdmin && !isLinkCard)
-    ? `<button class="nb-del" data-file="${escapeAttr(c.file)}" title="删除课程" aria-label="删除课程">${ic('close', 16)}</button>`
-    : '';
-
-  // 站内创建/上传的 Markdown 课程可直接进编辑器改
-  const editBtn = (deletable && isAdmin && c.dynamic && c.kind === 'md')
-    ? `<button class="nb-edit" data-file="${escapeAttr(c.file)}" title="编辑笔记" aria-label="编辑笔记">${ic('edit', 15)}</button>`
+  // 管理操作统一收进「更多选项」弹窗（重命名/简介/封面/图标/删除），
+  // 卡片上只留两个手柄：更多 + 拖动。游客（isAdmin=false）两个都不渲染。
+  const moreBtn = (deletable && isAdmin)
+    ? `<button type="button" class="nb-more" data-file="${escapeAttr(c.file)}" title="更多选项" aria-label="更多选项">${ic('list', 15)}</button>`
     : '';
 
   // 主网格（deletable=true）的卡片可拖动排序；游客不可
@@ -1094,9 +1367,9 @@ function cardHTML(c, deletable = false) {
     ? `<button type="button" class="nb-drag" title="拖动排序" aria-label="拖动排序">${ic('drag', 16)}</button>`
     : '';
 
-  // 图标：支持图片（.svg/.png 等，如三国杀课程）或 emoji
+  // 图标：支持图片（站内地址或 .svg/.png 等，如三国杀课程）或 emoji
   const iconStr = c.icon || '📄';
-  const iconHTML = /\.(svg|png|jpe?g|webp)$/i.test(iconStr)
+  const iconHTML = isIconImage(iconStr)
     ? `<img class="nb-card-icon" src="${escapeAttr(iconStr)}" alt="" style="width:38px;height:38px;object-fit:contain;border-radius:9px">`
     : `<span class="nb-card-icon">${escapeHTML(iconStr)}</span>`;
 
@@ -1111,10 +1384,8 @@ function cardHTML(c, deletable = false) {
   const coverURL = coverTs
     ? `/api/cover?slug=${encodeURIComponent(coverSlug.toLowerCase())}&v=${coverTs}`
     : `/assets/covers/${escapeAttr(coverSlug)}.webp?v=${COVER_ASSET_VERSION}`;
-  const coverBtn = isAdmin
-    ? `<button type="button" class="nb-cover" data-slug="${escapeAttr(coverSlug)}"${coverTs ? ' data-custom="1"' : ''} title="更换封面（右键恢复默认）" aria-label="更换封面">${ic('image', 15)}</button>`
-    : '';
-  const coverBlock = `<div class="nb-card-cover" aria-hidden="true"><img src="${escapeAttr(coverURL)}" alt="" loading="lazy" onerror="this.parentElement.classList.add('noimg')"></div>${coverBtn}`;
+  // 换封面也搬进了「更多选项」弹窗，卡片角上不再单独放按钮
+  const coverBlock = `<div class="nb-card-cover" aria-hidden="true"><img src="${escapeAttr(coverURL)}" alt="" loading="lazy" onerror="this.parentElement.classList.add('noimg')"></div>`;
 
   return `
     <a class="nb-card" href="${escapeAttr(href)}"
@@ -1123,7 +1394,7 @@ function cardHTML(c, deletable = false) {
        data-category="${escapeAttr(c.category || 'learn')}"
        data-search="${escapeAttr(searchText)}">
       ${coverBlock}
-      ${dragHandle}${delBtn}${editBtn}
+      ${moreBtn}${dragHandle}
       ${iconHTML}
       <div class="nb-card-body">
         <span class="nb-card-subject">${escapeHTML(c.subject || '笔记')}</span>
@@ -1133,6 +1404,12 @@ function cardHTML(c, deletable = false) {
       </div>
     </a>
   `;
+}
+
+// 图标可能是 emoji，也可能是图片：站内路径（/assets/... 或 /api/cover?...）都算图片
+function isIconImage(s) {
+  const v = String(s || '');
+  return v.startsWith('/') || /\.(svg|png|jpe?g|webp|gif)$/i.test(v);
 }
 
 // 简介的折叠文字：中文逐字折、拉丁按词折（按字母切会把单词拆散、读不出来）。
