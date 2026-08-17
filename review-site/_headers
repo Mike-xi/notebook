@@ -12,6 +12,12 @@
 /dc/*
   Cache-Control: public, max-age=0, must-revalidate
 
+# 策联杯三维海图 /heli：页面与脚本每次校验；plan.json 内容固定，可长缓存
+/heli/*
+  Cache-Control: public, max-age=0, must-revalidate
+/heli/data/*
+  Cache-Control: public, max-age=86400
+
 # Explore 实时应用：HTML 与功能脚本迭代频繁，每次进入都校验最新版
 /glance
   Cache-Control: private, max-age=0, must-revalidate

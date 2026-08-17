@@ -30,6 +30,8 @@ export async function onRequest(context) {
   if ((path === '/reader.html' || path === '/reader') && url.searchParams.has('share')) return next();
   // 大创综合演示 /dc：纯静态展示页（含 Python 算法源码），公开给团队/评审直接访问。
   if (path === '/dc' || path.startsWith('/dc/')) return next();
+  // 策联杯 B 题问题三三维海图 /heli：纯静态展示页，公开给队友/评审直接访问。
+  if (path === '/heli' || path.startsWith('/heli/')) return next();
   // 私人云盘 WebDAV：/dav 由其函数自行做 Basic/管理员鉴权（外部客户端无法走登录页 Cookie 流程）。
   if (path === '/dav' || path.startsWith('/dav/')) return next();
   // 公共云盘 Agent API：由其函数用 X-API-Key 自鉴权（脚本/agent 无登录 Cookie）。

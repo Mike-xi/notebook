@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#04070e">
+<title>海上油田直升机运载编排 · 三维实时海图</title>
+<meta name="description" content="2026 策联杯 B 题问题三最终方案的三维可视化：7 天 171 架次 4000 人，按周一到周日 1:1 实时推演。">
+<link rel="icon" href="/assets/favicon-xi.png">
+<link rel="stylesheet" href="/heli/assets/heli.css?v=1">
+</head>
+<body>
+
+<!-- 载入 -->
+<div id="boot">
+  <div class="boot-in">
+    <div class="boot-ring"><i>🚁</i></div>
+    <h1>海上油田直升机运载编排</h1>
+    <p>2026「策联杯」数学建模精英联赛 B 题 · 问题三最终方案<br>3 座机场 · 52 座海上设施 · 24 架直升机 · 一周 4000 人</p>
+    <div id="boot-pct">正在装载调度数据…</div>
+  </div>
+</div>
+
+<!-- 三维舞台 -->
+<div id="stage"><canvas id="cv"></canvas></div>
+<div class="vignette"></div>
+
+<!-- 顶栏 -->
+<div id="topbar">
+  <div class="brand glass">
+    <div class="brand-mark">🚁</div>
+    <div>
+      <h1>OFFSHORE OPS · 海上运载调度</h1>
+      <p><a href="/" title="返回 Xi Notebook">← Xi Notebook</a> · 策联杯 B 题问题三</p>
+    </div>
+  </div>
+  <div class="top-right">
+    <div class="stat-strip glass" id="statstrip"></div>
+    <div id="clockbox" class="glass">
+      <div>
+        <div class="day" id="c-day">周一 08/03</div>
+        <div class="tm" id="c-time">06:00<small id="c-sec">:00</small></div>
+      </div>
+      <div class="live-badge" id="c-live"><span class="live-dot"></span><span id="c-livetxt">LIVE</span></div>
+    </div>
+    <button class="btn ghost" id="btn-help" title="玩法说明">?</button>
+  </div>
+</div>
+
+<!-- 左栏 -->
+<div id="left">
+  <div class="card glass">
+    <h3>图层 <em id="l-scale"></em></h3>
+    <div class="toggles">
+      <button class="tg on" data-layer="routes">航路</button>
+      <button class="tg on" data-layer="labels">标注</button>
+      <button class="tg on" data-layer="weather">云</button>
+      <button class="tg on" data-layer="ships">补给船</button>
+      <button class="tg" id="tg-sound">音效</button>
+    </div>
+    <div class="sep"></div>
+    <div class="toggles">
+      <button class="tg" id="v-home">总览</button>
+      <button class="tg" id="v-top">俯视</button>
+      <button class="tg" id="v-a01">A01</button>
+      <button class="tg" id="v-a02">A02</button>
+      <button class="tg" id="v-a03">A03</button>
+    </div>
+  </div>
+
+  <div class="card glass" id="airlist">
+    <h3>当前在空 <em id="l-count">0</em></h3>
+    <div id="airlist-body"></div>
+  </div>
+</div>
+
+<!-- 右栏检视器 -->
+<div id="right">
+  <div class="card glass">
+    <div class="insp-head">
+      <button class="close" id="insp-close">×</button>
+      <div class="insp-kicker" id="insp-kicker">—</div>
+      <h2 id="insp-title">—</h2>
+      <div class="sub" id="insp-sub"></div>
+    </div>
+    <div class="insp-body" id="insp-body"></div>
+    <div class="insp-foot" id="insp-foot"></div>
+  </div>
+</div>
+
+<!-- 时间轴 -->
+<div id="timebar" class="glass">
+  <div class="tb-top">
+    <button class="btn" id="btn-live">回到实时</button>
+    <button class="btn" id="btn-play">⏸ 暂停</button>
+    <div class="speeds" id="speeds">
+      <button class="btn on" data-rate="1">1×</button>
+      <button class="btn" data-rate="10">10×</button>
+      <button class="btn" data-rate="60">60×</button>
+      <button class="btn" data-rate="240">240×</button>
+    </div>
+    <div class="tb-spacer"></div>
+    <div class="mono dim" id="tb-info" style="font-size:12px"></div>
+  </div>
+  <div id="track"><canvas id="trackcv"></canvas><div id="playhead"></div></div>
+  <div class="daylabels" id="daylabels"></div>
+</div>
+
+<div id="hint" class="glass"><span id="hint-txt"></span><button class="btn sm" id="hint-btn">跳到下一班</button></div>
+<div id="tip"></div>
+
+<!-- 说明 -->
+<div class="overlay" id="help">
+  <div class="sheet glass">
+    <h2>这是什么</h2>
+    <p>2026 年「策联杯」数学建模精英联赛 <b>B 题（海上油田人员直升机运载计划编排）</b>的<b>问题三最终提交方案</b>，被逐架次、逐时刻还原成了一张会走时的三维海图。
+       图上每一架直升机的位置、每一次停靠、每一位乘客坐哪一班，都直接来自提交的 <span class="mono">q3-routes.csv</span> 与 <span class="mono">q3-assignments.csv</span>，没有任何演示用的假数据。</p>
+
+    <h4>时间是 1:1 走的</h4>
+    <p>方案覆盖 2026-08-03（周一）到 08-09（周日）整整七天，正好是一个完整星期。页面默认把<b>现实中的星期几与时刻</b>直接映射到计划里的同一时刻——现在是周三 15:20，你看到的就是计划第三天 15:20 那一刻天上的飞机。
+       想快进就调倍速，想回看就拖时间轴，随时可以按「回到实时」跳回来。每天 06:00 才允许起飞、18:00 前必须最后一次起飞、20:00 前全部归场，所以夜里是安静的。</p>
+
+    <h4>怎么玩</h4>
+    <ul>
+      <li><b>拖动</b>旋转视角，<b>滚轮</b>缩放，<b>右键拖动</b>或 <kbd>Shift</kbd>+拖动平移</li>
+      <li><b>点机场</b>（A01/A02/A03）→ 进入该机场的<b>候机厅</b>：航班牌、机位、乘客名册全都在</li>
+      <li><b>点海上平台</b> → 看它这一天的起降记录与人员进出</li>
+      <li><b>点飞机</b>或左栏航班 → 跟机视角、航路高亮、机上乘客明细</li>
+      <li><kbd>空格</kbd> 暂停 / 继续　<kbd>L</kbd> 回到实时　<kbd>H</kbd> 总览　<kbd>1..7</kbd> 跳到某一天</li>
+    </ul>
+
+    <h4>方案本身</h4>
+    <table>
+      <tr><th>指标</th><th>数值</th><th>说明</th></tr>
+      <tr><td>总飞机使用时间 T</td><td class="n" id="h-T"></td><td>题目的主要考核目标</td></tr>
+      <tr><td>总架次数 N</td><td class="n" id="h-N"></td><td>七天合计</td></tr>
+      <tr><td>人员总在途时间 P</td><td class="n" id="h-P"></td><td>第二层目标</td></tr>
+      <tr><td>座位利用率 U</td><td class="n" id="h-U"></td><td>按客座公里计</td></tr>
+      <tr><td>总燃油</td><td class="n" id="h-F"></td><td>kg</td></tr>
+      <tr><td>下界 / 最优性间隙</td><td class="n" id="h-G"></td><td>完整模型 + 割阶梯法证得</td></tr>
+    </table>
+    <p style="margin-top:12px" class="dim">解法是「先造架次、再挑架次」两层分解：穷举停靠顺序/机型/机场/加油方案生成候选架次池，再用 COPT 解带时刻的集合覆盖，最后用大邻域搜索与三个可穷举的窄邻域（架次合并 / 乘客组重定位 / 局部改线）收尾。
+       平面坐标由题目的距离矩阵做 MDS 还原，平均相对误差 0.5%；三座机场的中文名与海岸线形状是为观感所加，题目本身只给编号。</p>
+    <div style="margin-top:18px;text-align:right"><button class="btn big" id="help-close">开始</button></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>if(typeof THREE==='undefined')document.write('<scr'+'ipt src="https://unpkg.com/three@0.160.0/build/three.min.js"><\/scr'+'ipt>');</script>
+<script src="/heli/assets/core.js?v=1"></script>
+<script src="/heli/assets/world.js?v=1"></script>
+<script src="/heli/assets/hud.js?v=1"></script>
+</body>
+</html>
