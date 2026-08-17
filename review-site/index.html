@@ -8,13 +8,13 @@
     // 首屏前定主题，避免浅/深闪烁；完整逻辑在 theme.js
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
     // 背景也先从本机缓存恢复；登录后 theme.js 会用当前密码用户的云端偏好校准。
-    (function(){try{var b=localStorage.getItem('nb-background')||'none';var a=['none','aurora','balatro'];document.documentElement.dataset.bg=a.includes(b)?b:'none';}catch(e){document.documentElement.dataset.bg='none';}})();
+    (function(){try{var b=localStorage.getItem('nb-background')||'none';if(b==='balatro')b='silk';var a=['none','mesh','aurora','silk','nebula'];var ok=a.indexOf(b)>=0||/^custom:[a-z0-9-]{1,40}$/.test(b);document.documentElement.dataset.bg=ok?b:'none';}catch(e){document.documentElement.dataset.bg='none';}})();
     // 界面风格（高级/经典）同样首屏前定，避免 Dock/经典顶栏互闪；完整逻辑在 premium.js
     (function(){try{var u=localStorage.getItem('nb-ui-level');document.documentElement.dataset.ui=(u==='classic')?'classic':'premium';}catch(e){document.documentElement.dataset.ui='premium';}})();
   </script>
   <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613d">
-  <link rel="stylesheet" href="/assets/style.css?v=20260719e">
-  <link rel="stylesheet" href="/assets/premium.css?v=20260719b">
+  <link rel="stylesheet" href="/assets/style.css?v=20260817a">
+  <link rel="stylesheet" href="/assets/premium.css?v=20260817a">
 </head>
 <body class="home">
   <header class="topbar">
@@ -50,6 +50,11 @@
           <span class="ic" data-icon="gear" data-icon-size="20"></span>
         </button>
         <div class="settings-menu" id="settings-menu" hidden role="menu">
+          <!-- 身份卡：一级访客 / 二级好友 / 三级管理员，由 /api/me 决定 -->
+          <div class="idcard" id="idcard" data-role="guest">
+            <span class="idcard-avatar" id="id-avatar" aria-hidden="true">🙂</span>
+            <b class="idcard-name" id="id-name">访客</b>
+          </div>
           <div class="sm-section">
             <span class="sm-label">界面风格</span>
             <div class="seg" role="group" aria-label="界面风格">
@@ -66,12 +71,11 @@
             </div>
           </div>
           <div class="sm-section">
-            <span class="sm-label">动态背景</span>
-            <div class="bg-picker" role="group" aria-label="动态背景">
-              <button class="bg-choice" data-bg-set="none" aria-pressed="false" type="button"><span class="bg-thumb bg-thumb-none"></span><span>纯色</span></button>
-              <button class="bg-choice" data-bg-set="aurora" aria-pressed="false" type="button"><span class="bg-thumb bg-thumb-aurora"></span><span>Aurora</span></button>
-              <button class="bg-choice" data-bg-set="balatro" aria-pressed="false" type="button"><span class="bg-thumb bg-thumb-balatro"></span><span>Balatro</span></button>
-            </div>
+            <span class="sm-label">页面背景 <em class="sm-count" id="bg-count"></em></span>
+            <!-- 手风琴：悬停展开一格看大图，点选生效。面板由 appearance.js 渲染 -->
+            <div class="bg-accordion" id="bg-accordion" role="listbox" aria-label="页面背景"></div>
+            <p class="sm-hint" id="bg-hint">5 张内置 + 最多 3 张自选，点 ＋ 传自己的图</p>
+            <input type="file" id="bg-file" accept="image/png,image/jpeg,image/webp,image/avif" hidden>
           </div>
           <div class="sm-section">
             <span class="sm-label">阅读器工具栏唤出</span>
@@ -240,10 +244,11 @@
   </div>
 
   <script src="/assets/icons.js?v=20260616a"></script>
-  <script src="/assets/theme.js?v=20260719d"></script>
-  <script src="/assets/backgrounds.js?v=20260719d"></script>
+  <script src="/assets/theme.js?v=20260817a"></script>
+  <script src="/assets/backgrounds.js?v=20260817a"></script>
+  <script src="/assets/appearance.js?v=20260817a"></script>
   <script src="/assets/md.js?v=20260608d"></script>
-  <script src="/assets/app.js?v=20260719c"></script>
-  <script src="/assets/premium.js?v=20260719b"></script>
+  <script src="/assets/app.js?v=20260817a"></script>
+  <script src="/assets/premium.js?v=20260817a"></script>
 </body>
 </html>

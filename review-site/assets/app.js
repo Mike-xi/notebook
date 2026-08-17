@@ -55,6 +55,9 @@ async function loadAndRender() {
     hidden = (od && od.hidden) || [];
     categoryOverrides = (od && od.categories) || {};
     isAdmin = (me && me.role) === 'admin';
+    // 身份广播给设置面板的身份卡（appearance.js）。role: guest / friend / admin
+    window.NBMe = me || { role: 'guest', level: 1, name: '访客' };
+    window.dispatchEvent(new CustomEvent('nb-me', { detail: window.NBMe }));
     applyRoleUI();
   } catch (e) {
     console.warn('[home] load failed', e);
@@ -1125,11 +1128,24 @@ function cardHTML(c, deletable = false) {
       <div class="nb-card-body">
         <span class="nb-card-subject">${escapeHTML(c.subject || '笔记')}</span>
         <h3 class="nb-card-title">${escapeHTML(c.title)}</h3>
-        <p class="nb-card-meta">${escapeHTML(c.description || '')}</p>
+        <p class="nb-card-meta">${foldHTML(c.description || '')}</p>
         ${progressBlock}
       </div>
     </a>
   `;
+}
+
+// 简介的折叠文字：中文逐字折、拉丁按词折（按字母切会把单词拆散、读不出来）。
+// 每片带 --i 序号，CSS 用它算 transition-delay，做出逐个翻下来的效果。
+function foldHTML(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return '';
+  const parts = raw.match(/[A-Za-z0-9][A-Za-z0-9@._#/+-]*|\s+|[\s\S]/g) || [];
+  let i = 0;
+  return parts.map((p) => {
+    if (/^\s+$/.test(p)) return '<span class="fw"> </span>';
+    return `<span class="fc" style="--i:${i++}">${escapeHTML(p)}</span>`;
+  }).join('');
 }
 
 function escapeHTML(s) {

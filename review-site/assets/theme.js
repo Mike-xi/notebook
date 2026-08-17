@@ -4,7 +4,13 @@
   const BG_KEY = 'nb-background';
   const PREF_KEY = 'appearance:home';
   const THEME_ORDER = ['auto', 'light', 'dark'];
-  const BG_ORDER = ['none', 'aurora', 'balatro'];
+  // 内置 5 套；另外允许 custom:<id> 形式的自定义图片背景（最多 3 张，见 api/background.js）
+  const BG_BUILTIN = ['none', 'mesh', 'aurora', 'silk', 'nebula'];
+  // 老配置迁移：balatro 已下线，就近映射到 silk，用户的选择不会莫名其妙被清掉
+  const BG_ALIAS = { balatro: 'silk', plain: 'none' };
+  const isCustomBg = (v) => typeof v === 'string' && /^custom:[a-z0-9-]{1,40}$/.test(v);
+  const validBg = (v) => BG_BUILTIN.includes(v) || isCustomBg(v);
+  const normBg = (v) => (BG_ALIAS[v] || v);
   const ICON = { auto: '🌗', light: '☀️', dark: '🌙' };
   const LABEL = {
     auto: '主题：跟随系统（点击切到浅色）',
@@ -21,8 +27,8 @@
   }
 
   function backgroundPref() {
-    const value = localStorage.getItem(BG_KEY);
-    if (BG_ORDER.includes(value)) return value;
+    const value = normBg(localStorage.getItem(BG_KEY));
+    if (validBg(value)) return value;
     localStorage.setItem(BG_KEY, 'none');
     return 'none';
   }
@@ -105,7 +111,8 @@
   }
 
   function setBackground(pref, userAction = true) {
-    if (!BG_ORDER.includes(pref)) return;
+    pref = normBg(pref);
+    if (!validBg(pref)) return;
     localStorage.setItem(BG_KEY, pref);
     if (userAction) dirty = true;
     applyBackground(pref);
@@ -134,7 +141,7 @@
         return;
       }
       if (THEME_ORDER.includes(remote.theme)) setTheme(remote.theme, false);
-      if (BG_ORDER.includes(remote.background)) {
+      if (validBg(normBg(remote.background))) {
         setBackground(remote.background, false);
       } else {
         setBackground('none', false);
@@ -181,6 +188,9 @@
   window.addEventListener('load', hydrate, { once: true });
 
   window.NBTheme = {
+    BUILTIN_BG: BG_BUILTIN,
+    isCustomBg,
+    validBg,
     get effective() { return effective(themePref()); },
     get pref() { return themePref(); },
     get background() { return backgroundPref(); },

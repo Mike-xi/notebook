@@ -1,4 +1,7 @@
-// 英汉词典：单词本（收藏）+ 查词历史，云端同步。owner=角色（admin/guest），各自独立一份。
+// 英汉词典：单词本（收藏）+ 查词历史，云端同步。owner 只有 admin / guest 两个值：
+// 三级独立一份，一二级（guest / friend）共用一份。
+// 注意 owner 不能直接用 role：身份扩到三级后二级返回 'friend'，直接当 owner 会让
+// 二级密码原先存在 owner='guest' 下的单词本整个消失。ownerOf() 负责把它折回去。
 // GET  /api/wordbook                         -> { favorites:[{word,p,t,created_at}], history:[{word,created_at}] }
 // POST /api/wordbook { action:'fav',   word, p, t }  -> { ok, favorited:true }   收藏
 // POST /api/wordbook { action:'unfav', word }        -> { ok, favorited:false }  取消收藏
@@ -8,12 +11,15 @@
 import { ensureDictSchema, pruneDictHistory } from '../_lib/db.js';
 import { getRole } from '../_lib/auth.js';
 
+const ownerOf = async (request, env) =>
+  ((await getRole(request, env)) === 'admin' ? 'admin' : 'guest');
+
 const str = (v) => (typeof v === 'string' ? v : v == null ? '' : String(v)).trim();
 const cleanWord = (s) => str(s).replace(/[\x00-\x1f\x7f]/g, '').slice(0, 80);
 
 export async function onRequestGet({ request, env }) {
   await ensureDictSchema(env);
-  const owner = (await getRole(request, env)) || 'guest';
+  const owner = await ownerOf(request, env);
   const fav = (await env.DB.prepare(
     'SELECT word, p, t, created_at FROM dict_favorites WHERE owner = ? ORDER BY created_at DESC LIMIT 1000'
   ).bind(owner).all()).results || [];
@@ -25,7 +31,7 @@ export async function onRequestGet({ request, env }) {
 
 export async function onRequestPost({ request, env }) {
   await ensureDictSchema(env);
-  const owner = (await getRole(request, env)) || 'guest';
+  const owner = await ownerOf(request, env);
 
   let b;
   try { b = await request.json(); } catch { return Response.json({ error: '请求格式错误' }, { status: 400 }); }

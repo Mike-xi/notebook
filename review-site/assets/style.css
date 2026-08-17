@@ -406,6 +406,54 @@ main {
   overflow: hidden;
 }
 
+/* ---- 简介的折叠文字（仅课程网格里的卡片）----
+   平时简介是折起来的：字还占着位置，所以网格不会因为悬停而跳动，
+   但看不见，卡片就清爽。鼠标移上去才一片片翻下来，移开再折回去。 */
+.card-grid .nb-card-meta {
+  position: relative;
+  perspective: 320px;
+}
+.card-grid .nb-card-meta .fc {
+  display: inline-block;
+  transform-origin: 50% 0;
+  transform: rotateX(-96deg);
+  opacity: 0;
+  will-change: transform;
+  transition: transform 300ms cubic-bezier(.22, .78, .28, 1), opacity 180ms ease;
+}
+.card-grid .nb-card-meta .fw { display: inline-block; width: .3em; }
+.card-grid .nb-card:hover .nb-card-meta .fc,
+.card-grid .nb-card:focus-within .nb-card-meta .fc {
+  transform: none;
+  opacity: 1;
+  /* 只在展开时排队，折回去是齐刷刷一下，不拖泥带水 */
+  transition-delay: calc(var(--i, 0) * 13ms);
+}
+/* 折起来时留一小截色条占位，看着像是有意留白而不是漏排版 */
+.card-grid .nb-card-meta::before {
+  content: '';
+  position: absolute;
+  left: 0; top: .5em;
+  width: 24px; height: 3px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent, var(--primary)) 46%, transparent);
+  transition: opacity 160ms ease, transform 240ms ease;
+}
+.card-grid .nb-card:hover .nb-card-meta::before,
+.card-grid .nb-card:focus-within .nb-card-meta::before {
+  opacity: 0;
+  transform: translateX(-8px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-grid .nb-card-meta .fc { transform: none; opacity: 1; transition: none; }
+  .card-grid .nb-card-meta::before { display: none; }
+}
+/* 触屏没法悬停，直接把简介显示出来 */
+@media (hover: none) {
+  .card-grid .nb-card-meta .fc { transform: none; opacity: 1; }
+  .card-grid .nb-card-meta::before { display: none; }
+}
+
 .nb-progress {
   display: flex;
   align-items: center;
@@ -2393,79 +2441,253 @@ body.home > main { position: relative; z-index: 1; }
 [data-theme="dark"] .nb-background-canvas { opacity: .82; filter: saturate(1.14) brightness(.92); }
 :root[data-ui="premium"][data-bg]:not([data-bg="none"]) body.home::before { opacity: .22; }
 
+/* 自定义图片背景：铺满视口，压暗一点免得盖过正文。 */
+.nb-background-image {
+  position: fixed; inset: 0; z-index: 0;
+  pointer-events: none;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  opacity: .34;
+  transition: opacity 240ms ease;
+}
+[data-theme="dark"] .nb-background-image { opacity: .30; filter: brightness(.82) saturate(1.05); }
+
 /* WebGL 不可用时仍保留对应的静态氛围，不退回一片空白。 */
+:root.nb-bg-fallback[data-bg="mesh"] body.home {
+  background-image: radial-gradient(66vw 40vh at 18% 22%, #6aa8ff5c, transparent 70%), radial-gradient(58vw 44vh at 78% 32%, #c86bff4d, transparent 72%);
+}
 :root.nb-bg-fallback[data-bg="aurora"] body.home {
-  background-image: radial-gradient(70vw 38vh at 22% 18%, #7cff6766, transparent 70%), radial-gradient(62vw 42vh at 72% 28%, #5227ff70, transparent 72%);
+  background-image: radial-gradient(70vw 38vh at 22% 18%, #58e6a866, transparent 70%), radial-gradient(62vw 42vh at 72% 28%, #4b6bff5c, transparent 72%);
 }
-:root.nb-bg-fallback[data-bg="balatro"] body.home {
-  background-image: conic-gradient(from 210deg at 54% 34%, #11131c, #7d29ff55, #0b91ff66, #11131c);
+:root.nb-bg-fallback[data-bg="silk"] body.home {
+  background-image: repeating-linear-gradient(114deg, #7c5cff2e 0 26px, transparent 26px 62px), radial-gradient(80vw 60vh at 60% 40%, #2ea8ff3d, transparent 72%);
 }
+:root.nb-bg-fallback[data-bg="nebula"] body.home {
+  background-image: radial-gradient(46vw 46vh at 30% 30%, #8b5cff5c, transparent 68%), radial-gradient(56vw 40vh at 74% 62%, #1f6bd63d, transparent 70%);
+}
+
+/* ========================================
+   设置面板：身份卡 + 背景手风琴
+   ======================================== */
 .settings-menu {
-  width: 286px;
+  width: 340px;
   max-height: calc(100vh - 92px);
   overflow: auto;
   scrollbar-width: thin;
 }
-.bg-picker {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
-}
-.bg-choice {
+
+/* ---- 身份卡：一级访客 / 二级好友 / 三级管理员 ---- */
+.idcard {
+  --idc: var(--primary);
   position: relative;
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-  padding: 5px 5px 7px;
-  border: 1px solid var(--outline-variant);
-  border-radius: 11px;
-  background: color-mix(in srgb, var(--surface-container-lowest) 76%, transparent);
-  color: var(--on-surface-variant);
-  font: 600 10px/1.1 inherit;
-  cursor: pointer;
-  transition: border-color var(--transition), color var(--transition), transform var(--transition), background-color var(--transition);
-}
-.bg-choice:hover {
-  color: var(--on-surface);
-  border-color: color-mix(in srgb, var(--primary) 48%, var(--outline-variant));
-  transform: translateY(-1px);
-}
-.bg-choice.active {
-  color: var(--primary);
-  border-color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 10%, var(--surface-container-lowest));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 24%, transparent);
-}
-.bg-choice.active::after {
-  content: '✓';
-  position: absolute;
-  top: 7px; right: 7px;
-  display: grid; place-items: center;
-  width: 14px; height: 14px;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--surface) 74%, transparent);
-  color: var(--primary);
-  font-size: 9px;
-}
-.bg-thumb {
-  display: block;
-  width: 100%; height: 31px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 2px 2px 10px;
+  padding: 9px 13px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--idc) 30%, var(--outline-variant));
+  background:
+    radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--idc) 20%, transparent), transparent 62%),
+    var(--surface-container-lowest);
   overflow: hidden;
-  border-radius: 7px;
+}
+/* 斜向高光，让卡片有一点会员卡的质感 */
+.idcard::after {
+  content: '';
+  position: absolute;
+  top: -60%; right: -20%;
+  width: 58%; height: 220%;
+  transform: rotate(18deg);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--idc) 16%, transparent), transparent);
+  pointer-events: none;
+}
+.idcard[data-role="guest"]  { --idc: #6b8cae; }
+.idcard[data-role="friend"] { --idc: #12a884; }
+.idcard[data-role="admin"]  { --idc: #b8862b; }
+[data-theme="dark"] .idcard[data-role="guest"]  { --idc: #8fb2d4; }
+[data-theme="dark"] .idcard[data-role="friend"] { --idc: #3ad3ac; }
+[data-theme="dark"] .idcard[data-role="admin"]  { --idc: #e5bd63; }
+
+.idcard-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", sans-serif;
+  font-size: 15px;
+  line-height: 1;
+  background: color-mix(in srgb, var(--idc) 18%, var(--surface-container-high));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--idc) 38%, transparent);
+}
+.idcard-name {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: color-mix(in srgb, var(--idc) 72%, var(--on-surface));
+}
+/* ---- 背景手风琴 ---- */
+.sm-count {
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: .65;
+}
+.sm-hint {
+  margin: 7px 1px 0;
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--on-surface-variant);
+  opacity: .82;
+}
+.bg-accordion {
+  display: flex;
+  gap: 5px;
+  height: 92px;
+}
+.bg-panel {
+  position: relative;
+  box-sizing: border-box;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  background: var(--surface-container-lowest);
+  overflow: hidden;
+  cursor: pointer;
+  /* 手风琴靠 flex-grow 过渡，不用 JS 也不用 width 计算 */
+  transition: flex-grow 380ms cubic-bezier(.2, .8, .2, 1), border-color var(--transition), box-shadow var(--transition);
+}
+.bg-accordion:hover .bg-panel { flex-grow: .7; }
+.bg-panel.on { flex-grow: 1.7; border-color: color-mix(in srgb, var(--primary) 62%, var(--outline-variant)); }
+.bg-accordion .bg-panel:hover,
+.bg-accordion .bg-panel:focus-visible { flex-grow: 3.4; z-index: 2; }
+.bg-panel:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+.bp-art {
+  position: absolute;
+  inset: 0;
+  display: block;
   background-color: #0b0c17;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.10);
+  background-position: center;
+  background-size: cover;
 }
-.bg-thumb-none {
-  background: linear-gradient(135deg, var(--surface-container-lowest) 0 50%, var(--surface-container-high) 50%);
+/* 素色在深色主题下两半都很暗，中间补一条分界线才看得出是「关掉背景」 */
+.bp-none {
+  background:
+    linear-gradient(135deg, transparent calc(50% - .5px), color-mix(in srgb, var(--on-surface) 34%, transparent) calc(50% - .5px) calc(50% + .5px), transparent calc(50% + .5px)),
+    linear-gradient(135deg, var(--surface-container-lowest) 0 50%, var(--surface-container-high) 50%);
 }
-.bg-thumb-aurora {
-  background: radial-gradient(70% 90% at 16% 34%, #7cff67cc, transparent 72%), radial-gradient(90% 90% at 76% 50%, #5227ff, #0b0c17 72%);
+.bp-mesh {
+  background: radial-gradient(80% 70% at 22% 26%, #6aa8ff, transparent 70%), radial-gradient(80% 80% at 76% 70%, #c86bff, #171a2b 74%);
 }
-.bg-thumb-balatro {
-  background: repeating-radial-gradient(ellipse at 58% 50%, #7028ff 0 9%, #078eff 12%, #121322 20%);
+.bp-aurora {
+  background: radial-gradient(70% 90% at 18% 34%, #58e6a8cc, transparent 72%), radial-gradient(90% 90% at 76% 52%, #4b6bff, #0b0c17 74%);
 }
+.bp-silk {
+  background: repeating-linear-gradient(114deg, #7c5cff 0 7px, #2ea8ff 7px 13px, #141a33 13px 21px);
+}
+.bp-nebula {
+  background: radial-gradient(46% 52% at 34% 32%, #a878ff, transparent 66%), radial-gradient(60% 60% at 74% 68%, #2f7fd6, transparent 70%), #0a0b16;
+}
+.bp-add {
+  display: grid;
+  place-items: center;
+  background: var(--surface-container-lowest);
+  color: var(--on-surface-variant);
+  font-size: 19px;
+  font-weight: 300;
+}
+.bg-add { border-style: dashed; }
+.bg-add:hover .bp-add { color: var(--primary); }
+
+/* 标签平时藏起来，只有展开那一格才露出来 */
+.bp-label {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 14px 8px 6px;
+  background: linear-gradient(transparent, rgba(6, 8, 16, .72));
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 200ms ease, transform 240ms ease;
+}
+.bg-panel:hover .bp-label,
+.bg-panel:focus-visible .bp-label,
+.bg-panel.on .bp-label { opacity: 1; transform: none; }
+.bp-bar {
+  flex: none;
+  width: 3px; height: 10px;
+  border-radius: 2px;
+  background: #fff;
+  opacity: .85;
+}
+.bg-panel.on .bp-bar { background: var(--primary); opacity: 1; }
+.bg-add .bp-label { background: none; color: var(--on-surface-variant); }
+.bg-add .bp-bar { background: currentColor; }
+
+.bp-check {
+  position: absolute;
+  top: 5px; left: 5px;
+  display: grid; place-items: center;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--on-primary, #fff);
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0;
+  transform: scale(.6);
+  transition: opacity 160ms ease, transform 200ms cubic-bezier(.2, 1.4, .4, 1);
+}
+.bg-panel.on .bp-check { opacity: 1; transform: none; }
+
+.bp-del {
+  position: absolute;
+  top: 5px; right: 5px;
+  display: grid; place-items: center;
+  width: 17px; height: 17px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(8, 10, 18, .62);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 160ms ease, background-color var(--transition);
+}
+.bg-panel:hover .bp-del,
+.bg-panel:focus-within .bp-del { opacity: 1; }
+.bp-del:hover { background: #d0342c; }
+
 @media (max-width: 520px) {
-  .settings-menu { width: min(286px, calc(100vw - 24px)); max-height: calc(100dvh - 86px); }
+  .settings-menu { width: min(340px, calc(100vw - 24px)); max-height: calc(100dvh - 86px); }
   .nb-background-canvas { opacity: .45; }
   [data-theme="dark"] .nb-background-canvas { opacity: .72; }
+  /* 触屏没有 hover，手风琴退化成网格，每格都看得见 */
+  .bg-accordion { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; height: auto; }
+  .bg-panel { height: 50px; }
+  .bg-panel:hover, .bg-accordion:hover .bg-panel { flex-grow: 1; }
+  .bp-label, .bg-panel.on .bp-label { opacity: 0; }
+  .bp-del { opacity: 1; }
+}
+
+/* 触屏 / 无悬停设备：同样别依赖 hover 才能看清 */
+@media (hover: none) {
+  .bp-del { opacity: 1; }
 }

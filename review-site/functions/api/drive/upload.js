@@ -13,9 +13,9 @@ async function driveUsage(env) {
 }
 
 export async function onRequestPost({ request, env }) {
-  // 管理员（三级）上传直接上线；一二级（guest）上传进审核队列（status=pending），通过后才公开。
+  // 管理员（三级）上传直接上线；一二级（guest / friend）上传进审核队列（status=pending），通过后才公开。
   const role = await getRole(request, env);
-  if (role !== 'admin' && role !== 'guest') {
+  if (!role) {
     return Response.json({ error: '请先登录' }, { status: 401 });
   }
   const isAdmin = role === 'admin';

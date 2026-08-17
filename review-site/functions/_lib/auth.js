@@ -3,6 +3,15 @@
 const COOKIE_NAME = 'review_auth';
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
+// 三级身份。role 本身就是等级，不再另设字段：
+//   guest(一级/访客) < friend(二级/好友) < admin(三级/管理员)
+// 站内所有权限判断历来写的都是 role === 'admin'，新增的 'friend' 天然落在
+// 「非管理员」一侧，所以扩到三级不改变任何既有权限。
+export const ROLES = ['guest', 'friend', 'admin'];
+export const ROLE_NAMES = { guest: '访客', friend: '好友', admin: '管理员' };
+export const ROLE_LEVEL = { guest: 1, friend: 2, admin: 3 };
+export const normRole = (r) => (r === 'admin' ? 'admin' : r === 'friend' ? 'friend' : 'guest');
+
 export async function hmacSign(secret, message) {
   const key = await crypto.subtle.importKey(
     'raw',
@@ -26,13 +35,13 @@ export async function hashOwnerId(password) {
 
 export async function createSessionToken(env, role = 'guest', owner = '') {
   const expiry = Date.now() + SESSION_DURATION_MS;
-  const r = role === 'admin' ? 'admin' : 'guest';
+  const r = normRole(role);
   const payload = `${expiry}|${r}|${owner}`;   // 把角色 + owner 哈希编进已签名的 payload
   const sig = await hmacSign(env.AUTH_SECRET, payload);
   return `${payload}.${sig}`;
 }
 
-// 校验通过返回角色字符串（'admin' | 'guest'），失败返回 false。
+// 校验通过返回角色字符串（'admin' | 'friend' | 'guest'），失败返回 false。
 // 旧版（payload 只有 expiry、无角色）token 一律按最低权限 'guest' 处理。
 export async function verifySessionToken(token, env) {
   const full = await verifySessionFull(token, env);
@@ -50,12 +59,12 @@ export async function verifySessionFull(token, env) {
   const segs = payload.split('|');
   const expiry = parseInt(segs[0], 10);
   if (isNaN(expiry) || expiry < Date.now()) return null;
-  const role = segs[1] === 'admin' ? 'admin' : 'guest';
+  const role = normRole(segs[1]);
   const owner = segs[2] || role;
   return { role, owner };
 }
 
-// 取当前请求的角色（'admin' | 'guest'）；未登录/无效返回 null
+// 取当前请求的角色（'admin' | 'friend' | 'guest'）；未登录/无效返回 null
 export async function getRole(request, env) {
   const role = await verifySessionToken(getCookie(request, COOKIE_NAME), env);
   return role || null;

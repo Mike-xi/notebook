@@ -124,6 +124,30 @@ export async function ensureCoversSchema(env) {
   coversReady = true;
 }
 
+// 自定义首页背景图。scope 只有两个值：
+//   'admin'  —— 三级密码独立一份
+//   'shared' —— 一级 / 二级共用一份
+// 每个 scope 最多 MAX_CUSTOM_BG 张（见 api/background.js），配合 5 张内置背景凑满 8 张。
+let bgReady = false;
+export async function ensureBackgroundsSchema(env) {
+  if (bgReady) return;
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS home_backgrounds (
+       id         TEXT PRIMARY KEY,
+       scope      TEXT NOT NULL,
+       label      TEXT NOT NULL DEFAULT '',
+       r2_key     TEXT NOT NULL,
+       mime       TEXT NOT NULL DEFAULT 'image/webp',
+       size       INTEGER NOT NULL DEFAULT 0,
+       updated_at INTEGER NOT NULL
+     )`
+  ).run();
+  await env.DB.prepare(
+    'CREATE INDEX IF NOT EXISTS idx_home_backgrounds_scope ON home_backgrounds(scope, updated_at DESC)'
+  ).run();
+  bgReady = true;
+}
+
 // 通用键值偏好表（单用户）。目前用于存课程显示顺序（key=course_order）。
 let prefsReady = false;
 export async function ensurePrefsSchema(env) {
