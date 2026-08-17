@@ -10,10 +10,12 @@
   const MAX_CUSTOM = 3;
 
   /* ================================================================ 身份卡 */
+  // 头像用站内统一的 Phosphor 图标（assets/icons.js），不用 emoji ——
+  // emoji 是各系统自己的字体，跟站内其他图标不是一套设计语言。
   const ROLE_UI = {
-    guest: { name: '访客', avatar: '🙂' },
-    friend: { name: '好友', avatar: '🤝' },
-    admin: { name: '管理员', avatar: '👑' },
+    guest: { name: '访客', icon: 'user' },
+    friend: { name: '好友', icon: 'handshake' },
+    admin: { name: '管理员', icon: 'crown' },
   };
 
   function renderIdentity(me) {
@@ -22,7 +24,8 @@
     const ui = ROLE_UI[me && me.role] || ROLE_UI.guest;
     // 身份只靠 data-role 换配色，文案就三个字，不再加说明
     card.dataset.role = (me && me.role) || 'guest';
-    $('id-avatar').textContent = ui.avatar;
+    const av = $('id-avatar');
+    av.innerHTML = window.NBIcon ? NBIcon(ui.icon, { size: 17 }) : '';
     $('id-name').textContent = ui.name;
     card.setAttribute('aria-label', `当前身份：${ui.name}`);
   }
@@ -98,12 +101,14 @@
     acc.innerHTML = parts.join('');
     const total = BUILTIN.length + customs.length;
     if (countEl) countEl.textContent = `${total}/8`;
+    // 常驻说明已经挪进「说明文档」，这里只在上传中/出错/传满时临时提示一句
     if (hint) {
       hint.textContent = busy
         ? '正在上传…'
         : customs.length >= MAX_CUSTOM
           ? `自选已满 ${MAX_CUSTOM} 张，删掉一张才能再传`
-          : (scope === 'admin' ? '管理员的自选背景单独保存' : '一级 / 二级共用这份自选背景');
+          : '';
+      hint.hidden = !hint.textContent;
     }
     wire();
   }

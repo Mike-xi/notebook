@@ -8,7 +8,7 @@
     // 首屏前定主题，避免浅/深闪烁；完整逻辑在 theme.js
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
     // 背景也先从本机缓存恢复；登录后 theme.js 会用当前密码用户的云端偏好校准。
-    (function(){try{var b=localStorage.getItem('nb-background')||'none';var M={balatro:'waves',plain:'none',mesh:'aurora',silk:'waves',nebula:'terrain'};if(M[b])b=M[b];var a=['none','aurora','blinds','waves','terrain'];var ok=a.indexOf(b)>=0||/^custom:[a-z0-9-]{1,40}$/.test(b);document.documentElement.dataset.bg=ok?b:'none';var o=parseFloat(localStorage.getItem('nb-bg-opacity'));document.documentElement.style.setProperty('--nb-bg-opacity',String(isFinite(o)?Math.min(1,Math.max(.15,o)):.55));}catch(e){document.documentElement.dataset.bg='none';}})();
+    (function(){try{var b=localStorage.getItem('nb-background')||'none';var M={balatro:'waves',plain:'none',mesh:'aurora',silk:'waves',nebula:'terrain'};if(M[b])b=M[b];var a=['none','aurora','blinds','waves','terrain'];var ok=a.indexOf(b)>=0||/^custom:[a-z0-9-]{1,40}$/.test(b);document.documentElement.dataset.bg=ok?b:'none';var o=parseFloat(localStorage.getItem('nb-bg-opacity'));document.documentElement.style.setProperty('--nb-bg-opacity',String(isFinite(o)?Math.min(1,Math.max(.15,o)):.55));var br=parseFloat(localStorage.getItem('nb-bg-brightness'));document.documentElement.style.setProperty('--nb-bg-brightness',String(isFinite(br)?Math.min(1.6,Math.max(.25,br)):1));var ba=localStorage.getItem('nb-bar-alpha')||'medium';var BA={solid:.92,medium:.72,sheer:.5,glass:.28};document.documentElement.dataset.bar=BA[ba]?ba:'medium';document.documentElement.style.setProperty('--nb-bar-alpha',String(BA[ba]||.72));}catch(e){document.documentElement.dataset.bg='none';}})();
     // 界面风格（高级/经典）同样首屏前定，避免 Dock/经典顶栏互闪；完整逻辑在 premium.js
     (function(){try{var u=localStorage.getItem('nb-ui-level');document.documentElement.dataset.ui=(u==='classic')?'classic':'premium';}catch(e){document.documentElement.dataset.ui='premium';}})();
     // 首屏数据预取：这几个请求本来要等 app.js（60KB）下载 + 解析完才发得出去，
@@ -26,8 +26,8 @@
     })();
   </script>
   <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613d">
-  <link rel="stylesheet" href="/assets/style.css?v=20260817h">
-  <link rel="stylesheet" href="/assets/premium.css?v=20260817h">
+  <link rel="stylesheet" href="/assets/style.css?v=20260817i">
+  <link rel="stylesheet" href="/assets/premium.css?v=20260817i">
 </head>
 <body class="home">
   <header class="topbar">
@@ -65,7 +65,7 @@
         <div class="settings-menu" id="settings-menu" hidden role="menu">
           <!-- 身份卡：一级访客 / 二级好友 / 三级管理员，由 /api/me 决定 -->
           <div class="idcard" id="idcard" data-role="guest">
-            <span class="idcard-avatar" id="id-avatar" aria-hidden="true">🙂</span>
+            <span class="idcard-avatar" id="id-avatar" aria-hidden="true"></span>
             <b class="idcard-name" id="id-name">访客</b>
           </div>
           <div class="sm-section">
@@ -87,13 +87,26 @@
             <span class="sm-label">页面背景 <em class="sm-count" id="bg-count"></em></span>
             <!-- 手风琴：悬停展开一格看大图，点选生效。面板由 appearance.js 渲染 -->
             <div class="bg-accordion" id="bg-accordion" role="listbox" aria-label="页面背景"></div>
-            <div class="bg-opacity" id="bg-opacity-row">
-              <label for="bg-opacity">浓淡</label>
-              <input type="range" id="bg-opacity" data-bg-opacity min="0.15" max="1" step="0.05"
-                     aria-label="背景浓淡">
+            <!-- 两根弹性滑杆由 slider.js 就地增强，原生 input 仍是数据源 -->
+            <div class="bg-sliders">
+              <div class="es-row"><span class="es-label">浓淡</span>
+                <input type="range" id="bg-opacity" data-bg-opacity min="0.15" max="1" step="0.05" aria-label="背景浓淡">
+              </div>
+              <div class="es-row"><span class="es-label">亮度</span>
+                <input type="range" id="bg-brightness" data-bg-brightness min="0.25" max="1.6" step="0.05" aria-label="背景亮度">
+              </div>
             </div>
-            <p class="sm-hint" id="bg-hint">5 张内置 + 最多 3 张自选，点 ＋ 传自己的图</p>
+            <p class="sm-hint" id="bg-hint" hidden></p>
             <input type="file" id="bg-file" accept="image/png,image/jpeg,image/webp,image/avif" hidden>
+          </div>
+          <div class="sm-section">
+            <span class="sm-label">顶栏通透度</span>
+            <div class="seg" role="group" aria-label="顶栏通透度">
+              <button class="seg-btn" data-bar-set="solid" aria-pressed="false">实心</button>
+              <button class="seg-btn" data-bar-set="medium" aria-pressed="false">适中</button>
+              <button class="seg-btn" data-bar-set="sheer" aria-pressed="false">通透</button>
+              <button class="seg-btn" data-bar-set="glass" aria-pressed="false">极透</button>
+            </div>
           </div>
           <div class="sm-section">
             <span class="sm-label">阅读器工具栏唤出</span>
@@ -107,7 +120,7 @@
           <div class="sm-divider"></div>
           <button class="sm-item" id="review-item" role="menuitem" style="display:none"><span class="sm-ic ic" data-icon="tray" data-icon-size="18"></span><span>内容审核</span><span class="sm-badge" id="review-badge" hidden>0</span></button>
           <button class="sm-item" id="logins-btn" role="menuitem"><span class="sm-ic ic" data-icon="list" data-icon-size="18"></span><span>登录日志</span></button>
-          <button class="sm-item" id="about-btn" role="menuitem"><span class="sm-ic ic" data-icon="sparkle" data-icon-size="18"></span><span>关于</span></button>
+          <button class="sm-item" id="docs-btn" role="menuitem"><span class="sm-ic ic" data-icon="bookopen" data-icon-size="18"></span><span>说明文档</span></button>
           <button class="sm-item sm-danger" id="logout-btn" role="menuitem"><span class="sm-ic ic" data-icon="signout" data-icon-size="18"></span><span>退出登录</span></button>
         </div>
       </div>
@@ -263,12 +276,14 @@
   </div>
 
   <script src="/assets/icons.js?v=20260616a" defer></script>
-  <script src="/assets/theme.js?v=20260817e" defer></script>
-  <script src="/assets/backgrounds.js?v=20260817e" defer></script>
-  <script src="/assets/gooey.js?v=20260817e" defer></script>
-  <script src="/assets/appearance.js?v=20260817e" defer></script>
+  <script src="/assets/cropper.js?v=20260817i" defer></script>
+  <script src="/assets/slider.js?v=20260817i" defer></script>
+  <script src="/assets/theme.js?v=20260817i" defer></script>
+  <script src="/assets/backgrounds.js?v=20260817i" defer></script>
+  <script src="/assets/gooey.js?v=20260817j" defer></script>
+  <script src="/assets/appearance.js?v=20260817i" defer></script>
   <script src="/assets/md.js?v=20260608d" defer></script>
-  <script src="/assets/app.js?v=20260817h" defer></script>
-  <script src="/assets/premium.js?v=20260817e" defer></script>
+  <script src="/assets/app.js?v=20260817i" defer></script>
+  <script src="/assets/premium.js?v=20260817i" defer></script>
 </body>
 </html>

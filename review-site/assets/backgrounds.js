@@ -6,11 +6,13 @@
 //   waves   波纹   ← React Bits「Sliced Waves」
 //   terrain 地形   ← React Bits「Topography」
 // 四套的 GLSL 都是从 React Bits 公开 registry 原样搬来的（原版靠 ogl 起一个全屏
-// 三角形，这里换成自己的裸 WebGL runner，着色器本体没改），可调参数固化成常量，
-// 只把配色按 uDark 拆成浅色/深色两套 —— 站点默认浅色，只按深色调的背景会把整页压暗。
+// 三角形，这里换成自己的裸 WebGL runner，着色器本体没改），可调参数固化成常量。
+// 配色只有一套：浅色和深色主题下背景长得一模一样，不再按主题偷偷提亮 ——
+// 明暗完全交给用户，用设置里的「亮度」滑杆调。
 //
 // 另外支持最多 3 张自定义上传的图片背景（值形如 custom:<id>，走 <div> 贴图不走 WebGL）。
-// 整体浓淡由 CSS 变量 --nb-bg-opacity 控制（设置面板里的滑杆，见 appearance.js）。
+// 浓淡 / 亮度分别由 CSS 变量 --nb-bg-opacity / --nb-bg-brightness 控制
+// （设置面板里的两根弹性滑杆，见 theme.js + slider.js）。
 //
 // 登录页（body.login）也用这套引擎，但不读偏好、不可切换：固定极光，浓淡固定。
 (function () {
@@ -63,7 +65,7 @@
        octaveDecay .1 / colorSpeed 1.0 / mouseInfluence .25。 */
     aurora: `
       precision highp float;
-      varying vec2 vUv; uniform vec2 uResolution; uniform float uTime; uniform float uDark; uniform vec2 uMouse;
+      varying vec2 vUv; uniform vec2 uResolution; uniform float uTime; uniform vec2 uMouse;
       #define TAU 6.28318
 
       vec3 gradientHash(vec3 p){
@@ -122,12 +124,12 @@
         vec2 uv=gl_FragCoord.xy/uResolution.xy;
         float t=0.6*0.4*uTime;                 // uSpeed .6
         vec2 shift=(uMouse-0.5)*0.25;          // uMouseInfluence
-        vec3 c1=mix(vec3(0.99,0.96,1.00),vec3(0.97,0.97,0.97),uDark);
-        vec3 c2=mix(vec3(0.55,0.32,0.92),vec3(0.88,0.00,1.00),uDark);
+        vec3 c1=vec3(0.97,0.97,0.97);
+        vec3 c2=vec3(0.88,0.00,1.00);
         vec3 col=vec3(0.0);
         col+=0.99*auroraGlow(t,shift)*cosineGradient(uv.x+uTime*0.6*0.2, vec3(0.5),vec3(0.5),vec3(1.0),vec3(0.3,0.20,0.20))*c1;
         col+=0.99*auroraGlow(t,shift)*cosineGradient(uv.x+uTime*0.6*0.1, vec3(0.5),vec3(0.5),vec3(2.0,1.0,0.0),vec3(0.5,0.20,0.25))*c2;
-        col*=mix(0.85,1.0,uDark);              // uBrightness
+        col*=1.0;              // uBrightness
         float alpha=clamp(length(col),0.0,1.0);
         gl_FragColor=vec4(col, alpha);
       }
@@ -138,7 +140,7 @@
        blindCount 16 / spotlightRadius .5 / softness 1 / opacity 1。 */
     blinds: `
       precision mediump float;
-      varying vec2 vUv; uniform vec2 uResolution; uniform float uTime; uniform float uDark; uniform vec2 uMouse;
+      varying vec2 vUv; uniform vec2 uResolution; uniform float uTime; uniform vec2 uMouse;
 
       float rand(vec2 co){return fract(sin(dot(co,vec2(12.9898,78.233)))*43758.5453);}
 
@@ -151,23 +153,23 @@
         vec2 uv=p*0.5+0.5;
 
         // 渐变底：两色线性插值（原版 getGradientColor 的 2 色档）
-        vec3 g0=mix(vec3(0.99,0.62,0.99),vec3(1.00,0.62,0.99),uDark);
-        vec3 g1=mix(vec3(0.42,0.30,0.92),vec3(0.32,0.15,1.00),uDark);
+        vec3 g0=vec3(1.00,0.62,0.99);
+        vec3 g1=vec3(0.32,0.15,1.00);
         vec3 base=mix(g0,g1,clamp(uv.x,0.0,1.0));
 
         // 聚光跟着鼠标
         float d=length(uv0-uMouse);
         float dn=d/0.5;
-        float spot=(1.0-2.0*pow(dn,1.0))*mix(0.55,1.0,uDark);
+        float spot=(1.0-2.0*pow(dn,1.0))*1.0;
         vec3 cir=vec3(spot);
 
         float stripe=fract(uv.x*16.0);
-        vec3 ran=vec3(stripe)*mix(0.62,1.0,uDark);
+        vec3 ran=vec3(stripe)*1.0;
 
         vec3 col=cir+base-ran;
         col+=(rand(gl_FragCoord.xy+uTime)-0.5)*0.3;
         col=clamp(col,0.0,1.0);
-        gl_FragColor=vec4(col, mix(0.72,0.92,uDark));
+        gl_FragColor=vec4(col, 0.92);
       }
     `,
 
@@ -177,7 +179,7 @@
        softness .05 / grain .05。原版是 #version 300 es，这里降到 ES 1.00。 */
     waves: `${DERIV}${FW}
       precision highp float;
-      varying vec2 vUv; uniform vec2 uResolution; uniform float uTime; uniform float uDark; uniform vec2 uMouse;
+      varying vec2 vUv; uniform vec2 uResolution; uniform float uTime; uniform vec2 uMouse;
 
       void main(){
         vec2 uv=gl_FragCoord.xy/uResolution.xy;
@@ -211,14 +213,14 @@
         float g=fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233))+uTime)*43758.5453);
         intensity=clamp(intensity+(g-0.5)*0.05,0.0,1.0);
 
-        vec3 k1=mix(vec3(0.98,0.58,0.96),vec3(1.00,0.62,0.99),uDark);
-        vec3 k2=mix(vec3(0.40,0.28,0.90),vec3(0.32,0.15,1.00),uDark);
-        vec3 k3=mix(vec3(0.62,0.52,0.82),vec3(0.71,0.59,0.81),uDark);
+        vec3 k1=vec3(1.00,0.62,0.99);
+        vec3 k2=vec3(0.32,0.15,1.00);
+        vec3 k3=vec3(0.71,0.59,0.81);
         vec3 grad=mix(k2,k1,mv);
         grad=mix(grad,k3,clamp(along,0.0,1.0)*0.45);
 
         vec3 col=clamp(grad*(1.0+infl*0.6),0.0,1.0);
-        float a=intensity*mix(0.62,0.85,uDark);
+        float a=intensity*0.85;
         gl_FragColor=vec4(col, a);
       }
     `,
@@ -230,7 +232,7 @@
        contrast 3 / grain .05，colorMode = elevation。 */
     terrain: `${DERIV}${FW}
       precision highp float;
-      varying vec2 vUv; uniform vec2 uResolution; uniform float uTime; uniform float uDark; uniform vec2 uMouse;
+      varying vec2 vUv; uniform vec2 uResolution; uniform float uTime; uniform vec2 uMouse;
       uniform vec4 uCtrlA; uniform vec4 uCtrlB; uniform vec4 uCtrlC; uniform vec4 uCtrlD;
 
       float bez(float t, vec4 c){
@@ -248,9 +250,9 @@
         vec2 uv=gl_FragCoord.xy/res;
         vec2 suv=uv;                       // uScale 1.0
 
-        vec3 low =mix(vec3(0.42,0.30,0.92),vec3(0.32,0.15,1.00),uDark);
-        vec3 mid =mix(vec3(0.93,0.55,0.92),vec3(1.00,0.62,0.99),uDark);
-        vec3 high=mix(vec3(0.42,0.62,0.98),vec3(1.00,1.00,1.00),uDark);
+        vec3 low =vec3(0.32,0.15,1.00);
+        vec3 mid =vec3(1.00,0.62,0.99);
+        vec3 high=vec3(1.00,1.00,1.00);
 
         float fv=field(suv);
 
@@ -277,7 +279,7 @@
 
         float g=fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233))+uTime)*43758.5453);
         float a=clamp(coverage+(g-0.5)*0.05,0.0,1.0);
-        gl_FragColor=vec4(clamp(lineCol,0.0,1.0), a*mix(0.80,0.95,uDark));
+        gl_FragColor=vec4(clamp(lineCol,0.0,1.0), a*0.95);
       }
     `,
   };
@@ -299,8 +301,6 @@
     }
     return shader;
   }
-
-  function darkNow() { return document.documentElement.dataset.theme === 'dark' ? 1 : 0; }
 
   function build(name) {
     cancelAnimationFrame(frame);
@@ -379,7 +379,6 @@
     gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
     uniform2('uResolution', canvas.width, canvas.height);
     uniform2('uMouse', mouse.x, mouse.y);
-    uniform1('uDark', darkNow());
     uniform1('uTime', time);
     if (current === 'terrain') {
       for (let g = 0; g < 4; g++) {

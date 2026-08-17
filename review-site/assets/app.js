@@ -508,11 +508,11 @@ async function omniSend() {
 // ========== 关于 / 学习画像 ==========
 const aboutModal = document.getElementById('about-modal');
 
-document.getElementById('about-btn').addEventListener('click', () => {
+function openAbout() {
   closeSettings();
   renderAbout();
   aboutModal.hidden = false;
-});
+}
 document.getElementById('about-close').addEventListener('click', () => { aboutModal.hidden = true; });
 aboutModal.addEventListener('click', (e) => { if (e.target === aboutModal) aboutModal.hidden = true; });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !aboutModal.hidden) aboutModal.hidden = true; });
@@ -640,7 +640,10 @@ function pickCover(slug, imgEl, btn, onDone) {
     if (!f) return;
     if (btn) btn.classList.add('busy');
     try {
-      const blob = await shrinkCover(f);
+      // 先进裁剪框（可平移缩放）；用户取消就什么都不做
+      const blob = window.NBCropper
+        ? await NBCropper.open(f, { aspect: 16 / 9, out: { w: 640, h: 360 } })
+        : await shrinkCover(f);
       const res = await fetch(`/api/cover?slug=${encodeURIComponent(slug)}`, {
         method: 'POST',
         headers: { 'Content-Type': blob.type || 'image/webp' },
@@ -656,7 +659,7 @@ function pickCover(slug, imgEl, btn, onDone) {
       if (btn) btn.dataset.custom = '1';
       if (onDone) onDone(data.updated_at);
     } catch (err) {
-      alert('换封面失败：' + (err.message || err));
+      if (err && err.message !== 'cancelled') alert('换封面失败：' + (err.message || err));
     } finally {
       if (btn) btn.classList.remove('busy');
     }
@@ -690,6 +693,7 @@ let coIconPicker = null;
 function openCourseOptions(file) {
   const c = allCoursesMap.get(file);
   if (!c) return;
+  closeSettings();
   const slug = String(file || '').replace(/\.[a-z0-9]+$/i, '').toLowerCase();
   const coverTs = customCovers[slug];
   const coverURL = coverTs
@@ -822,7 +826,10 @@ function openCourseOptions(file) {
       const f = coIconPicker.files && coIconPicker.files[0];
       if (!f) return;
       try {
-        const blob = await shrinkIcon(f);
+        // 图标是圆角方块，用 1:1 的圆形取景框裁
+        const blob = window.NBCropper
+          ? await NBCropper.open(f, { aspect: 1, out: { w: 192, h: 192 }, round: true })
+          : await shrinkIcon(f);
         const iconSlug = 'icon-' + slug;
         const res = await fetch(`/api/cover?slug=${encodeURIComponent(iconSlug)}`, {
           method: 'POST',
@@ -833,7 +840,9 @@ function openCourseOptions(file) {
         if (!res.ok) throw new Error(data.error || '上传失败');
         pendingIcon = `/api/cover?slug=${encodeURIComponent(iconSlug)}&v=${data.updated_at}`;
         paintIcon();
-      } catch (err) { alert('上传图标失败：' + (err.message || err)); }
+      } catch (err) {
+        if (err && err.message !== 'cancelled') alert('上传图标失败：' + (err.message || err));
+      }
     };
     coIconPicker.click();
   });
@@ -886,6 +895,107 @@ function openCourseOptions(file) {
   document.addEventListener('keydown', escCourseOptions);
 }
 
+// ========== 说明文档 ==========
+// 原来这里是「关于」（学习画像）。改成说明文档后，画像挪到文档末尾的按钮里，功能没丢。
+const DOC_SECTIONS = [
+  {
+    icon: 'users', title: '三级身份',
+    body: `进站要输密码，密码决定身份，三级权限依次放开：
+      <ul>
+        <li><b>访客（一级）</b> —— 浏览和使用全部内容；上传的东西要经审核才公开。</li>
+        <li><b>好友（二级）</b> —— 与访客权限相同，但自选背景、单词本等数据和访客共用一份。</li>
+        <li><b>管理员（三级）</b> —— 可以增删改课程、审核投稿、管理全站；数据单独一份，不与前两级混。</li>
+      </ul>
+      当前身份显示在设置面板最上方。换密码重新登录即可切换身份。`,
+  },
+  {
+    icon: 'palette', title: '外观与背景',
+    body: `<ul>
+        <li><b>界面风格</b> —— 「高级」是液态玻璃 Dock、全息卡片、卡堆；「经典」是原版 Material You 界面。</li>
+        <li><b>外观</b> —— 跟随系统 / 浅色 / 深色。</li>
+        <li><b>页面背景</b> —— 5 套内置着色器（素色、极光、百叶窗、波纹、地形）+ 最多 3 张自己上传的图，一共 8 格。
+            鼠标悬停某一格会展开看大图，点一下生效。自选背景按身份分开存：管理员一份，访客与好友共用一份。</li>
+        <li><b>浓淡 / 亮度</b> —— 两根滑杆。浓淡调背景压过正文的程度，亮度调背景本身的明暗；深浅两种主题下背景长得一样，靠这两根杆调到你舒服为止。</li>
+        <li><b>顶栏通透度</b> —— 顶部那条工具栏的玻璃透明程度，四档可选。</li>
+      </ul>`,
+  },
+  {
+    icon: 'stack', title: '课程卡片',
+    body: `<ul>
+        <li>鼠标移到卡片上，简介才会逐字翻出来；移开自动收起，网格保持清爽。</li>
+        <li>卡片右上角有两个手柄（仅管理员可见）：<b>三条横线</b>打开「更多选项」，<b>六点</b>是拖动排序。</li>
+        <li><b>更多选项</b>里可以改课程名、改简介、换分类、换封面、换图标（60 个 emoji 任选，或上传自己的图片），也可以删除课程。
+            上传封面和图标时会弹出裁剪框，可以缩放和框选要留下的范围。</li>
+        <li>把卡片拖到顶部的分类标签上松手，也能直接改分类。</li>
+      </ul>`,
+  },
+  {
+    icon: 'plus', title: '新建与审核',
+    body: `右上角 <b>Create</b> 可以上传 HTML / Markdown / PDF，或直接在站内写 Markdown 笔记。
+      管理员上传的直接上线；访客与好友上传的先进审核队列，管理员在设置里的「内容审核」通过后才会公开。`,
+  },
+  {
+    icon: 'search', title: '搜索与 AI',
+    body: `<ul>
+        <li>顶栏搜索框边打边筛；按 <b>回车</b> 进全文搜索，会搜进每篇笔记的正文。</li>
+        <li><b>AI</b> 按钮是跨全部笔记的问答，回答会带出处。对话记录按身份分开存。</li>
+      </ul>`,
+  },
+  {
+    icon: 'bookopen', title: '阅读器',
+    body: `打开任意课程即进入阅读器，阅读进度和书签自动云端同步。
+      设置里的<b>「阅读器工具栏唤出」</b>决定顶部工具栏多容易被唤出来：
+      灵敏（鼠标靠近 4px 就出来）、适中（14px）、隐藏（只留一个返回键）、永久（彻底不显示，用浏览器返回）。`,
+  },
+  {
+    icon: 'list', title: '登录日志与隐私',
+    body: `设置里的<b>「登录日志」</b>能看到历次登录的身份、设备和时间。管理员看得到全部身份的记录，访客与好友只看得到自己那一级的。
+      位置只精确到城市，<b>全站不记录 IP</b>。学习画像等统计只用你自己的课程数据生成，不上报第三方。`,
+  },
+];
+
+let docsModal = null;
+function openDocs() {
+  closeSettings();
+  if (!docsModal) {
+    docsModal = document.createElement('div');
+    docsModal.className = 'modal-overlay';
+    docsModal.id = 'docs-modal';
+    document.body.appendChild(docsModal);
+    docsModal.addEventListener('click', (e) => { if (e.target === docsModal) closeDocs(); });
+  }
+  docsModal.innerHTML = `<div class="modal doc-modal" role="dialog" aria-modal="true" aria-label="说明文档">
+      <div class="doc-head">
+        <h3><span class="ic" data-icon="bookopen" data-icon-size="19"></span> 说明文档</h3>
+        <button type="button" class="icon-btn" data-doc-close aria-label="关闭"><span class="ic" data-icon="close" data-icon-size="18"></span></button>
+      </div>
+      <div class="doc-body">
+        ${DOC_SECTIONS.map((s) => `<section class="doc-sec">
+          <h4><span class="ic" data-icon="${s.icon}" data-icon-size="16"></span>${escapeHTML(s.title)}</h4>
+          <div class="doc-text">${s.body}</div>
+        </section>`).join('')}
+      </div>
+      <div class="modal-actions co-actions">
+        <button type="button" class="btn-soft" id="doc-profile">看看我的学习画像</button>
+        <span class="co-spacer"></span>
+        <button type="button" class="btn-ghost" data-doc-close>关闭</button>
+      </div>
+    </div>`;
+  docsModal.hidden = false;
+  if (window.NBIconHydrate) NBIconHydrate(docsModal);
+  docsModal.querySelectorAll('[data-doc-close]').forEach((b) => b.addEventListener('click', closeDocs));
+  docsModal.querySelector('#doc-profile').addEventListener('click', () => { closeDocs(); openAbout(); });
+  document.addEventListener('keydown', escDocs);
+}
+function escDocs(e) { if (e.key === 'Escape') closeDocs(); }
+function closeDocs() {
+  if (!docsModal) return;
+  docsModal.hidden = true;
+  document.removeEventListener('keydown', escDocs);
+}
+const docsBtn = document.getElementById('docs-btn');
+if (docsBtn) docsBtn.addEventListener('click', openDocs);
+
 // ========== 登录日志 ==========
 // 三级都能看：管理员看全部身份，一二级只看自己那一级（后端过滤，见 api/logins.js）。
 // 只有大致城市，没有 IP —— 登录时压根没记 IP。
@@ -897,6 +1007,7 @@ function fmtWhen(ts) {
 }
 
 async function openLogins() {
+  closeSettings();          // 不关的话高级界面里菜单(z-index 130)会压在弹窗上
   if (!loginsModal) {
     loginsModal = document.createElement('div');
     loginsModal.className = 'modal-overlay';

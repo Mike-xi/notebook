@@ -9,6 +9,7 @@
 // 亮色主题下底色是白、球是深色、混合模式 darken；暗色主题反过来。
 (function () {
   const ANIM_MS = 600;
+  const PILL_DELAY = 260;      // 粒子开始汇聚到药丸长出来之间的间隔
   const PARTICLES = 14;
   const DIST = [86, 10];
   const R = 100;
@@ -87,21 +88,40 @@
 
     // 药丸贴到当前选中的那一格上；用 offset 而不是 getBoundingClientRect，
     // 免得设置面板还在弹出动画（scale）里时算出被缩放过的尺寸。
+    let pillTimer = 0;
+    let spawning = false;                // 正在放「粒子汇聚 → 药丸长出」这段动画
     function place(btn, animate) {
       if (!btn) return;
-      for (const el of [pill, filter]) {
-        el.style.left = `${btn.offsetLeft}px`;
-        el.style.top = `${btn.offsetTop}px`;
-        el.style.width = `${btn.offsetWidth}px`;
-        el.style.height = `${btn.offsetHeight}px`;
+      const box = {
+        left: `${btn.offsetLeft}px`, top: `${btn.offsetTop}px`,
+        width: `${btn.offsetWidth}px`, height: `${btn.offsetHeight}px`,
+      };
+      Object.assign(filter.style, box);
+
+      if (!animate) {
+        // 初次定位 / 尺寸变化：直接就位。注意不能顺手清掉 spawning ——
+        // 点击后业务代码会改 .active 类，MutationObserver 立刻走到这一支，
+        // 把刚设上的收缩状态抹掉，药丸就又变成「先出现再放粒子」了。
+        Object.assign(pill.style, box);
+        if (!spawning) pill.classList.remove('spawning');
+        return;
       }
-      if (animate) {
-        [...filter.querySelectorAll('.particle')].forEach((p) => p.remove());
-        pill.classList.remove('active');
-        void pill.offsetWidth;          // 强制重排，让动画能重放
-        pill.classList.add('active');
-        makeParticles(filter);
-      }
+
+      // 点击时的顺序：药丸先在旧位置消失 → 瞬移到新位置 → 粒子往里汇聚 →
+      // 汇聚到位时药丸才从中心长出来。原来是药丸先滑过去再放粒子，观感是
+      // 「一大坨紫色先出现、粒子后补」，正好反了。
+      clearTimeout(pillTimer);
+      spawning = true;
+      pill.classList.add('spawning');    // scale(0)，且此刻不带位移过渡
+      void pill.offsetWidth;
+      Object.assign(pill.style, box);    // 隐身状态下瞬移，不会被看到滑动
+      [...filter.querySelectorAll('.particle')].forEach((p) => p.remove());
+      makeParticles(filter);
+      // 粒子 30ms 后开始飞，到 ~65% 才收拢到中心，这里等它们聚拢再放药丸
+      pillTimer = setTimeout(() => {
+        spawning = false;
+        pill.classList.remove('spawning');
+      }, PILL_DELAY);
     }
 
     const activeBtn = () => seg.querySelector('.seg-btn.active') || seg.querySelector('.seg-btn');
