@@ -87,6 +87,7 @@
 
     // 原顶栏控件搬进 dock，事件监听随节点保留
     var moves = [
+      [document.querySelector('.cats-wrap'), '分类'],
       [document.querySelector('.search-wrap'), '搜索'],
       [document.getElementById('omni-btn'), 'Ask AI'],
       [document.querySelector('.create-wrap'), '创建'],
@@ -108,6 +109,7 @@
     [
       [document.getElementById('settings-menu'), document.getElementById('settings-btn')],
       [document.getElementById('create-menu'), document.getElementById('create-btn')],
+      [document.getElementById('cats-menu'), document.getElementById('cats-btn')],
     ].forEach(function (pair) {
       var menu = pair[0], anchor = pair[1];
       if (!menu || !anchor) return;
@@ -157,7 +159,9 @@
     var MAG = 0.32;       // 最大放大比例增量
     var DIST = 140;       // 影响半径 px
     var items = Array.prototype.filter.call(panel.children, function (el) {
-      return el.classList.contains('dock-item');
+      // 分类瓦片只在窄屏出现，桌面端是 display:none —— 别把它算进邻近放大，
+      // 否则它 offsetLeft=0，鼠标扫到最左边会去推一个看不见的瓦片。
+      return el.classList.contains('dock-item') && getComputedStyle(el).display !== 'none';
     });
     var state = items.map(function () { return { cur: 1, tgt: 1 }; });
     var mx = Infinity, hovering = false, running = false;

@@ -1,5 +1,5 @@
 import { isAuthenticated, getCookie } from './_lib/auth.js';
-import { logEvent } from './_lib/db.js';
+import { logEvent, bumpActivityDay } from './_lib/db.js';
 import { buildDetail } from './_lib/visitlog.js';
 
 // 注意：Pages 开启了 clean URL，会把 /foo.html 308 跳到 /foo，中间件最终看到的是去掉 .html 的路径。
@@ -61,7 +61,10 @@ export async function onRequest(context) {
   if (role) {
     const today = dayStamp();
     if (isPageView(request, path) && getCookie(request, SEEN_COOKIE) !== today) {
-      context.waitUntil(logEvent(env, 'visit', buildDetail(role, request)));
+      context.waitUntil(Promise.all([
+        logEvent(env, 'visit', buildDetail(role, request)),
+        bumpActivityDay(env, role, 'visit'),      // 热力图的按天计数（logs 只留 30 天，见 db.js）
+      ]));
       const res = await next();
       // Response 的 headers 是只读的，得整个复制一份才能补 Set-Cookie
       const out = new Response(res.body, res);

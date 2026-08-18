@@ -7,11 +7,38 @@
 // detail 的编码与解析都在 _lib/visitlog.js，兼容三代历史格式。
 //
 // GET /api/logins?limit=60 -> { role, scope, canSeeIp, items: [{kind, role, place, ip, device, deviceKind, at}] }
-import { ensureLogsSchema } from '../_lib/db.js';
+// GET /api/logins?heat=1     -> 上面那些 + heat: { days: {'YYYY-MM-DD': n}, total, max }
+//   热力图走 activity_days 表（按天计数，不过期），不是 logs —— logs 只留 30 天。
+import { ensureLogsSchema, ensureActivitySchema, beijingDay } from '../_lib/db.js';
 import { getRole, ROLE_NAMES } from '../_lib/auth.js';
 import { parseDetail, deviceOf } from '../_lib/visitlog.js';
 
 const MAX_LIMIT = 200;
+const HEAT_DAYS = 371;   // 53 周整，热力图正好排满 7 行
+
+// 热力图：管理员看全站（三级身份合计），一二级只看自己那一级。
+async function heatmap(env, role, isAdmin) {
+  try {
+    await ensureActivitySchema(env);
+    const from = beijingDay(Date.now() - (HEAT_DAYS - 1) * 86400e3);
+    const sql = isAdmin
+      ? 'SELECT day, SUM(logins + visits) AS n FROM activity_days WHERE day >= ? GROUP BY day'
+      : 'SELECT day, SUM(logins + visits) AS n FROM activity_days WHERE day >= ? AND role = ? GROUP BY day';
+    const stmt = env.DB.prepare(sql);
+    const rs = await (isAdmin ? stmt.bind(from) : stmt.bind(from, role)).all();
+    const days = {};
+    let total = 0, max = 0;
+    for (const r of rs.results || []) {
+      const n = Number(r.n) || 0;
+      days[r.day] = n;
+      total += n;
+      if (n > max) max = n;
+    }
+    return { days, total, max, from, to: beijingDay(), span: HEAT_DAYS };
+  } catch {
+    return { days: {}, total: 0, max: 0, from: beijingDay(), to: beijingDay(), span: HEAT_DAYS };
+  }
+}
 
 export async function onRequestGet({ request, env }) {
   const role = (await getRole(request, env)) || 'guest';
@@ -21,6 +48,7 @@ export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
   const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(url.searchParams.get('limit') || '60', 10) || 60));
   const isAdmin = role === 'admin';
+  const wantHeat = url.searchParams.get('heat') === '1';
 
   // 非管理员要按身份过滤，取多一些回来再筛，免得筛完不够一屏
   const rs = await env.DB.prepare(
@@ -45,5 +73,7 @@ export async function onRequestGet({ request, env }) {
     if (items.length >= limit) break;
   }
 
-  return Response.json({ role, scope: isAdmin ? 'all' : 'self', canSeeIp: isAdmin, items });
+  const out = { role, scope: isAdmin ? 'all' : 'self', canSeeIp: isAdmin, items };
+  if (wantHeat) out.heat = await heatmap(env, role, isAdmin);
+  return Response.json(out);
 }

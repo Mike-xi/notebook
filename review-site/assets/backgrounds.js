@@ -14,7 +14,7 @@
 // 浓淡 / 亮度分别由 CSS 变量 --nb-bg-opacity / --nb-bg-brightness 控制
 // （设置面板里的两根弹性滑杆，见 theme.js + slider.js）。
 //
-// 登录页（body.login）也用这套引擎，但不读偏好、不可切换：固定极光，浓淡固定。
+// 登录页（body.login）也用这套引擎，但不读偏好、不可切换：固定百叶窗，浓淡固定。
 (function () {
   const LOGIN = document.body.classList.contains('login');
   if (!LOGIN && !document.body.classList.contains('home')) return;
@@ -363,6 +363,35 @@
   function uniform1(n, v) { const l = loc(n); if (l !== null) gl.uniform1f(l, v); }
   function uniform4v(n, v) { const l = loc(n); if (l !== null) gl.uniform4fv(l, v); }
 
+  /* ------------------------------------------------------------- 取样给 ink.js
+     顶部字标和标题要挑一个跟背景相反的墨色，得知道左上角那片背景到底多亮。
+     画布没开 preserveDrawingBuffer（开了会拖慢合成），像素只能在 draw() 画完的
+     那一帧里读，所以这里是「挂个单，下一帧顺手读」。 */
+  let sampleJob = null;
+  const SPOTS = [[0.04, 0.05], [0.16, 0.10], [0.05, 0.20]];   // 字标 / 标题所在的左上角三点
+
+  function readSpots() {
+    const W = canvas.width, H = canvas.height, S = 12;
+    const px = new Uint8Array(S * S * 4);
+    let r = 0, g = 0, b = 0, a = 0, n = 0;
+    for (const [fx, fy] of SPOTS) {
+      const x = Math.min(W - S, Math.max(0, Math.round(W * fx)));
+      // readPixels 原点在左下角，页面坐标在左上角，y 要翻过来
+      const y = Math.min(H - S, Math.max(0, Math.round(H * (1 - fy)) - S));
+      gl.readPixels(x, y, S, S, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      for (let i = 0; i < px.length; i += 4) { r += px[i]; g += px[i + 1]; b += px[i + 2]; a += px[i + 3]; n++; }
+    }
+    if (!n) return null;
+    return { r: r / n / 255, g: g / n / 255, b: b / n / 255, a: a / n / 255 };
+  }
+
+  // ink.js 的入口：拿左上角背景的平均色（含 alpha）。非着色器背景一律给 null。
+  window.NBBackgroundSample = function (cb) {
+    if (!gl || !program || canvas.hidden || !SHADERS.includes(current)) { cb(null); return; }
+    sampleJob = cb;
+    if (!frame) frame = requestAnimationFrame(draw);   // reduced-motion 下循环是停的，踢一帧
+  };
+
   function draw(now) {
     frame = 0;
     if (!program || !SHADERS.includes(current)) return;
@@ -394,10 +423,11 @@
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+    if (sampleJob) { const job = sampleJob; sampleJob = null; try { job(readSpots()); } catch (e) { job(null); } }
     if (!REDUCED.matches && !document.hidden) frame = requestAnimationFrame(draw);
   }
 
-  const selected = () => (LOGIN ? 'aurora' : (document.documentElement.dataset.bg || 'none'));
+  const selected = () => (LOGIN ? 'blinds' : (document.documentElement.dataset.bg || 'none'));
   addEventListener('pointermove', (event) => {
     mouse.tx = event.clientX / Math.max(1, innerWidth);
     mouse.ty = 1 - event.clientY / Math.max(1, innerHeight);

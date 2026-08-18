@@ -154,6 +154,53 @@ homeTabs.addEventListener('click', (e) => {
   applyFilters();
 });
 
+// 窄屏分类菜单：手机上 .home-tabs 会折成两行，改成顶栏一个图标 + 下拉。
+// 菜单项由 .home-tabs 里的原按钮生成，点一下转发过去 —— 分类状态仍归上面那段管，
+// 这里只是个遥控器。代价是手机上没法把课程卡拖到分类标签上改分类了，
+// 不过卡片「更多选项」里本来就能改分类，手机上也只有那条路好走。
+const CAT_ICONS = { learn: 'bookopen', explore: 'compass', play: 'trophy', time: 'clock', all: 'stack' };
+const catsBtn = document.getElementById('cats-btn');
+const catsMenu = document.getElementById('cats-menu');
+const catsNow = document.getElementById('cats-now');
+if (catsBtn && catsMenu) {
+  catsMenu.innerHTML = [...homeTabs.querySelectorAll('.tab')].map((t) => `
+    <button type="button" class="cat-item" role="menuitem" data-cat-go="${escapeAttr(t.dataset.tab || 'all')}">
+      <span class="ic" data-icon="${CAT_ICONS[t.dataset.tab] || 'stack'}" data-icon-size="18"></span>
+      <span class="cat-name">${escapeHTML(t.textContent.trim())}</span>
+      <span class="ic cat-check" data-icon="check" data-icon-size="16"></span>
+    </button>`).join('');
+  if (window.NBIconHydrate) NBIconHydrate(catsMenu);
+
+  const closeCats = () => { catsMenu.hidden = true; catsBtn.setAttribute('aria-expanded', 'false'); };
+  catsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeSettings();
+    closeCreateMenu();
+    const open = catsMenu.hidden;
+    catsMenu.hidden = !open;
+    catsBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  catsMenu.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-cat-go]');
+    if (!item) return;
+    const tab = homeTabs.querySelector(`.tab[data-tab="${item.dataset.catGo}"]`);
+    if (tab) tab.click();
+    closeCats();
+  });
+  document.addEventListener('click', closeCats);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeCats(); });
+
+  // 选中态跟着原 tab 走（含 app.js 启动时恢复上次分类）
+  const syncCats = () => {
+    const cur = homeTabs.querySelector('.tab.active');
+    const key = (cur && cur.dataset.tab) || 'learn';
+    if (catsNow) catsNow.textContent = cur ? cur.textContent.trim() : 'Learn';
+    catsMenu.querySelectorAll('[data-cat-go]').forEach((b) => b.classList.toggle('on', b.dataset.catGo === key));
+  };
+  new MutationObserver(syncCats).observe(homeTabs, { attributes: true, subtree: true, attributeFilter: ['class'] });
+  syncCats();
+}
+
 // ========== 时间视图（Time Tab：按课程加进来的时间分组） ==========
 //
 // 关键约束：**不能为了排版去重排 DOM**。拖拽排序保存的就是 #courses 里 .nb-card 的
@@ -208,8 +255,6 @@ function layoutTimeline(on) {
   // 课程重新渲染时是整段 innerHTML 覆盖，标题节点会被一起冲掉 —— 池子里留的是
   // 已经脱离文档的孤儿节点，得先丢掉再重建，否则分组标题会整片消失。
   if (timeHeads.length && timeHeads[0].parentElement !== grid) timeHeads.length = 0;
-  const seg = document.getElementById('time-modes');
-  if (seg) seg.hidden = !on;
   grid.classList.toggle('by-time', !!on);
 
   const cards = [...grid.querySelectorAll('.nb-card')];
@@ -368,6 +413,7 @@ const settingsMenu = document.getElementById('settings-menu');
 function openSettings() {
   settingsMenu.hidden = false;
   settingsBtn.setAttribute('aria-expanded', 'true');
+  loadHeat();          // 首次打开时才去拉热力图，省一个首屏请求
 }
 function closeSettings() {
   settingsMenu.hidden = true;
@@ -1004,7 +1050,7 @@ function openCourseOptions(file) {
 
   courseModal.hidden = false;
   courseModal.classList.add('open');
-  if (window.NBGooey) NBGooey.enhanceAll(courseModal);
+  if (window.NBSegment) NBSegment.enhanceAll(courseModal);
   setTimeout(() => $('co-title').focus(), 30);
   document.addEventListener('keydown', escCourseOptions);
 }
@@ -1070,8 +1116,16 @@ const DOC_SECTIONS = [
   {
     icon: 'bookopen', title: '阅读器',
     body: `打开任意课程即进入阅读器，阅读进度和书签自动云端同步。
-      设置里的<b>「阅读器工具栏唤出」</b>决定顶部工具栏多容易被唤出来：
-      灵敏（鼠标靠近 4px 就出来）、适中（14px）、隐藏（只留一个返回键）、永久（彻底不显示，用浏览器返回）。`,
+      <ul>
+        <li><b>工具栏唤出</b> —— 设置里那一档决定顶部工具栏多容易被唤出来：灵敏（鼠标靠近 4px 就出来）、适中（14px）、隐藏（只留一个返回键）、永久（彻底不显示，用浏览器返回）。</li>
+        <li><b>阅读偏好</b>（字号、行距、暖光）只对当前这一篇生效，并会同步到云端。</li>
+        <li><b>分享</b> —— 生成的是只读链接：拿到链接的人不用登录就能看这一篇的全文、主题和阅读设置，但看不到你其它笔记，也回不到笔记库。必须设有效期（最长一年），到期链接失效。</li>
+      </ul>`,
+  },
+  {
+    icon: 'bookopen', title: '各页面的说明',
+    body: `云盘、Xi Pan、留言板这些页面右上角都有一个<b>「说明」</b>按钮 ——
+      原先散在页面上的灰色小字（审核规则、挂载地址、可见范围…）都收进去了，需要时点开看，平时不占版面。`,
   },
   {
     icon: 'list', title: '登录日志与隐私',
@@ -1129,9 +1183,65 @@ function closeDocs() {
 const docsBtn = document.getElementById('docs-btn');
 if (docsBtn) docsBtn.addEventListener('click', openDocs);
 
+// ========== 登录活跃热力图（设置面板） ==========
+// 一格一天，深浅按当天「登录 + 访问」的次数。数据走 /api/logins?heat=1 ——
+// 那边读的是 activity_days 按天计数表，不是 logs（logs 只留 30 天，撑不起一整年）。
+// 日期一律按北京时间：把时间戳 +8h 之后只读 UTC 字段，跟服务端的分天口径对齐。
+const heatBox = document.getElementById('login-heat');
+let heatState = 'idle';           // idle / loading / done
+const DAY_MS = 86400e3;
+const bjDate = (ts) => new Date(ts + 8 * 3600e3);
+const bjKey = (d) => d.toISOString().slice(0, 10);
+
+async function loadHeat() {
+  if (!heatBox || heatState !== 'idle') return;
+  heatState = 'loading';
+  heatBox.innerHTML = '<p class="heat-note">读取中…</p>';
+  let heat = null;
+  try {
+    const res = await fetch('/api/logins?heat=1&limit=1', { headers: { Accept: 'application/json' } });
+    const d = res.ok ? await res.json() : null;
+    heat = d && d.heat;
+  } catch {}
+  if (!heat) { heatState = 'idle'; heatBox.innerHTML = '<p class="heat-note">读取失败，重开一次设置再试</p>'; return; }
+  heatState = 'done';
+  renderHeat(heat);
+}
+
+function renderHeat(heat) {
+  const end = bjDate(Date.now());
+  // 起点：往前 span-1 天，再退到那一周的周日，凑成整列
+  const rough = new Date(end.getTime() - ((heat.span || 371) - 1) * DAY_MS);
+  const start = new Date(rough.getTime() - rough.getUTCDay() * DAY_MS);
+  const peak = Math.max(1, heat.max || 0);
+
+  const cells = [];
+  const months = [];
+  let col = 0;
+  for (let t = start.getTime(); t <= end.getTime(); t += DAY_MS) {
+    const d = new Date(t);
+    const key = bjKey(d);
+    const n = heat.days[key] || 0;
+    const lvl = n === 0 ? 0 : Math.min(4, Math.ceil((n / peak) * 4));
+    cells.push(`<i class="hc l${lvl}" style="grid-column:${col + 1};grid-row:${d.getUTCDay() + 1}" title="${key} · ${n} 次"></i>`);
+    // 每月 1 号所在的那一列打一个月份标
+    if (d.getUTCDate() === 1) months.push(`<em class="hm" style="grid-column:${col + 1} / span 5">${d.getUTCMonth() + 1}月</em>`);
+    if (d.getUTCDay() === 6) col++;
+  }
+
+  heatBox.innerHTML = `<div class="heat-top">
+      <span>过去一年 <b>${heat.total || 0}</b> 次</span>
+      <span class="heat-legend">少<i class="hc l0"></i><i class="hc l1"></i><i class="hc l2"></i><i class="hc l3"></i><i class="hc l4"></i>多</span>
+    </div>
+    <div class="heat-scroll"><div class="heat-grid" style="grid-template-columns:repeat(${col + 1}, var(--hc, 9px))">${cells.join('')}${months.join('')}</div></div>`;
+  // 最新的一周在最右边，默认滚到底
+  const scroller = heatBox.querySelector('.heat-scroll');
+  if (scroller) scroller.scrollLeft = scroller.scrollWidth;
+}
+
 // ========== 登录日志 ==========
 // 三级都能看：管理员看全部身份，一二级只看自己那一级（后端过滤，见 api/logins.js）。
-// 只有大致城市，没有 IP —— 登录时压根没记 IP。
+// 管理员那一级额外带 IP，一二级的返回里 ip 是空串。
 let loginsModal = null;
 // 日志里设备类型对应的图标（服务端 deviceKind：phone / tablet / desktop）
 const DEV_ICON = { phone: 'phone', tablet: 'tablet', desktop: 'laptop' };
@@ -1179,8 +1289,7 @@ async function openLogins() {
       <td class="lg-when">${escapeHTML(fmtWhen(it.at))}</td>
     </tr>`).join('');
   box.innerHTML = `<h3>登录日志</h3>
-    <p class="lg-scope">${data.scope === 'all' ? '管理员视角：显示全部身份的记录' : '只显示你这一级身份的记录'} ·
-      <b>登录</b>＝输过密码，<b>访问</b>＝已登录的设备当天第一次打开（会话有效期 30 天，手机往往只在这里出现）${ip ? ' · IP 仅管理员可见' : ' · 不显示 IP'}</p>
+    <p class="lg-scope">${data.scope === 'all' ? '管理员视角：全部身份的记录' : '只显示你这一级身份的记录'}</p>
     <div class="lg-wrap">
       <table class="lg-table">
         <thead><tr><th>方式</th><th>身份</th><th>设备</th><th>位置${ip ? ' / IP' : ''}</th><th>时间</th></tr></thead>

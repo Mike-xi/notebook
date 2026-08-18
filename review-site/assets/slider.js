@@ -146,7 +146,7 @@
     input.addEventListener('input', paint);
     input.addEventListener('change', paint);
     new ResizeObserver(paint).observe(root);
-    // 设置面板初始 hidden 时观察器不回调，低频兜一下（同 gooey.js 的处理）
+    // 设置面板初始 hidden 时观察器不回调，低频兜一下（同 segment.js 的处理）
     setInterval(paint, 400);
 
     paint();

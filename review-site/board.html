@@ -27,7 +27,6 @@
     header .back { text-decoration:none; color:var(--fg); font-size:20px; line-height:1; padding:4px 6px; border-radius:8px; }
     header .back:hover { background:var(--chip); }
     header .title { font-weight:700; font-size:16px; flex:1 1 auto; }
-    header .title small { font-weight:500; color:var(--muted); font-size:12px; margin-left:6px; }
     .admin-flag { font-size:11.5px; color:var(--accent); border:1px solid var(--accent); border-radius:999px; padding:2px 9px; }
 
     #list { flex:1 1 auto; overflow-y:auto; padding:14px 14px 6px; display:flex; flex-direction:column; gap:10px; }
@@ -60,7 +59,8 @@
     #nick:focus, #body:focus { outline:none; border-color:var(--accent); }
     #send { flex:0 0 auto; border:none; border-radius:12px; padding:0 20px; background:var(--accent); color:#fff; font-size:15px; font-weight:600; cursor:pointer; }
     #send:disabled { opacity:.5; cursor:default; }
-    .hint { font-size:11.5px; color:var(--muted); margin-top:6px; }
+    .hbtn { flex:0 0 auto; border:1px solid var(--border); background:none; color:var(--muted); border-radius:9px; padding:5px 11px; font-size:12.5px; cursor:pointer; }
+    .hbtn:hover { color:var(--fg); border-color:var(--accent); }
     .toast { position:fixed; left:50%; bottom:96px; transform:translateX(-50%); background:#111; color:#fff; padding:8px 16px; border-radius:999px; font-size:13px; opacity:0; transition:opacity .2s; pointer-events:none; z-index:20; }
     .toast.show { opacity:.92; }
   </style>
@@ -68,7 +68,8 @@
 <body>
   <header>
     <a class="back" href="/" title="返回">‹</a>
-    <div class="title">留言板 <small>人人可发 · 人人可见</small></div>
+    <div class="title">留言板</div>
+    <button class="hbtn" id="help-btn" type="button">说明</button>
     <span class="admin-flag" id="admin-flag" hidden>管理员视图</span>
   </header>
 
@@ -82,11 +83,22 @@
       <textarea id="body" rows="1" placeholder="说点什么…（Enter 发送，Shift+Enter 换行）"></textarea>
       <button id="send">发送</button>
     </div>
-    <div class="hint" id="hint">所有留言对全体登录用户可见。</div>
   </footer>
 
   <div class="toast" id="toast"></div>
 
-  <script src="/assets/board.js?v=20260617c"></script>
+  <script src="/assets/help.js?v=20260818a"></script>
+  <script>
+    NBHelp.attach('#help-btn', {
+      title: '留言板说明',
+      sections: [
+        { h: '谁看得到', body: '所有登录用户共用这一个版面：三级身份都能发言，发出来的内容对全体登录用户可见。' },
+        { h: '昵称', body: '昵称随手就能改，只是个显示名，不影响身份。' },
+        { h: '发送', body: '<b>Enter</b> 发送，<b>Shift + Enter</b> 换行。' },
+        { h: '管理员', body: '管理员视图下每条留言会附带 IP 与客户端信息，并可以删除留言。' },
+      ],
+    });
+  </script>
+  <script src="/assets/board.js?v=20260818a"></script>
 </body>
 </html>

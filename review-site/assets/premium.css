@@ -254,6 +254,20 @@
   color: inherit;
   filter: none;
 }
+/* 分类瓦片（窄屏）：内层按钮铺满瓦片，只留图标，当前分类名让位给 46px 见方 */
+:root[data-ui="premium"] .cats-wrap.dock-item .cats-btn {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  border-radius: inherit;
+  justify-content: center;
+}
+:root[data-ui="premium"] .dock-panel .cats-now { display: none; }
+/* 桌面端有分类瓦片，用不上分类菜单（.dock-item 的 display 压过 style.css，得在这儿关） */
+:root[data-ui="premium"] .cats-wrap.dock-item { display: none; }
 :root[data-ui="premium"] .settings-wrap.dock-item .settings-btn {
   width: 100%;
   height: 100%;
@@ -622,16 +636,10 @@
 
 /* ---------- 响应式 ---------- */
 @media (max-width: 700px) {
-  /* 小屏：dock 收窄，分类瓦片让位给经典分类条（触屏没有 hover 放大） */
+  /* 小屏：dock 收窄，五个分类瓦片收进顶栏的「分类」菜单（见 style.css .cats-wrap）。
+     以前这里是退回经典分类条，但 5 个标签在 iPhone 上会折成两行。 */
   :root[data-ui="premium"] .dock-tab, :root[data-ui="premium"] .dock-sep { display: none; }
-  :root[data-ui="premium"] .home-tabs {
-    display: flex;
-    padding: 6px;
-    border-radius: 18px;
-    width: fit-content;
-    margin-left: auto;   /* 小屏居中（原先 fit-content 左贴） */
-    margin-right: auto;
-  }
+  :root[data-ui="premium"] .cats-wrap.dock-item { display: inline-flex; }
   :root[data-ui="premium"] .dockbar .brand { position: static; transform: none; display: inline-flex; margin-bottom: 8px; }
   :root[data-ui="premium"] .topbar.dockbar { position: static; padding: 14px 16px 4px; text-align: center; }
   :root[data-ui="premium"] .dock-panel { height: 58px; }

@@ -1,5 +1,5 @@
 import { createSessionToken, makeAuthCookie, hashOwnerId } from '../_lib/auth.js';
-import { logEvent } from '../_lib/db.js';
+import { logEvent, bumpActivityDay } from '../_lib/db.js';
 import { buildDetail } from '../_lib/visitlog.js';
 
 // 逗号分隔的多密码 -> 去空数组
@@ -47,6 +47,7 @@ export async function onRequestPost({ request, env }) {
   // 位置和 IP 都取自 Cloudflare 边缘（request.cf / CF-Connecting-IP）；IP 只有管理员看得到，
   // 一二级在 /api/logins 里会被抹掉，别在别处直接把 detail 原样吐给前端。
   await logEvent(env, 'login', buildDetail(role, request));
+  await bumpActivityDay(env, role, 'login');   // 热力图的按天计数（logs 只留 30 天，见 db.js）
   return new Response(JSON.stringify({ ok: true, role }), {
     headers: {
       'Content-Type': 'application/json',

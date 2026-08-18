@@ -197,6 +197,61 @@ export async function logEvent(env, type, detail = '') {
   } catch {}
 }
 
+// 登录 / 访问的按天计数，喂设置面板里的热力图。
+// 为什么不直接数 logs 表：logs 只留 30 天（见上面的 LOG_RETENTION_MS），热力图要一整年。
+// 这张表一天一角色一行（三级身份 * 365 天 ≈ 1000 行/年），不清理也不会涨起来。
+let actReady = false;
+export async function ensureActivitySchema(env) {
+  if (actReady) return;
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS activity_days (
+       day    TEXT NOT NULL,               -- 北京时间的 YYYY-MM-DD
+       role   TEXT NOT NULL,
+       logins INTEGER NOT NULL DEFAULT 0,  -- 敲密码的次数
+       visits INTEGER NOT NULL DEFAULT 0,  -- 已登录设备当天首次打开的次数
+       PRIMARY KEY (day, role)
+     )`
+  ).run();
+  // 建表这一次顺手把 logs 里还没过期的 30 天回填进来，免得刚上线时热力图一片空白。
+  // detail 有三代格式：新的是 JSON（role 在 .r），老的是 "role · …" 前缀。
+  // 回填要读 logs 表，全新库里它可能还没建起来（中间件是并发调两边的），失败就算了
+  try {
+    const has = await env.DB.prepare('SELECT COUNT(*) AS n FROM activity_days').first();
+    if (!has || !has.n) {
+      await env.DB.prepare(
+        `INSERT OR IGNORE INTO activity_days (day, role, logins, visits)
+         SELECT date((created_at + 28800000) / 1000, 'unixepoch') AS day,
+                CASE WHEN substr(detail, 1, 1) = '{'
+                     THEN COALESCE(json_extract(detail, '$.r'), 'guest')
+                     ELSE COALESCE(NULLIF(substr(detail, 1, instr(detail, ' · ') - 1), ''), 'guest')
+                END AS role,
+                SUM(CASE WHEN type = 'login' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN type = 'visit' THEN 1 ELSE 0 END)
+           FROM logs
+          WHERE type IN ('login', 'visit')
+          GROUP BY day, role`
+      ).run();
+    }
+  } catch {}
+  actReady = true;
+}
+
+// 北京时间的 YYYY-MM-DD（和 _middleware.js 的 nb_seen cookie 用同一套分天口径）
+export const beijingDay = (ts = Date.now()) => new Date(ts + 8 * 3600e3).toISOString().slice(0, 10);
+
+// 记一次活跃。任何失败都吞掉 —— 统计不能影响登录主流程。
+export async function bumpActivityDay(env, role, kind) {
+  try {
+    if (!env || !env.DB) return;
+    await ensureActivitySchema(env);
+    const login = kind === 'login' ? 1 : 0;
+    await env.DB.prepare(
+      `INSERT INTO activity_days (day, role, logins, visits) VALUES (?, ?, ?, ?)
+       ON CONFLICT(day, role) DO UPDATE SET logins = logins + excluded.logins, visits = visits + excluded.visits`
+    ).bind(beijingDay(), String(role || 'guest').slice(0, 16), login, 1 - login).run();
+  } catch {}
+}
+
 // AI 对话历史：scope 区分会话（课程用 file，全能问答用 'omni'），保留约 30 天。
 let chatReady = false;
 export async function ensureChatSchema(env) {

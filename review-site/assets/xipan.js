@@ -10,7 +10,6 @@
     const dark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
     document.body.classList.toggle('dark', dark); })();
 
-  $('dav-url').textContent = location.origin + '/dav/';
 
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const enc = (rel) => rel.split('/').map(encodeURIComponent).join('/');

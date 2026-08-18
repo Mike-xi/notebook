@@ -63,7 +63,8 @@
       const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
       if (!r.ok) return;
       const d = await r.json();
-      if (d.me && d.me.admin && !isAdmin) { isAdmin = true; $('admin-flag').hidden = false; $('hint').textContent = '管理员视图：可见每条留言的 IP / 客户端，并可删除。'; }
+      // 「管理员视图可见 IP / 可删除」这句话搬到了右上角的「说明」里，这里只亮徽标
+      if (d.me && d.me.admin && !isAdmin) { isAdmin = true; $('admin-flag').hidden = false; }
       const msgs = d.messages || [];
       if (!lastId && !msgs.length) emptyEl.hidden = false;
       append(msgs);

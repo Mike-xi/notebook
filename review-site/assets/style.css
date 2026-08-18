@@ -153,9 +153,19 @@ body.home {
   height: 28px;
   width: auto;
   display: block;
+  transition: filter 260ms ease;
 }
-/* 深色模式：单色藏青字标统一反白 */
+/* 兜底：ink.js 没跑（非首页、或取样失败）时按主题反白 */
 [data-theme="dark"] .brand-logo { filter: brightness(0) invert(1); }
+
+/* ---- 与背景反着来的墨色（首页字标 + 「My notebooks」标题）----
+   data-ink 由 assets/ink.js 按背景实际亮度写：light = 背景暗，上白墨；
+   dark = 背景亮，字标回到原本的藏青、标题压成近黑。再补一圈反色光晕，
+   让它在花哨背景上也能立住（为什么不用 mix-blend-mode，见 ink.js 抬头）。 */
+:root[data-ink="light"] .brand-logo { filter: brightness(0) invert(1) drop-shadow(0 1px 6px rgba(0, 0, 0, .55)); }
+:root[data-ink="dark"] .brand-logo { filter: drop-shadow(0 1px 6px rgba(255, 255, 255, .6)); }
+:root[data-ink="light"] .section-title { color: #fff; text-shadow: 0 1px 14px rgba(0, 0, 0, .5); }
+:root[data-ink="dark"] .section-title { color: #14111c; text-shadow: 0 1px 14px rgba(255, 255, 255, .55); }
 
 .topbar-right {
   display: flex;
@@ -317,6 +327,47 @@ body.home {
 }
 .tab:hover { background: var(--surface-container-high); color: var(--on-surface); }
 .tab.active { background: var(--on-surface); color: var(--surface); }
+/* 窄屏分类菜单：顶栏一个图标顶掉整条分类栏（见 app.js 里的遥控器逻辑）。
+   默认不显示，只在 ≤700px 出现；那时 .home-tabs 整条隐藏。 */
+.cats-wrap { position: relative; display: none; flex: none; }
+.cats-btn { gap: 7px; }
+.cats-now { font-size: 13px; font-weight: 600; letter-spacing: -0.01em; }
+.cats-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  width: 200px;
+  padding: 8px;
+  background: var(--surface-container-high);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 60;
+  animation: settings-pop 140ms ease-out;
+  transform-origin: top left;
+}
+.cat-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 11px 12px;
+  border: none;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--on-surface);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color var(--transition), color var(--transition);
+}
+.cat-item:hover { background: var(--surface-container-highest); }
+.cat-name { flex: 1; text-align: left; }
+.cat-check { opacity: 0; }
+.cat-item.on { color: var(--primary); }
+.cat-item.on .cat-check { opacity: 1; }
+
 /* 拖动课程卡时：Tab 显出可放置边框；悬停的目标 Tab 高亮成「投放区」 */
 body.sorting .home-tabs .tab { box-shadow: inset 0 0 0 1.5px var(--outline-variant); transition: none; }
 .home-tabs .tab.drop-target {
@@ -333,6 +384,7 @@ main {
 }
 
 .section-title {
+  transition: color 260ms ease, text-shadow 260ms ease;
   font-size: 22px;
   font-weight: 600;
   color: var(--on-surface);
@@ -349,18 +401,6 @@ main {
 /* ---- 时间视图（Time Tab）----
    分组只靠 CSS order 排（DOM 顺序不动，见 app.js layoutTimeline），
    分组标题是同一个网格里的整行元素。 */
-.grid-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  flex-wrap: wrap;
-}
-.grid-head { margin: 28px 0 0; }
-.grid-head .section-title { margin: 0 4px; }
-.time-seg { flex: none; width: auto; }
-.time-seg .seg-btn { padding: 6px 14px; font-size: 12px; }
-
 .time-head {
   grid-column: 1 / -1;
   display: flex;
@@ -1803,29 +1843,35 @@ body.reader.split-chat #chat-panel {
 /* ========================================
    登录页
    ======================================== */
-/* 底色仍然铺一层渐变：极光画布加载前（或 WebGL 不可用时）不至于一片死白 */
+/* 底色仍然铺一层渐变：百叶窗画布加载前（或 WebGL 不可用时）不至于一片死白，
+   色调也照着百叶窗那两个端点走（粉 → 靛蓝），免得加载瞬间跳一下 */
 body.login {
   min-height: 100vh;
   display: grid;
   place-items: center;
   background:
-    radial-gradient(at 20% 30%, var(--primary-container) 0%, transparent 50%),
-    radial-gradient(at 80% 70%, var(--tertiary-container) 0%, transparent 50%),
-    var(--surface);
+    radial-gradient(at 18% 26%, rgba(255, 158, 253, .55) 0%, transparent 52%),
+    radial-gradient(at 82% 74%, rgba(82, 38, 255, .55) 0%, transparent 52%),
+    #14101f;
   padding: 24px;
 }
+/* 登录框走通透玻璃：底色只留一层薄雾，靠模糊 + 饱和把百叶窗的条纹折进来，
+   顶缘一道高光当玻璃厚度。深浅主题都压在这块暗底背景上，所以字统一走浅色。 */
 .login-card {
   position: relative;
-  z-index: 1;          /* 压在极光画布之上 */
-  background: color-mix(in srgb, var(--surface-container) 88%, transparent);
-  -webkit-backdrop-filter: blur(18px) saturate(1.2);
-  backdrop-filter: blur(18px) saturate(1.2);
-  border: 1px solid color-mix(in srgb, var(--outline-variant) 70%, transparent);
+  z-index: 1;          /* 压在背景画布之上 */
+  background: color-mix(in srgb, var(--surface-container) 12%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.5) brightness(1.06);
+  backdrop-filter: blur(14px) saturate(1.5) brightness(1.06);
+  border: 1px solid rgba(255, 255, 255, .26);
   border-radius: var(--radius-xl);
   padding: 48px 40px;
   width: 100%;
   max-width: 400px;
-  box-shadow: var(--shadow-lg);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .4),
+    inset 0 -1px 0 rgba(255, 255, 255, .1),
+    0 26px 64px rgba(8, 6, 20, .45);
 }
 .login-logo {
   width: 210px;
@@ -1833,41 +1879,44 @@ body.login {
   height: auto;
   display: block;
   margin: 4px auto 22px;
+  filter: brightness(0) invert(1);      /* 玻璃底下一律反白，不再分主题 */
 }
-[data-theme="dark"] .login-logo { filter: brightness(0) invert(1); }
-body.login .eyebrow { display: block; text-align: center; margin: 0 0 26px; }
+body.login .eyebrow { display: block; text-align: center; margin: 0 0 26px; color: rgba(255, 255, 255, .72); }
 .login-card label {
   display: block;
   font-size: 12px;
   font-weight: 500;
-  color: var(--on-surface-variant);
+  color: rgba(255, 255, 255, .72);
   margin-bottom: 8px;
 }
 #password {
   width: 100%;
   padding: 16px 20px;
-  border: 1px solid var(--outline);
+  border: 1px solid rgba(255, 255, 255, .26);
   border-radius: var(--radius-sm);
-  background: var(--surface-container-lowest);
-  color: var(--on-surface);
+  background: rgba(255, 255, 255, .1);
+  color: #fff;
   font-size: 16px;
   outline: none;
   margin-bottom: 24px;
-  transition: border-color var(--transition);
+  transition: border-color var(--transition), background-color var(--transition);
 }
-#password:focus { border-color: var(--primary); border-width: 2px; padding: 15px 19px; }
+#password::placeholder { color: rgba(255, 255, 255, .45); }
+#password:focus { border-color: rgba(255, 255, 255, .7); background: rgba(255, 255, 255, .16); }
+/* 按钮走「玻璃上的白药丸」：紫底上白色比品牌紫更跳得出来 */
 #submit-btn {
   width: 100%;
   padding: 14px;
   border: none;
   border-radius: var(--radius-full);
-  background: var(--primary);
-  color: var(--on-primary);
+  background: rgba(255, 255, 255, .92);
+  color: #241b3a;
   font-size: 15px;
-  font-weight: 500;
-  transition: filter var(--transition);
+  font-weight: 600;
+  box-shadow: 0 6px 18px rgba(8, 6, 20, .28);
+  transition: background-color var(--transition), transform var(--transition);
 }
-#submit-btn:hover:not(:disabled) { filter: brightness(1.05); }
+#submit-btn:hover:not(:disabled) { background: #fff; transform: translateY(-1px); }
 #submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .error-msg {
   margin-top: 16px;
@@ -1882,6 +1931,13 @@ body.login .eyebrow { display: block; text-align: center; margin: 0 0 26px; }
 /* ========================================
    响应式
    ======================================== */
+/* 手机：整条分类栏收进顶栏的「分类」菜单。5 个标签在 iPhone 上会折成两行，
+   而触屏本来也拖不动课程卡去改分类（改分类走卡片的「更多选项」）。 */
+@media (max-width: 700px) {
+  .home-tabs { display: none; }
+  .cats-wrap { display: block; }
+  .cats-btn .cats-now { display: inline; }
+}
 @media (max-width: 640px) {
   .topbar { padding: 16px 20px; flex-wrap: wrap; gap: 14px; }
   .topbar-right { width: 100%; }
@@ -1960,6 +2016,55 @@ body.login .eyebrow { display: block; text-align: center; margin: 0 0 26px; }
   color: var(--on-surface-variant);
   margin-bottom: 8px;
 }
+/* ---- 登录活跃热力图（设置面板，见 app.js renderHeat）----
+   7 行 = 周日到周六，一列一周；列数由 JS 写进 grid-template-columns。
+   设置面板只有 340px 宽，一整年排不下，所以横向滚动、默认滚到最右（最近一周）。 */
+.heat { --hc: 9px; }
+.heat-note { margin: 2px; font-size: 11.5px; color: var(--on-surface-variant); }
+.heat-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 2px 7px;
+  font-size: 11.5px;
+  color: var(--on-surface-variant);
+}
+.heat-top b { color: var(--on-surface); font-weight: 650; }
+.heat-legend { display: inline-flex; align-items: center; gap: 3px; }
+.heat-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.heat-scroll::-webkit-scrollbar { height: 0; }
+.heat-grid {
+  display: grid;
+  grid-template-rows: repeat(7, var(--hc)) 14px;
+  gap: 3px;
+  width: max-content;
+}
+.hc {
+  display: block;
+  width: var(--hc);
+  height: var(--hc);
+  border-radius: 2.5px;
+  background: color-mix(in srgb, var(--on-surface) 9%, transparent);
+}
+.hc.l1 { background: color-mix(in srgb, var(--primary) 30%, transparent); }
+.hc.l2 { background: color-mix(in srgb, var(--primary) 52%, transparent); }
+.hc.l3 { background: color-mix(in srgb, var(--primary) 74%, transparent); }
+.hc.l4 { background: var(--primary); }
+.hm {
+  grid-row: 8;
+  align-self: end;
+  font-size: 9.5px;
+  font-style: normal;
+  color: var(--on-surface-variant);
+  white-space: nowrap;
+}
+
 .seg {
   display: flex;
   gap: 4px;
@@ -1989,108 +2094,37 @@ body.login .eyebrow { display: block; text-align: center; margin: 0 0 26px; }
 [data-theme="dark"] .seg-btn.active { color: #1c1b1f; }
 
 /* ========================================
-   分段控件的黏液指示器（移植自 React Bits GooeyNav，见 assets/gooey.js）
+   分段控件的滑块指示器（见 assets/segment.js）
    ======================================== */
-.seg.gooey {
-  position: relative;
-  isolation: isolate;      /* mix-blend-mode 只在这个盒子里生效，别去糊整页 */
-  /* 熔球层那块 inset:-60px 的底色必须裁掉：isolate 之后控件外面在这个混合组里
-     是全透明的，黑底压上去不会被 lighten 抵消，会直接糊住旁边的内容。 */
-  overflow: hidden;
-  --goo-ink: var(--primary);
-  --goo-bg: #fff;          /* 亮色：白底 + 深色球 + darken */
-  --goo-blend: darken;
-}
-[data-theme="dark"] .seg.gooey {
-  --goo-bg: #000;          /* 暗色：黑底 + 亮色球 + lighten */
-  --goo-blend: lighten;
-}
-/* 药丸交给 effect 层画，按钮自己的底色让位（文字颜色还是要跟着切） */
-.seg.gooey .seg-btn { position: relative; z-index: 3; background: none !important; box-shadow: none !important; }
-.seg.gooey .seg-btn.active { color: var(--on-primary, #fff); }
-[data-theme="dark"] .seg.gooey .seg-btn.active { color: #1c1b1f; }
-
-.seg.gooey .effect {
+.seg.slide { position: relative; }
+/* 药丸交给 .seg-thumb 画，按钮自己的底色让位（文字颜色还是要跟着切） */
+.seg.slide .seg-btn { position: relative; z-index: 2; }
+.seg.slide .seg-btn.active { background: transparent; box-shadow: none; color: var(--on-primary, #fff); }
+[data-theme="dark"] .seg.slide .seg-btn.active { color: #1c1b1f; }
+/* 未选中的格子悬停给一层极淡的底，指明可点，但别抢药丸的戏 */
+.seg.slide .seg-btn:not(.active):hover { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+.seg-thumb {
   position: absolute;
-  left: 0; top: 0;
-  width: 0; height: 0;
-  pointer-events: none;
-  display: grid;
-  place-items: center;
-  z-index: 1;
-  transition: left 380ms cubic-bezier(.22,.78,.28,1), top 380ms cubic-bezier(.22,.78,.28,1),
-              width 380ms cubic-bezier(.22,.78,.28,1), height 380ms cubic-bezier(.22,.78,.28,1);
-}
-/* 实心药丸层：普通渲染，不进混合组，深浅两色下都是实的 */
-.seg.gooey .effect.pill {
+  left: 0;
+  top: 0;
   z-index: 1;
   border-radius: 100vw;
-  background: var(--goo-ink);
-  box-shadow: 0 1px 6px color-mix(in srgb, var(--goo-ink) 45%, transparent);
-  transform: scale(1);
-  opacity: 1;
-  /* 回弹一下，像是被粒子「挤」出来的 */
-  transition: transform 340ms cubic-bezier(.34, 1.56, .64, 1), opacity 200ms ease;
-}
-/* 点击瞬间进入这个状态：药丸缩没，同时关掉位移过渡好瞬移到新格子；
-   等粒子汇聚到位后 JS 摘掉这个类，药丸再从中心弹出来。 */
-.seg.gooey .effect.pill.spawning {
-  transform: scale(0);
-  opacity: 0;
-  transition: transform 140ms ease-in, opacity 120ms ease-in;
-}
-
-/* 熔球层：blur + 极高 contrast 把分开的小球熔成一坨，这是 gooey 的关键 */
-.seg.gooey .effect.filter {
-  z-index: 2;
-  filter: blur(7px) contrast(100) blur(0);
-  mix-blend-mode: var(--goo-blend);
-}
-.seg.gooey .effect.filter::before {
-  content: '';
-  position: absolute;
-  inset: -60px;
-  z-index: -2;
-  background: var(--goo-bg);
-}
-
-.seg.gooey .particle,
-.seg.gooey .point {
-  display: block;
-  opacity: 0;
-  width: 20px; height: 20px;
-  border-radius: 100%;
+  background: var(--primary);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .22),
+    0 1px 4px color-mix(in srgb, var(--primary) 42%, transparent);
+  transform: translate3d(var(--tx, 0), var(--ty, 0), 0) scaleX(var(--sx, 1));
   transform-origin: center;
+  pointer-events: none;
+  /* 位移带一点点回弹；宽度跟着走，拉伸(--sx)单独用一条更快的曲线收回去 */
+  transition:
+    transform 380ms cubic-bezier(.34, 1.24, .44, 1),
+    width 380ms cubic-bezier(.34, 1.24, .44, 1),
+    height 200ms ease;
 }
-.seg.gooey .particle {
-  --time: 5s;
-  position: absolute;
-  top: calc(50% - 10px);
-  left: calc(50% - 10px);
-  animation: goo-particle calc(var(--time)) ease 1 -350ms;
-}
-.seg.gooey .point {
-  background: var(--goo-ink);
-  opacity: 1;
-  animation: goo-point calc(var(--time)) ease 1 -350ms;
-}
-@keyframes goo-particle {
-  0%   { transform: rotate(0deg) translate(var(--start-x), var(--start-y)); opacity: 1; animation-timing-function: cubic-bezier(.55,0,1,.45); }
-  70%  { transform: rotate(calc(var(--rotate) * .5)) translate(calc(var(--end-x) * 1.2), calc(var(--end-y) * 1.2)); opacity: 1; animation-timing-function: ease; }
-  85%  { transform: rotate(calc(var(--rotate) * .66)) translate(var(--end-x), var(--end-y)); opacity: 1; }
-  100% { transform: rotate(calc(var(--rotate) * 1.2)) translate(calc(var(--end-x) * .5), calc(var(--end-y) * .5)); opacity: 1; }
-}
-@keyframes goo-point {
-  0%   { transform: scale(0); opacity: 0; animation-timing-function: cubic-bezier(.55,0,1,.45); }
-  25%  { transform: scale(calc(var(--scale) * .25)); }
-  38%  { opacity: 1; }
-  65%  { transform: scale(var(--scale)); opacity: 1; animation-timing-function: ease; }
-  85%  { transform: scale(var(--scale)); opacity: 1; }
-  100% { transform: scale(0); opacity: 0; }
-}
+.seg-thumb.moving { filter: saturate(1.12); }
 @media (prefers-reduced-motion: reduce) {
-  .seg.gooey .effect { transition: none; }
-  .seg.gooey .particle { display: none; }
+  .seg-thumb { transition: none; }
 }
 .sm-tip {
   margin: 8px 2px 0;

@@ -26,8 +26,8 @@
     })();
   </script>
   <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613d">
-  <link rel="stylesheet" href="/assets/style.css?v=20260817i">
-  <link rel="stylesheet" href="/assets/premium.css?v=20260817i">
+  <link rel="stylesheet" href="/assets/style.css?v=20260818a">
+  <link rel="stylesheet" href="/assets/premium.css?v=20260818a">
 </head>
 <body class="home">
   <header class="topbar">
@@ -35,6 +35,14 @@
       <img class="brand-logo" src="/assets/brand-xinotebook.png?v=20260613d" alt="Xi Notebook">
     </a>
     <div class="topbar-right">
+      <!-- 窄屏分类：5 个标签在手机上要折两行，收成顶栏一个图标菜单（≤700px 才显示） -->
+      <div class="cats-wrap">
+        <button class="pill-btn cats-btn" id="cats-btn" aria-haspopup="true" aria-expanded="false" title="分类">
+          <span class="ic" data-icon="squaresfour" data-icon-size="18"></span>
+          <span class="cats-now" id="cats-now">Learn</span>
+        </button>
+        <div class="cats-menu" id="cats-menu" hidden role="menu"></div>
+      </div>
       <div class="search-wrap">
         <span class="search-icon ic" data-icon="search" data-icon-size="18"></span>
         <input type="search" id="search" placeholder="Search notebooks · press Enter for full text" autocomplete="off">
@@ -108,6 +116,19 @@
             </div>
           </div>
           <div class="sm-section">
+            <span class="sm-label">时间视图分组</span>
+            <!-- Time 标签下按什么粒度分组（自然月 / 交大学期），见 app.js layoutTimeline -->
+            <div class="seg" role="group" aria-label="时间分组方式" id="time-modes">
+              <button class="seg-btn" data-time-mode="month" aria-pressed="false">按月份</button>
+              <button class="seg-btn" data-time-mode="term" aria-pressed="false">按学期</button>
+            </div>
+          </div>
+          <div class="sm-section">
+            <span class="sm-label">登录活跃</span>
+            <!-- 一年的登录 / 访问热力图，数据来自 /api/logins?heat=1（见 app.js renderHeat） -->
+            <div class="heat" id="login-heat" aria-label="登录活跃热力图"></div>
+          </div>
+          <div class="sm-section">
             <span class="sm-label">阅读器工具栏唤出</span>
             <div class="seg" role="group" aria-label="工具栏唤出灵敏度">
               <button class="seg-btn" data-bar-reveal="4" aria-pressed="false">灵敏</button>
@@ -137,14 +158,7 @@
     </nav>
 
     <section>
-      <div class="grid-head">
-        <h2 class="section-title" id="grid-title">My notebooks</h2>
-        <!-- 只在 Time 视图下出现：按自然月 / 按学期两种分组粒度 -->
-        <div class="seg time-seg" id="time-modes" role="group" aria-label="时间分组方式" hidden>
-          <button class="seg-btn" data-time-mode="month" aria-pressed="false">按月份</button>
-          <button class="seg-btn" data-time-mode="term" aria-pressed="false">按学期</button>
-        </div>
-      </div>
+      <h2 class="section-title" id="grid-title">My notebooks</h2>
       <div id="courses" class="card-grid"></div>
       <p id="empty-hint" class="empty-state" hidden>No notebooks here yet — use <b>Create</b> to add one.</p>
     </section>
@@ -278,20 +292,20 @@
         <h3><span class="ic" data-icon="tray" data-icon-size="18"></span> 内容审核</h3>
         <button class="icon-btn" id="review-close" title="关闭"><span class="ic" data-icon="close" data-icon-size="18"></span></button>
       </div>
-      <p class="rv-tip">游客（一级 / 二级）上传的内容会先到这里。通过后进入课程列表，拒绝则删除。</p>
       <div class="rv-body" id="review-body"></div>
     </div>
   </div>
 
-  <script src="/assets/icons.js?v=20260616a" defer></script>
-  <script src="/assets/cropper.js?v=20260817i" defer></script>
-  <script src="/assets/slider.js?v=20260817i" defer></script>
-  <script src="/assets/theme.js?v=20260817i" defer></script>
-  <script src="/assets/backgrounds.js?v=20260817i" defer></script>
-  <script src="/assets/gooey.js?v=20260817j" defer></script>
-  <script src="/assets/appearance.js?v=20260817i" defer></script>
-  <script src="/assets/md.js?v=20260608d" defer></script>
-  <script src="/assets/app.js?v=20260817i" defer></script>
-  <script src="/assets/premium.js?v=20260817i" defer></script>
+  <script src="/assets/icons.js?v=20260818a" defer></script>
+  <script src="/assets/cropper.js?v=20260818a" defer></script>
+  <script src="/assets/slider.js?v=20260818a" defer></script>
+  <script src="/assets/theme.js?v=20260818a" defer></script>
+  <script src="/assets/backgrounds.js?v=20260818a" defer></script>
+  <script src="/assets/segment.js?v=20260818a" defer></script>
+  <script src="/assets/ink.js?v=20260818a" defer></script>
+  <script src="/assets/appearance.js?v=20260818a" defer></script>
+  <script src="/assets/md.js?v=20260818a" defer></script>
+  <script src="/assets/app.js?v=20260818a" defer></script>
+  <script src="/assets/premium.js?v=20260818a" defer></script>
 </body>
 </html>

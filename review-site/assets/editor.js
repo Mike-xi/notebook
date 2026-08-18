@@ -1,6 +1,15 @@
 // 站内 Markdown 笔记编辑器：左编辑右预览（窄屏二选一切换）。
 // 新建：POST /api/courses（multipart，复用上传通道）；编辑：PUT /api/courses。
 // 新建时的草稿自动备份到 localStorage，防崩溃丢稿；保存成功后清掉。
+//
+// 除了基本的语法工具栏，还有几件「成熟编辑器该有」的事（对着 Typora / StackEdit /
+// Vditor 这些补的）：
+//   · 公式符号面板 —— 希腊字母 / 运算 / 关系 / 微积分 / 矩阵 / 物理记号 / 常量单位 /
+//     常用公式，按钮本身用 KaTeX 渲染，支持中文搜索（数据见 editor-symbols.js）；
+//   · 大纲（从 # 标题生成，点击跳转）、字数与阅读时间统计；
+//   · 列表 / 引用回车自动续行，空项回车收尾；
+//   · 图片粘贴或拖入，压缩后内嵌成 data URI；
+//   · 编辑区与预览区滚动同步。
 (function () {
   const params = new URLSearchParams(location.search);
   let file = params.get('file') || '';          // 空 = 新建
@@ -50,6 +59,8 @@
   }
   function renderPreview() {
     const text = inputEl.value;
+    updateCount();
+    renderOutline();
     if (!text.trim()) {
       previewEl.innerHTML = '<p class="ed-preview-empty">预览会出现在这里…</p>';
       return;
@@ -215,13 +226,305 @@
     applyMd(btn.dataset.md);
   });
 
-  // 编辑区内快捷键：Ctrl/⌘+B 加粗、Ctrl/⌘+I 斜体（保存快捷键见下方全局监听）
+  // 编辑区内快捷键（保存快捷键见下方全局监听）
+  const HOTKEYS = { b: 'bold', i: 'italic', k: 'link', e: 'code', m: 'formula' };
   inputEl.addEventListener('keydown', (e) => {
     if (!(e.ctrlKey || e.metaKey)) return;
-    const k = e.key.toLowerCase();
-    if (k === 'b') { e.preventDefault(); applyMd('bold'); }
-    else if (k === 'i') { e.preventDefault(); applyMd('italic'); }
+    const act = HOTKEYS[e.key.toLowerCase()];
+    if (act) { e.preventDefault(); applyMd(act); }
   });
+
+  // ===== 公式符号面板 =====
+  // 数据在 assets/editor-symbols.js。按钮上的样子直接用 KaTeX 渲染，所见即所得。
+  // 插入时会判断光标是不是已经在 $…$ 里：不在就顺手补一对美元号，省得每次手动包。
+  const symsBox = document.getElementById('ed-syms');
+  const symTabs = document.getElementById('sym-tabs');
+  const symGrid = document.getElementById('sym-grid');
+  const symSearch = document.getElementById('sym-search');
+  const symBtn = document.getElementById('ed-sym-btn');
+  const GROUPS = window.NB_SYMBOLS || [];
+  let symGroup = GROUPS.length ? GROUPS[0].key : '';
+
+  function katexHTML(tex) {
+    if (!window.katex) return escapeHTML(tex);
+    try { return katex.renderToString(tex, { throwOnError: false, displayMode: false }); }
+    catch { return escapeHTML(tex); }
+  }
+  function escapeHTML(s) {
+    return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  }
+
+  // 光标是否落在行内公式里：数一数本段落里光标之前有多少个未转义的 $，奇数即在里面
+  function insideMath(pos) {
+    const val = inputEl.value;
+    const from = val.lastIndexOf('\n\n', Math.max(0, pos - 1)) + 1;
+    const seg = val.slice(from, pos);
+    let n = 0;
+    for (let i = 0; i < seg.length; i++) {
+      if (seg[i] === '$' && seg[i - 1] !== '\\') n++;
+    }
+    return n % 2 === 1;
+  }
+
+  function insertSymbol(item) {
+    const s = inputEl.selectionStart, e = inputEl.selectionEnd;
+    const body = item.i || item.t;
+    const block = body.includes('\n');                 // 矩阵这类多行的，直接给块级公式
+    let text = body, pad = 0;
+    if (block) {
+      text = insideMath(s) ? body : '$$\n' + body + '\n$$';
+      pad = insideMath(s) ? 0 : 3;
+    } else if (!insideMath(s)) {
+      text = '$' + body + '$';
+      pad = 1;
+    }
+    inputEl.setRangeText(text, s, e, 'end');
+    // 模板插进去以后把要改的那一小段选中，直接接着敲
+    if (item.sel) {
+      const at = inputEl.value.indexOf(item.sel, s + pad);
+      if (at >= 0) inputEl.setSelectionRange(at, at + item.sel.length);
+    }
+    afterEdit();
+  }
+
+  function renderSymGrid(query) {
+    if (!symGrid) return;
+    const q = (query || '').trim().toLowerCase();
+    let items = [];
+    let wide = false;
+    if (q) {
+      // 搜索跨全部分组，匹配关键字或 LaTeX 本身
+      GROUPS.forEach((gr) => gr.items.forEach((it) => {
+        const hay = ((it.k || '') + ' ' + (it.i || it.t)).toLowerCase();
+        if (hay.includes(q)) items.push(it);
+      }));
+      items = items.slice(0, 60);
+    } else {
+      const gr = GROUPS.find((x) => x.key === symGroup) || GROUPS[0];
+      if (gr) { items = gr.items; wide = !!gr.wide; }
+    }
+    symGrid.classList.toggle('wide', wide || (!!q && items.some((it) => (it.i || it.t).length > 22)));
+    symGrid.innerHTML = items.length
+      ? items.map((it, i) => `<button class="sym-btn" type="button" data-sym="${i}" title="${escapeHTML(it.k || '')}\n${escapeHTML(it.i || it.t)}">${katexHTML(it.t)}</button>`).join('')
+      : '<p class="sym-empty">没找到，换个词试试（支持中文名，如「求和」「矢量」「雷诺」）</p>';
+    symGrid.__items = items;
+  }
+
+  if (symsBox && GROUPS.length) {
+    symTabs.innerHTML = GROUPS.map((gr) => `<button class="sym-tab${gr.key === symGroup ? ' on' : ''}" type="button" data-group="${gr.key}">${gr.name}</button>`).join('');
+    symTabs.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-group]');
+      if (!b) return;
+      symGroup = b.dataset.group;
+      symSearch.value = '';
+      symTabs.querySelectorAll('.sym-tab').forEach((x) => x.classList.toggle('on', x.dataset.group === symGroup));
+      renderSymGrid('');
+    });
+    symGrid.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-sym]');
+      if (!b || !symGrid.__items) return;
+      const it = symGrid.__items[Number(b.dataset.sym)];
+      if (it) insertSymbol(it);
+    });
+    symSearch.addEventListener('input', () => renderSymGrid(symSearch.value));
+    symBtn.addEventListener('click', () => {
+      const open = symsBox.hidden;
+      symsBox.hidden = !open;
+      symBtn.classList.toggle('on', open);
+      if (open && !symGrid.__items) renderSymGrid('');
+    });
+  }
+
+  // ===== 大纲 =====
+  // 从正文里抓 # 标题（跳过 ``` 代码块里的假标题），点一下把编辑区滚过去。
+  const outlineEl = document.getElementById('ed-outline');
+  const olBtn = document.getElementById('ed-ol-btn');
+
+  function headings() {
+    const lines = inputEl.value.split('\n');
+    const out = [];
+    let fence = false;
+    lines.forEach((ln, i) => {
+      if (/^\s*(```|~~~)/.test(ln)) { fence = !fence; return; }
+      if (fence) return;
+      const m = /^(#{1,4})\s+(.+?)\s*#*$/.exec(ln);
+      if (m) out.push({ level: m[1].length, text: m[2], line: i });
+    });
+    return out;
+  }
+
+  function renderOutline() {
+    if (!outlineEl || !mainEl.classList.contains('show-outline')) return;
+    const hs = headings();
+    outlineEl.innerHTML = hs.length
+      ? hs.map((h) => `<button class="ol-item h${h.level}" type="button" data-line="${h.line}">${escapeHTML(h.text)}</button>`).join('')
+      : '<p class="ol-empty">还没有标题。用 <b>#</b> 开头写一行就会出现在这里。</p>';
+  }
+
+  // 把某一行滚到编辑区可视范围（textarea 没有 scrollIntoView，按行高估算）
+  function gotoLine(line) {
+    const val = inputEl.value;
+    let at = 0;
+    for (let i = 0; i < line; i++) {
+      const nl = val.indexOf('\n', at);
+      if (nl === -1) break;
+      at = nl + 1;
+    }
+    inputEl.focus();
+    inputEl.setSelectionRange(at, at);
+    const lh = parseFloat(getComputedStyle(inputEl).lineHeight) || 27;
+    inputEl.scrollTop = Math.max(0, line * lh - inputEl.clientHeight / 3);
+  }
+
+  if (outlineEl && olBtn) {
+    olBtn.addEventListener('click', () => {
+      const on = mainEl.classList.toggle('show-outline');
+      olBtn.classList.toggle('on', on);
+      if (on) renderOutline();
+    });
+    outlineEl.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-line]');
+      if (b) gotoLine(Number(b.dataset.line));
+    });
+  }
+
+  // ===== 字数统计 =====
+  // 中文按字算、英文按词算，两边分开数才准。
+  const countEl = document.getElementById('ed-count');
+  function updateCount() {
+    if (!countEl) return;
+    const text = inputEl.value;
+    const cjk = (text.match(/[一-鿿㐀-䶿]/g) || []).length;
+    const words = (text.replace(/[一-鿿㐀-䶿]/g, ' ').match(/[A-Za-z0-9_'-]+/g) || []).length;
+    const lines = text ? text.split('\n').length : 0;
+    // 中文按 300 字/分钟、英文按 200 词/分钟估阅读时间
+    const mins = Math.max(1, Math.round(cjk / 300 + words / 200));
+    countEl.textContent = `${cjk + words} 字 · ${lines} 行 · 约 ${mins} 分钟`;
+  }
+
+  // ===== 列表 / 引用自动续行 =====
+  // 回车时如果上一行是列表项，自动补上同样的记号；上一行是空项就把它清掉收尾。
+  const LIST_RE = /^(\s*)(?:([-*+])|(\d+)([.)]))\s+(\[[ xX]\]\s+)?(.*)$/;
+  const QUOTE_RE = /^(\s*)>\s?(.*)$/;
+
+  function continueList(e) {
+    if (e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.metaKey || e.isComposing) return;
+    const pos = inputEl.selectionStart;
+    if (pos !== inputEl.selectionEnd) return;
+    const val = inputEl.value;
+    const from = val.lastIndexOf('\n', pos - 1) + 1;
+    const line = val.slice(from, pos);
+
+    const li = LIST_RE.exec(line);
+    if (li) {
+      const [, indent, bullet, num, dot, task, body] = li;
+      if (!body.trim()) {           // 空项：回车即收尾，把这行清掉
+        e.preventDefault();
+        inputEl.setRangeText('', from, pos, 'end');
+        afterEdit();
+        return;
+      }
+      e.preventDefault();
+      const mark = bullet ? bullet + ' ' : (Number(num) + 1) + dot + ' ';
+      inputEl.setRangeText('\n' + indent + mark + (task ? '[ ] ' : ''), pos, pos, 'end');
+      afterEdit();
+      return;
+    }
+    const qu = QUOTE_RE.exec(line);
+    if (qu) {
+      if (!qu[2].trim()) {
+        e.preventDefault();
+        inputEl.setRangeText('', from, pos, 'end');
+        afterEdit();
+        return;
+      }
+      e.preventDefault();
+      inputEl.setRangeText('\n' + qu[1] + '> ', pos, pos, 'end');
+      afterEdit();
+    }
+  }
+  inputEl.addEventListener('keydown', continueList);
+
+  // ===== 图片：粘贴 / 拖进来 =====
+  // 站内没有给笔记正文用的图床，所以压一压直接内嵌成 data URI（笔记本身就是一份 .md 文本）。
+  // 长边超过 1600 会缩，压完还超过 1.2MB 就拒绝 —— 免得一张图把整篇笔记撑爆。
+  const IMG_MAX_EDGE = 1600;
+  const IMG_MAX_BYTES = 1.2 * 1024 * 1024;
+
+  function shrinkImage(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const scale = Math.min(1, IMG_MAX_EDGE / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        const type = file.type === 'image/png' ? 'image/png' : 'image/webp';
+        resolve(cv.toDataURL(type, 0.85));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片读不出来')); };
+      img.src = url;
+    });
+  }
+
+  async function insertImage(file) {
+    if (!file || !/^image\//.test(file.type)) return;
+    setStatus('处理图片…');
+    try {
+      const uri = await shrinkImage(file);
+      if (uri.length > IMG_MAX_BYTES) { setStatus('图片太大了（压完仍超 1.2 MB），先缩小再传', 'err'); return; }
+      insertBlock(`![${(file.name || 'image').replace(/\.[^.]+$/, '')}](${uri})`);
+      setStatus(`已插入图片（约 ${Math.max(1, Math.round(uri.length / 1024))} KB）`);
+    } catch (err) {
+      setStatus(err.message || '图片插入失败', 'err');
+    }
+  }
+
+  inputEl.addEventListener('paste', (e) => {
+    const item = [...(e.clipboardData && e.clipboardData.items || [])].find((x) => x.type.startsWith('image/'));
+    if (!item) return;
+    e.preventDefault();
+    insertImage(item.getAsFile());
+  });
+  inputEl.addEventListener('dragover', (e) => {
+    if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) e.preventDefault();
+  });
+  inputEl.addEventListener('drop', (e) => {
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!file || !/^image\//.test(file.type)) return;
+    e.preventDefault();
+    insertImage(file);
+  });
+
+  // ===== 编辑区 <-> 预览 滚动同步 =====
+  // 按滚动百分比对齐就够了（要精确对应得给每个块打行号，代价太大）。
+  const previewWrap = document.getElementById('ed-preview-wrap');
+  let syncing = 0;
+  function linkScroll(from, to) {
+    from.addEventListener('scroll', () => {
+      if (syncing === 2) return;
+      syncing = 1;
+      const max = from.scrollHeight - from.clientHeight;
+      const ratio = max > 0 ? from.scrollTop / max : 0;
+      to.scrollTop = ratio * (to.scrollHeight - to.clientHeight);
+      requestAnimationFrame(() => { syncing = 0; });
+    }, { passive: true });
+  }
+  if (previewWrap) {
+    linkScroll(inputEl, previewWrap);
+    previewWrap.addEventListener('scroll', () => {
+      if (syncing === 1) return;
+      syncing = 2;
+      const max = previewWrap.scrollHeight - previewWrap.clientHeight;
+      const ratio = max > 0 ? previewWrap.scrollTop / max : 0;
+      inputEl.scrollTop = ratio * (inputEl.scrollHeight - inputEl.clientHeight);
+      requestAnimationFrame(() => { syncing = 0; });
+    }, { passive: true });
+  }
 
   // ===== 保存 =====
   function guessTitle() {

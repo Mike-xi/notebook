@@ -8,7 +8,7 @@
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
   </script>
   <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613c">
-  <link rel="stylesheet" href="/assets/style.css?v=20260615a">
+  <link rel="stylesheet" href="/assets/style.css?v=20260818a">
 </head>
 <body class="reader">
   <iframe
@@ -43,7 +43,6 @@
   <div class="modal-overlay" id="share-modal" hidden>
     <div class="modal share-dialog">
       <h3><span class="ic" data-icon="share" data-icon-size="18"></span> Share this notebook</h3>
-      <p class="modal-hint">Create a read-only link. Anyone with it can open the full notebook — contents, theme and reading settings included — without signing in. They can’t see your other notebooks or get back to your library.</p>
       <div class="field">
         <span>Expires in <em>*</em></span>
         <div class="seg share-exp" id="share-exp" role="group" aria-label="Expiry">
@@ -53,7 +52,6 @@
           <button type="button" class="seg-btn" data-days="180">6 months</button>
           <button type="button" class="seg-btn" data-days="365">1 year</button>
         </div>
-        <p class="sm-tip">An expiry is required (up to one year); the link stops working afterwards.</p>
       </div>
       <div class="share-result" id="share-result" hidden>
         <div class="share-link-row">
@@ -107,7 +105,6 @@
         </div>
       </div>
       <button class="pref-reset" id="pref-reset">Reset</button>
-      <p class="sm-tip" id="prefs-tip">Applies to this notebook only, and syncs to the cloud.</p>
     </div>
   </aside>
 
@@ -158,10 +155,10 @@
     </form>
   </aside>
 
-  <script src="/assets/icons.js?v=20260614a"></script>
-  <script src="/assets/theme.js?v=20260817a"></script>
-  <script src="/assets/md.js?v=20260608d"></script>
-  <script src="/assets/highlights.js?v=20260607d"></script>
-  <script src="/assets/reader.js?v=20260719a"></script>
+  <script src="/assets/icons.js?v=20260818a"></script>
+  <script src="/assets/theme.js?v=20260818a"></script>
+  <script src="/assets/md.js?v=20260818a"></script>
+  <script src="/assets/highlights.js?v=20260818a"></script>
+  <script src="/assets/reader.js?v=20260818a"></script>
 </body>
 </html>

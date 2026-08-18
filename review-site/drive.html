@@ -8,7 +8,7 @@
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
   </script>
   <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613d">
-  <link rel="stylesheet" href="/assets/style.css?v=20260617a">
+  <link rel="stylesheet" href="/assets/style.css?v=20260818a">
 </head>
 <body class="drive-page">
   <header class="topbar">
@@ -19,6 +19,7 @@
     <div class="topbar-right">
       <span class="drive-title"><span class="ic" data-icon="folder" data-icon-size="18"></span> 云盘</span>
       <span class="drive-role-badge" id="drive-role" hidden></span>
+      <button class="pill-btn" id="help-btn" title="云盘说明"><span class="ic" data-icon="bookopen" data-icon-size="16"></span><span class="pill-label">说明</span></button>
     </div>
   </header>
 
@@ -116,7 +117,6 @@
         <h3><span class="ic" data-icon="tray" data-icon-size="18"></span> 内容审核</h3>
         <button class="icon-btn" id="review-close" title="关闭"><span class="ic" data-icon="close" data-icon-size="18"></span></button>
       </div>
-      <p class="rv-tip">一二级账号上传的文件会先进入这里，通过后才会出现在云盘并对一二级开放。</p>
       <div class="rv-body" id="review-body"></div>
     </div>
   </div>
@@ -135,8 +135,22 @@
     </div>
   </div>
 
-  <script src="/assets/icons.js?v=20260616b"></script>
-  <script src="/assets/theme.js?v=20260817a"></script>
-  <script src="/assets/drive.js?v=20260617d"></script>
+  <script src="/assets/icons.js?v=20260818a"></script>
+  <script src="/assets/theme.js?v=20260818a"></script>
+  <script src="/assets/drive.js?v=20260818a"></script>
+  <script src="/assets/help.js?v=20260818a"></script>
+  <script>
+    // 页面上原本挂着的灰色小字（审核队列说明等）统一收到这个「说明」里
+    NBHelp.attach('#help-btn', {
+      title: '云盘说明',
+      sections: [
+        { h: '谁看得到什么', body: '管理员看得到全部文件；访客（一级）与好友（二级）只看得到管理员标为「公开」的那些。' },
+        { h: '上传与审核', body: '管理员上传的文件直接进云盘。一二级账号上传的先进「内容审核」队列，管理员通过后才会出现在云盘并对一二级开放。' },
+        { h: '拖拽上传', body: '把文件从桌面拖到文件列表上松手，就传到当前所在的文件夹。' },
+        { h: '分享链接', body: '任意文件或文件夹都能生成对外链接，可设有效期、访问密码、下载次数上限；「管理分享」里可以随时撤销。' },
+        { h: '挂载到电脑 / 手机', body: '仅管理员：Windows「映射网络驱动器」或 iPhone 的 WebDAV App 连 <code>' + location.origin + '/dav/</code>，用户名随意，密码＝管理员密码。' },
+      ],
+    });
+  </script>
 </body>
 </html>
