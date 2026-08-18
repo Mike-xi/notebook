@@ -187,7 +187,7 @@ export async function logEvent(env, type, detail = '') {
     await ensureLogsSchema(env);
     const now = Date.now();
     await env.DB.prepare('INSERT INTO logs (type, detail, created_at) VALUES (?, ?, ?)')
-      .bind(String(type).slice(0, 32), String(detail || '').slice(0, 300), now).run();
+      .bind(String(type).slice(0, 32), String(detail || '').slice(0, 400), now).run();
     if (Math.random() < 0.15) {
       await env.DB.prepare('DELETE FROM logs WHERE created_at < ?').bind(now - LOG_RETENTION_MS).run();
       await env.DB.prepare(

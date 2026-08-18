@@ -17,9 +17,17 @@
   const normBg = (v) => (BG_ALIAS[v] || v);
   // 背景浓淡 / 亮度：分别落到 CSS 变量 --nb-bg-opacity / --nb-bg-brightness，
   // 画布层和图片层都吃它们。深浅两种主题下背景本身完全一致，明暗只由这两根杆决定。
+  //
+  // 两根杆的刻度都是「显示 0–100」，取值范围特意配成：
+  //   浓淡 100 -> opacity 1     （满格就是不打折，图片按原样铺满）
+  //   亮度  50 -> brightness 1  （区间以 1 为中点对称，所以中间格＝不动原图）
+  // 也就是说 100 / 50 这一组就是「直接加载图片」的原始状态，别再改这两个常数的对称性。
+  // 出厂默认仍是 0.55：内置着色器铺满整屏，满格会把正文压得看不清。
+  // 用户自己传的图另说 —— 上传成功那一刻 appearance.js 会把两根杆推到 100 / 50，
+  // 也就是「传上去先按原图显示」，要淡再自己拉。
   const OPACITY_MIN = 0.15, OPACITY_MAX = 1, OPACITY_DEFAULT = 0.55;
   const BRIGHT_KEY = 'nb-bg-brightness';
-  const BRIGHT_MIN = 0.25, BRIGHT_MAX = 1.6, BRIGHT_DEFAULT = 1;
+  const BRIGHT_MIN = 0.2, BRIGHT_MAX = 1.8, BRIGHT_DEFAULT = 1;
   const clampOpacity = (v) => {
     const n = Number(v);
     if (!isFinite(n)) return OPACITY_DEFAULT;
@@ -91,24 +99,43 @@
     if (userAction) queuePersist();
   }
 
-  // 顶栏（高级界面的 Dock）通透度：四档，落到 --nb-bar-alpha
+  // 顶栏（高级界面的 Dock）通透度：0–100 连续可调（原来是四档按钮）。
+  // 越透就越像玻璃 —— 底色淡下去的同时把背后的模糊和饱和度顶上来，否则纯降 alpha
+  // 只会变成「一块脏兮兮的半透明板」，而不是玻璃。三个量一起由 barValue 推出来。
   const BAR_KEY = 'nb-bar-alpha';
-  const BAR_LEVELS = { solid: 0.92, medium: 0.72, sheer: 0.5, glass: 0.28 };
-  const barPref = () => (BAR_LEVELS[localStorage.getItem(BAR_KEY)] ? localStorage.getItem(BAR_KEY) : 'medium');
-  function applyBar(level) {
-    document.documentElement.dataset.bar = level;
-    document.documentElement.style.setProperty('--nb-bar-alpha', String(BAR_LEVELS[level]));
-    document.querySelectorAll('[data-bar-set]').forEach((b) => {
-      const on = b.getAttribute('data-bar-set') === level;
-      b.classList.toggle('active', on);
-      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  const BAR_DEFAULT = 40;
+  // 老的四档存的是字符串，迁移成等效的数值，用户的选择不会被重置
+  const BAR_LEGACY = { solid: 8, medium: 40, sheer: 65, glass: 92 };
+  const clampBar = (v) => {
+    if (BAR_LEGACY[v] != null) return BAR_LEGACY[v];   // 老的四档名字（本机缓存和云端 prefs 里都可能还是它）
+    if (v == null || v === '') return BAR_DEFAULT;         // Number(null) 是 0，会被当成实心
+    const n = Number(v);
+    if (!isFinite(n)) return BAR_DEFAULT;
+    return Math.min(100, Math.max(0, Math.round(n)));
+  };
+  function barPref() {
+    const raw = localStorage.getItem(BAR_KEY);
+    return raw == null ? BAR_DEFAULT : clampBar(raw);
+  }
+  const lerp = (a, b, t) => a + (b - a) * t;
+  function applyBar(value) {
+    const t = clampBar(value) / 100;
+    const root = document.documentElement;
+    root.dataset.bar = String(clampBar(value));
+    root.style.setProperty('--nb-bar-alpha', (lerp(0.96, 0.05, t)).toFixed(3));
+    root.style.setProperty('--nb-bar-blur', `${lerp(12, 34, t).toFixed(1)}px`);
+    root.style.setProperty('--nb-bar-sat', (lerp(1.2, 2.1, t)).toFixed(2));
+    // 玻璃感的最后一味：越透，顶缘高光越亮，边界才不会糊掉
+    root.style.setProperty('--nb-bar-gloss', (lerp(0.16, 0.62, t)).toFixed(2));
+    document.querySelectorAll('[data-bar-alpha]').forEach((el) => {
+      if (el.value !== String(clampBar(value))) el.value = String(clampBar(value));
     });
   }
-  function setBar(level, userAction = true) {
-    if (!BAR_LEVELS[level]) return;
-    localStorage.setItem(BAR_KEY, level);
+  function setBar(value, userAction = true) {
+    const v = clampBar(value);
+    localStorage.setItem(BAR_KEY, String(v));
     if (userAction) dirty = true;
-    applyBar(level);
+    applyBar(v);
     if (userAction) queuePersist();
   }
 
@@ -225,7 +252,7 @@
       if (THEME_ORDER.includes(remote.theme)) setTheme(remote.theme, false);
       if (remote.bgOpacity != null) setOpacity(remote.bgOpacity, false);
       if (remote.bgBrightness != null) setBrightness(remote.bgBrightness, false);
-      if (remote.bar) setBar(remote.bar, false);
+      if (remote.bar != null) setBar(remote.bar, false);
       if (validBg(normBg(remote.background))) {
         setBackground(remote.background, false);
       } else {
@@ -277,18 +304,27 @@
       });
       input.addEventListener('change', () => setBrightness(input.value));
     });
-    document.querySelectorAll('[data-bar-set]').forEach((button) => {
-      if (button.__nbBarWired) return;
-      button.__nbBarWired = true;
-      button.addEventListener('click', () => setBar(button.getAttribute('data-bar-set')));
+    document.querySelectorAll('[data-bar-alpha]').forEach((input) => {
+      if (input.__nbBarWired) return;
+      input.__nbBarWired = true;
+      input.addEventListener('input', () => {
+        const v = clampBar(input.value);
+        localStorage.setItem(BAR_KEY, String(v));
+        dirty = true;
+        applyBar(v);
+      });
+      input.addEventListener('change', () => setBar(input.value));
     });
     // 弹性滑杆：把原生 range 就地升级（slider.js），原 input 仍是数据源
     if (window.NBSlider) {
       const ic = (n) => (window.NBIcon ? NBIcon(n, { size: 14 }) : '');
+      // 只在左边挂一个图标当标签（右侧图标会把杆挤窄，悬停放大时更容易顶出面板）
       document.querySelectorAll('[data-bg-opacity]').forEach((el) =>
-        NBSlider.enhance(el, { left: ic('half'), right: ic('palette') }));
+        NBSlider.enhance(el, { left: ic('half') }));
       document.querySelectorAll('[data-bg-brightness]').forEach((el) =>
-        NBSlider.enhance(el, { left: ic('moon'), right: ic('sun') }));
+        NBSlider.enhance(el, { left: ic('sun') }));
+      document.querySelectorAll('[data-bar-alpha]').forEach((el) =>
+        NBSlider.enhance(el, { left: ic('stack') }));
     }
     updateThemeButtons(themePref());
     updateBackgroundButtons(backgroundPref());
@@ -325,6 +361,7 @@
     get bgBrightness() { return brightnessPref(); },
     get bar() { return barPref(); },
     OPACITY_MIN, OPACITY_MAX, OPACITY_DEFAULT,
+    BRIGHT_DEFAULT,
     apply: () => applyTheme(themePref()),
     set: setTheme,
     setBackground,

@@ -118,12 +118,24 @@
   border-radius: 22px;
   height: 62px;
   overflow: visible;
-  /* 通透度四档（设置里的「顶栏通透度」，theme.js 写 --nb-bar-alpha）。
-     只作用于 Dock 本身，菜单/弹窗仍用默认的 --lg-bg-strong，不然内容会透穿。 */
+  /* 通透度滑杆（设置里的「顶栏通透度」，theme.js 写这四个变量）。
+     只降 alpha 会让 Dock 变成一块脏兮兮的半透明板，所以越透就同步：
+     模糊更重 + 饱和更高（折射感）+ 顶缘高光更亮（玻璃的边）。
+     只作用于 Dock 本身，菜单/弹窗仍用 --lg-bg-strong，不然内容会透穿。 */
   background: color-mix(in srgb, var(--surface-container-lowest) calc(var(--nb-bar-alpha, .72) * 100%), transparent);
+  -webkit-backdrop-filter: blur(var(--nb-bar-blur, 22px)) saturate(var(--nb-bar-sat, 1.65));
+  backdrop-filter: blur(var(--nb-bar-blur, 22px)) saturate(var(--nb-bar-sat, 1.65));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, var(--nb-bar-gloss, .5)),
+    inset 0 -1px 0 var(--lg-highlight-weak),
+    var(--lg-shadow);
 }
 [data-theme="dark"]:root[data-ui="premium"] .dock-panel {
   background: color-mix(in srgb, var(--surface-container-low) calc(var(--nb-bar-alpha, .72) * 100%), transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, calc(var(--nb-bar-gloss, .22) * .45)),
+    inset 0 -1px 0 var(--lg-highlight-weak),
+    var(--lg-shadow);
 }
 
 /* Dock 单元：统一方圆玻璃瓦片；放大/推开变换由 JS 写 transform。

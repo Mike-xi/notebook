@@ -32,17 +32,19 @@
     const step = parseFloat(input.step || '1') || 1;
     const fmt = o.format || ((v) => String(Math.round(((v - min) / (max - min)) * 100)));
 
+    // 两侧图标都是可选的：没给就整个不渲染，免得留下 15px 空位把杆挤窄。
+    // 本站三根杆都只挂左边一个图标当标签（文字标签已去掉，见 index.html）。
     const wrap = document.createElement('div');
     wrap.className = 'es-wrap';
     wrap.innerHTML = `
-      <span class="es-icon es-left" aria-hidden="true">${o.left || ''}</span>
+      ${o.left ? `<span class="es-icon es-left" aria-hidden="true">${o.left}</span>` : ''}
       <div class="es-root">
         <span class="es-value" aria-hidden="true"></span>
         <div class="es-track-wrap">
           <div class="es-track"><div class="es-range"></div></div>
         </div>
       </div>
-      <span class="es-icon es-right" aria-hidden="true">${o.right || ''}</span>`;
+      ${o.right ? `<span class="es-icon es-right" aria-hidden="true">${o.right}</span>` : ''}`;
     input.parentNode.insertBefore(wrap, input);
     input.classList.add('es-native');   // 藏起来但保留可聚焦，键盘仍能操作
 
@@ -52,6 +54,7 @@
     const valueEl = wrap.querySelector('.es-value');
     const iconL = wrap.querySelector('.es-left');
     const iconR = wrap.querySelector('.es-right');
+    const nudge = (el, px) => { if (el) el.style.transform = `translateX(${px}px)`; };
 
     let overflow = 0;       // 越界位移（px，带符号：左负右正）
     let scale = 1;          // 整条杆的缩放
@@ -70,8 +73,8 @@
       // 往左越界就以右端为支点拉伸，反之亦然
       trackWrap.style.transformOrigin = overflow < 0 ? 'right' : 'left';
       trackWrap.style.transform = `scaleX(${scaleX}) scaleY(${scaleY})`;
-      iconL.style.transform = `translateX(${overflow < 0 ? overflow / scale : 0}px)`;
-      iconR.style.transform = `translateX(${overflow > 0 ? overflow / scale : 0}px)`;
+      nudge(iconL, overflow < 0 ? overflow / scale : 0);
+      nudge(iconR, overflow > 0 ? overflow / scale : 0);
       wrap.style.setProperty('--es-scale', String(scale));
     }
 

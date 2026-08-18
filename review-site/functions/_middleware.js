@@ -1,4 +1,6 @@
-import { isAuthenticated } from './_lib/auth.js';
+import { isAuthenticated, getCookie } from './_lib/auth.js';
+import { logEvent } from './_lib/db.js';
+import { buildDetail } from './_lib/visitlog.js';
 
 // 注意：Pages 开启了 clean URL，会把 /foo.html 308 跳到 /foo，中间件最终看到的是去掉 .html 的路径。
 // 因此每个公开页都要同时登记 .html 与无后缀两种形式。
@@ -13,6 +15,22 @@ const PUBLIC_PATHS = new Set([
   '/drive-share.html', '/drive-share', // 云盘公开分享页（页面壳，正文由 /api/drive/shared 的 token 鉴权）
   '/api/drive/shared',                 // 云盘分享取数（凭 token + 可选密码自鉴权）
 ]);
+
+// 「访问」日志。/api/login 只在真的敲密码那一刻记一笔，而 cookie 有效期 30 天 ——
+// 手机装到桌面后往往一个月才登一次，日志里就只剩下天天重登的电脑，看着像「手机没被记录」。
+// 所以这里补一条：带着有效 cookie 来的设备，每天第一次打开页面记一条 type=visit。
+// 用一个只存日期戳的 cookie 去重，避免为此每次都读一遍 D1；写库放进 waitUntil，不挡首屏。
+const SEEN_COOKIE = 'nb_seen';
+const dayStamp = () => new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);   // 按北京时间分天
+
+// 只对「人打开的页面」记账：导航请求、GET、非 API / 非静态资源。
+function isPageView(request, path) {
+  if (request.method !== 'GET') return false;
+  if (path.startsWith('/api/') || path.startsWith('/assets/') || path.startsWith('/dav')) return false;
+  const mode = request.headers.get('Sec-Fetch-Mode');
+  if (mode) return mode === 'navigate';
+  return (request.headers.get('Accept') || '').includes('text/html');
+}
 
 export async function onRequest(context) {
   const { request, env, next } = context;
@@ -39,7 +57,19 @@ export async function onRequest(context) {
   // 苹果比价刷新端点：由其函数用 X-API-Key 自鉴权（GitHub Actions cron 无登录 Cookie）。
   if (path === '/api/apple/refresh') return next();
 
-  if (await isAuthenticated(request, env)) return next();
+  const role = await isAuthenticated(request, env);
+  if (role) {
+    const today = dayStamp();
+    if (isPageView(request, path) && getCookie(request, SEEN_COOKIE) !== today) {
+      context.waitUntil(logEvent(env, 'visit', buildDetail(role, request)));
+      const res = await next();
+      // Response 的 headers 是只读的，得整个复制一份才能补 Set-Cookie
+      const out = new Response(res.body, res);
+      out.headers.append('Set-Cookie', `${SEEN_COOKIE}=${today}; Path=/; Max-Age=86400; SameSite=Lax`);
+      return out;
+    }
+    return next();
+  }
 
   if (path.startsWith('/api/')) {
     return new Response(JSON.stringify({ error: 'unauthorized' }), {

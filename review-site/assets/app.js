@@ -9,7 +9,8 @@ const COVER_ASSET_VERSION = '20260719b'; // 封面 URL 版本；绕过自定义�
 let studyProfile = null;       // 「关于」弹窗用：基于你自己的课程数据生成的学习画像
 let staticCoursesData = [];     // 静态课程元数据，供「全能问答」随请求带给后端
 let allCoursesMap = new Map();  // file -> 课程元数据，深入搜索结果展示用
-let activeTab = 'learn';        // 当前分类 Tab：默认 learn；顺序 learn / explore / play / all
+let activeTab = 'learn';        // 当前 Tab：默认 learn；顺序 learn / explore / play / time / all
+                                // （time 不是分类，是「按添加时间分组」的另一种展示，见下方时间视图）
 let searchQ = '';               // 即时搜索词（小写）
 let totalCourses = 0;           // 课程总数（空状态判断用）
 let ncCat = 'learn';            // 创建课程时选择的分类
@@ -153,16 +154,129 @@ homeTabs.addEventListener('click', (e) => {
   applyFilters();
 });
 
-// 课程卡按「当前 Tab 分类」与「搜索词」联合显隐
+// ========== 时间视图（Time Tab：按课程加进来的时间分组） ==========
+//
+// 关键约束：**不能为了排版去重排 DOM**。拖拽排序保存的就是 #courses 里 .nb-card 的
+// 先后（见 saveOrder），一旦按时间重排 DOM，管理员随手拖一张卡就会把「时间顺序」
+// 当成新的课程顺序写回服务端。所以这里只写 CSS 的 order（网格按 order 摆放，
+// DOM 顺序原封不动），分组标题也是同一套 order 里的整行元素。
+//
+// 时间从哪来：动态课程是 D1 的 created_at；静态课程（courses.json）的 created_at
+// 是从 git 历史里挖出来的「该条目首次进入 courses.json 的提交时间」，已写进 json。
+const TIME_MODE_KEY = 'nb-time-mode';
+let timeMode = (() => {
+  try { return localStorage.getItem(TIME_MODE_KEY) === 'term' ? 'term' : 'month'; }
+  catch { return 'month'; }
+})();
+const timeHeads = [];        // 复用的分组标题节点池
+
+const CN_MONTH = (m) => `${m} 月`;
+
+// 自然月分组
+function monthGroup(ts) {
+  const d = new Date(ts);
+  return { key: `m${d.getFullYear()}-${d.getMonth()}`, label: `${d.getFullYear()} 年 ${CN_MONTH(d.getMonth() + 1)}` };
+}
+
+// 学期分组（交大作息）：9–1 月秋season、2–6 月春、7–8 月夏季小学期。
+// 1 月归到上一年开学的那个秋季学期里，跨年不会被劈成两段。
+function termGroup(ts) {
+  const d = new Date(ts);
+  const y = d.getFullYear();
+  const m = d.getMonth() + 1;
+  let start, name;
+  if (m >= 9) { start = y; name = '秋季学期'; }
+  else if (m === 1) { start = y - 1; name = '秋季学期'; }
+  else if (m <= 6) { start = y - 1; name = '春季学期'; }
+  else { start = y - 1; name = '夏季小学期'; }
+  return { key: `t${start}-${name}`, label: `${start}–${start + 1} 学年 · ${name}` };
+}
+
+function timeHead(grid, i) {
+  if (timeHeads[i]) return timeHeads[i];
+  const el = document.createElement('div');
+  el.className = 'time-head';
+  el.innerHTML = '<b></b><em></em><i></i>';
+  grid.appendChild(el);
+  timeHeads[i] = el;
+  return el;
+}
+
+function layoutTimeline(on) {
+  const grid = document.getElementById('courses');
+  if (!grid) return;
+  // 课程重新渲染时是整段 innerHTML 覆盖，标题节点会被一起冲掉 —— 池子里留的是
+  // 已经脱离文档的孤儿节点，得先丢掉再重建，否则分组标题会整片消失。
+  if (timeHeads.length && timeHeads[0].parentElement !== grid) timeHeads.length = 0;
+  const seg = document.getElementById('time-modes');
+  if (seg) seg.hidden = !on;
+  grid.classList.toggle('by-time', !!on);
+
+  const cards = [...grid.querySelectorAll('.nb-card')];
+  if (!on) {
+    // 退出时间视图：把 order 全部还原，标题收起来
+    cards.forEach((c) => { c.style.order = ''; });
+    timeHeads.forEach((h) => { h.hidden = true; });
+    return;
+  }
+
+  const groupOf = timeMode === 'term' ? termGroup : monthGroup;
+  const groups = new Map();
+  for (const card of cards) {
+    if (card.style.display === 'none') continue;
+    const ts = Number(card.dataset.created) || 0;
+    const g = ts ? groupOf(ts) : { key: 'unknown', label: '未标注时间' };
+    let bucket = groups.get(g.key);
+    if (!bucket) { bucket = { label: g.label, ts, cards: [] }; groups.set(g.key, bucket); }
+    bucket.ts = Math.max(bucket.ts, ts);
+    bucket.cards.push({ card, ts });
+  }
+
+  // 组之间按最近的一条排；组内也按时间倒序（新加的排前面）
+  const ordered = [...groups.values()].sort((a, b) => b.ts - a.ts);
+  let slot = 0;
+  ordered.forEach((g, i) => {
+    const head = timeHead(grid, i);
+    head.hidden = false;
+    head.style.order = String(slot++);
+    head.querySelector('b').textContent = g.label;
+    head.querySelector('em').textContent = `${g.cards.length} 项`;
+    g.cards.sort((a, b) => b.ts - a.ts).forEach(({ card }) => { card.style.order = String(slot++); });
+  });
+  for (let i = ordered.length; i < timeHeads.length; i++) timeHeads[i].hidden = true;
+}
+
+document.querySelectorAll('[data-time-mode]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    timeMode = btn.getAttribute('data-time-mode') === 'term' ? 'term' : 'month';
+    try { localStorage.setItem(TIME_MODE_KEY, timeMode); } catch {}
+    syncTimeModeButtons();
+    layoutTimeline(activeTab === 'time');
+  });
+});
+function syncTimeModeButtons() {
+  document.querySelectorAll('[data-time-mode]').forEach((b) => {
+    const on = b.getAttribute('data-time-mode') === timeMode;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+syncTimeModeButtons();
+
+
+// 课程卡按「当前 Tab 分类」与「搜索词」联合显隐。
+// time 是特例：它不筛类别（等同 all），只是把结果按时间分组排版。
 function applyFilters() {
   let visible = 0;
+  const byTime = activeTab === 'time';
   document.querySelectorAll('#courses .nb-card').forEach((card) => {
-    const catOk = activeTab === 'all' || (card.dataset.category || 'learn') === activeTab;
+    const catOk = activeTab === 'all' || byTime || (card.dataset.category || 'learn') === activeTab;
     const sOk = !searchQ || (card.dataset.search || '').includes(searchQ);
     const show = catOk && sOk;
     card.style.display = show ? '' : 'none';
     if (show) visible++;
   });
+  layoutTimeline(byTime);
   const empty = document.getElementById('empty-hint');
   if (totalCourses === 0) {
     empty.hidden = false;
@@ -915,9 +1029,21 @@ const DOC_SECTIONS = [
         <li><b>外观</b> —— 跟随系统 / 浅色 / 深色。</li>
         <li><b>页面背景</b> —— 5 套内置着色器（素色、极光、百叶窗、波纹、地形）+ 最多 3 张自己上传的图，一共 8 格。
             鼠标悬停某一格会展开看大图，点一下生效。自选背景按身份分开存：管理员一份，访客与好友共用一份。</li>
-        <li><b>浓淡 / 亮度</b> —— 两根滑杆。浓淡调背景压过正文的程度，亮度调背景本身的明暗；深浅两种主题下背景长得一样，靠这两根杆调到你舒服为止。</li>
-        <li><b>顶栏通透度</b> —— 顶部那条工具栏的玻璃透明程度，四档可选。</li>
+        <li><b>浓淡 / 亮度</b> —— 两根滑杆，左边的小图标就是它们的名字（半圆＝浓淡，太阳＝亮度）。
+            <b>浓淡 100 + 亮度 50 就是「原图直出」</b>：图怎么传上来就怎么显示，不做任何处理；
+            往下调浓淡让背景退到正文后面，亮度以 50 为中点往两边压暗或提亮。新传的图会自动回到这一组数值。</li>
+        <li><b>顶栏通透度</b> —— 顶部那条工具栏的玻璃程度，0 到 100 连续可调。越往右越透，同时模糊、折射和边缘高光会一起加重，接近 100 时就是一块通透玻璃。</li>
       </ul>`,
+  },
+  {
+    icon: 'clock', title: '按时间浏览',
+    body: `顶部分类标签里的 <b>Time</b> 不是一个分类，而是换一种看法：不分学习/探索/游戏，
+      把所有课程按<b>加进来的时间</b>从新到旧排，分组显示。右上角可以切换分组粒度：
+      <ul>
+        <li><b>按月份</b> —— 每个自然月一组。</li>
+        <li><b>按学期</b> —— 按交大作息分组：9 月–次年 1 月是秋季学期，2–6 月是春季学期，7–8 月是夏季小学期。</li>
+      </ul>
+      老课程的时间取自它第一次被加进课程表的那次提交，后来上传的取上传时间。这个视图里不能拖动排序（先后由时间决定）。`,
   },
   {
     icon: 'stack', title: '课程卡片',
@@ -949,8 +1075,15 @@ const DOC_SECTIONS = [
   },
   {
     icon: 'list', title: '登录日志与隐私',
-    body: `设置里的<b>「登录日志」</b>能看到历次登录的身份、设备和时间。管理员看得到全部身份的记录，访客与好友只看得到自己那一级的。
-      位置只精确到城市，<b>全站不记录 IP</b>。学习画像等统计只用你自己的课程数据生成，不上报第三方。`,
+    body: `设置里的<b>「登录日志」</b>记两种事，用「方式」列区分：
+      <ul>
+        <li><b>登录</b> —— 真的输了一次密码。</li>
+        <li><b>访问</b> —— 已经登录过的设备当天第一次打开站点。会话能撑 30 天，手机大多只在这一类里出现，
+            所以光看「登录」会以为手机从来没上过站。同一台设备一天只记一条。</li>
+      </ul>
+      每条记录带身份、设备（手机/平板/电脑 + 浏览器和系统）、位置和时间。
+      管理员看得到全部身份的记录并附 <b>IP</b>；访客与好友只看得到自己那一级的，且<b>不下发 IP</b>。
+      位置精确到城市。学习画像等统计只用你自己的课程数据生成，不上报第三方。`,
   },
 ];
 
@@ -1000,6 +1133,8 @@ if (docsBtn) docsBtn.addEventListener('click', openDocs);
 // 三级都能看：管理员看全部身份，一二级只看自己那一级（后端过滤，见 api/logins.js）。
 // 只有大致城市，没有 IP —— 登录时压根没记 IP。
 let loginsModal = null;
+// 日志里设备类型对应的图标（服务端 deviceKind：phone / tablet / desktop）
+const DEV_ICON = { phone: 'phone', tablet: 'tablet', desktop: 'laptop' };
 function fmtWhen(ts) {
   const d = new Date(ts);
   const p = (n) => String(n).padStart(2, '0');
@@ -1022,7 +1157,7 @@ async function openLogins() {
 
   let data;
   try {
-    const res = await fetch('/api/logins?limit=60', { headers: { Accept: 'application/json' } });
+    const res = await fetch('/api/logins?limit=120', { headers: { Accept: 'application/json' } });
     data = res.ok ? await res.json() : null;
   } catch { data = null; }
 
@@ -1031,24 +1166,30 @@ async function openLogins() {
     box.innerHTML = `<h3>登录日志</h3><p class="lg-loading">读取失败，请稍后重试。</p>
       <div class="modal-actions co-actions"><span class="co-spacer"></span>
       <button type="button" class="btn-ghost" data-lg-close>关闭</button></div>`;
-  } else {
-    const rows = data.items.map((it) => `<tr>
-        <td><span class="lg-role lg-${escapeAttr(it.role)}">${escapeHTML(it.roleName)}</span></td>
-        <td>${escapeHTML(it.device)}</td>
-        <td>${escapeHTML(it.place)}</td>
-        <td class="lg-when">${escapeHTML(fmtWhen(it.at))}</td>
-      </tr>`).join('');
-    box.innerHTML = `<h3>登录日志</h3>
-      <p class="lg-scope">${data.scope === 'all' ? '管理员视角：显示全部身份的登录记录' : '只显示你这一级身份的登录记录'} · 仅记录大致城市，不记录 IP</p>
-      <div class="lg-wrap">
-        <table class="lg-table">
-          <thead><tr><th>身份</th><th>设备</th><th>位置</th><th>时间</th></tr></thead>
-          <tbody>${rows || '<tr><td colspan="4" class="lg-empty">还没有记录</td></tr>'}</tbody>
-        </table>
-      </div>
-      <div class="modal-actions co-actions"><span class="co-spacer"></span>
-        <button type="button" class="btn-ghost" data-lg-close>关闭</button></div>`;
+    box.querySelectorAll('[data-lg-close]').forEach((b) => b.addEventListener('click', closeLogins));
+    return;
   }
+
+  const ip = !!data.canSeeIp;
+  const rows = data.items.map((it) => `<tr>
+      <td><span class="lg-kind lg-k-${it.kind === 'visit' ? 'visit' : 'login'}">${it.kind === 'visit' ? '访问' : '登录'}</span></td>
+      <td><span class="lg-role lg-${escapeAttr(it.role)}">${escapeHTML(it.roleName)}</span></td>
+      <td class="lg-dev"><span class="lg-devic ic" data-icon="${DEV_ICON[it.deviceKind] || 'laptop'}" data-icon-size="14"></span>${escapeHTML(it.device)}</td>
+      <td>${escapeHTML(it.place)}${ip ? `<em class="lg-ip">${escapeHTML(it.ip || '—')}</em>` : ''}</td>
+      <td class="lg-when">${escapeHTML(fmtWhen(it.at))}</td>
+    </tr>`).join('');
+  box.innerHTML = `<h3>登录日志</h3>
+    <p class="lg-scope">${data.scope === 'all' ? '管理员视角：显示全部身份的记录' : '只显示你这一级身份的记录'} ·
+      <b>登录</b>＝输过密码，<b>访问</b>＝已登录的设备当天第一次打开（会话有效期 30 天，手机往往只在这里出现）${ip ? ' · IP 仅管理员可见' : ' · 不显示 IP'}</p>
+    <div class="lg-wrap">
+      <table class="lg-table">
+        <thead><tr><th>方式</th><th>身份</th><th>设备</th><th>位置${ip ? ' / IP' : ''}</th><th>时间</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="5" class="lg-empty">还没有记录</td></tr>'}</tbody>
+      </table>
+    </div>
+    <div class="modal-actions co-actions"><span class="co-spacer"></span>
+      <button type="button" class="btn-ghost" data-lg-close>关闭</button></div>`;
+  if (window.NBIconHydrate) NBIconHydrate(box);
   box.querySelectorAll('[data-lg-close]').forEach((b) => b.addEventListener('click', closeLogins));
 }
 function escLogins(e) { if (e.key === 'Escape') closeLogins(); }
@@ -1126,6 +1267,7 @@ function persistOrder() {
 
 coursesGrid.addEventListener('pointerdown', (e) => {
   if (e.button != null && e.button > 0) return;          // 仅主键/触摸
+  if (activeTab === 'time') return;                      // 时间视图的先后由时间决定，不接受手动排序
   const handle = e.target.closest('.nb-drag');
   if (!handle) return;
   const card = handle.closest('.nb-card');
@@ -1161,7 +1303,7 @@ window.addEventListener('pointermove', (e) => {
   // 高级界面下经典分类条隐藏、由 Dock 瓦片（.dock-tab）代行，两者都算目标
   const tabEl = under && under.closest ? under.closest('#home-tabs .tab, .dock-tab') : null;
   clearTabDropHighlight();
-  if (tabEl && tabEl.dataset.tab && tabEl.dataset.tab !== 'all') {
+  if (tabEl && tabEl.dataset.tab && tabEl.dataset.tab !== 'all' && tabEl.dataset.tab !== 'time') {
     dragOverTab = tabEl.dataset.tab;
     tabEl.classList.add('drop-target');
     return;
@@ -1503,6 +1645,7 @@ function cardHTML(c, deletable = false) {
        style="--accent: ${c.color || '#6750A4'}"
        data-file="${escapeAttr(c.file)}"
        data-category="${escapeAttr(c.category || 'learn')}"
+       data-created="${Number(c.created_at) || 0}"
        data-search="${escapeAttr(searchText)}">
       ${coverBlock}
       ${moreBtn}${dragHandle}

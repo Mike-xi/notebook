@@ -191,7 +191,13 @@
         if (!res.ok) throw new Error(data.error || '上传失败');
         customs.push({ id: data.id, label: data.label, mime: data.mime, updated_at: data.updated_at });
         busy = false;
-        if (window.NBTheme) NBTheme.setBackground('custom:' + data.id);
+        if (window.NBTheme) {
+          // 刚传上来的图先按原样显示：浓淡拉满、亮度回中点（= opacity 1 / brightness 1）。
+          // 不这么做的话，新图会直接套用上一张背景调好的浓淡，看起来像"传上去就发灰"。
+          NBTheme.setOpacity(NBTheme.OPACITY_MAX);
+          NBTheme.setBrightness(NBTheme.BRIGHT_DEFAULT);
+          NBTheme.setBackground('custom:' + data.id);
+        }
         dispatchEvent(new CustomEvent('nb-backgrounds-loaded'));
         render();
       } catch (err) {

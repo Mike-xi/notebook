@@ -8,7 +8,7 @@
     // 首屏前定主题，避免浅/深闪烁；完整逻辑在 theme.js
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
     // 背景也先从本机缓存恢复；登录后 theme.js 会用当前密码用户的云端偏好校准。
-    (function(){try{var b=localStorage.getItem('nb-background')||'none';var M={balatro:'waves',plain:'none',mesh:'aurora',silk:'waves',nebula:'terrain'};if(M[b])b=M[b];var a=['none','aurora','blinds','waves','terrain'];var ok=a.indexOf(b)>=0||/^custom:[a-z0-9-]{1,40}$/.test(b);document.documentElement.dataset.bg=ok?b:'none';var o=parseFloat(localStorage.getItem('nb-bg-opacity'));document.documentElement.style.setProperty('--nb-bg-opacity',String(isFinite(o)?Math.min(1,Math.max(.15,o)):.55));var br=parseFloat(localStorage.getItem('nb-bg-brightness'));document.documentElement.style.setProperty('--nb-bg-brightness',String(isFinite(br)?Math.min(1.6,Math.max(.25,br)):1));var ba=localStorage.getItem('nb-bar-alpha')||'medium';var BA={solid:.92,medium:.72,sheer:.5,glass:.28};document.documentElement.dataset.bar=BA[ba]?ba:'medium';document.documentElement.style.setProperty('--nb-bar-alpha',String(BA[ba]||.72));}catch(e){document.documentElement.dataset.bg='none';}})();
+    (function(){try{var b=localStorage.getItem('nb-background')||'none';var M={balatro:'waves',plain:'none',mesh:'aurora',silk:'waves',nebula:'terrain'};if(M[b])b=M[b];var a=['none','aurora','blinds','waves','terrain'];var ok=a.indexOf(b)>=0||/^custom:[a-z0-9-]{1,40}$/.test(b);document.documentElement.dataset.bg=ok?b:'none';var o=parseFloat(localStorage.getItem('nb-bg-opacity'));document.documentElement.style.setProperty('--nb-bg-opacity',String(isFinite(o)?Math.min(1,Math.max(.15,o)):.55));var br=parseFloat(localStorage.getItem('nb-bg-brightness'));document.documentElement.style.setProperty('--nb-bg-brightness',String(isFinite(br)?Math.min(1.8,Math.max(.2,br)):1));var raw=localStorage.getItem('nb-bar-alpha');var L={solid:8,medium:40,sheer:65,glass:92};var bv=raw==null?40:(L[raw]!=null?L[raw]:Math.min(100,Math.max(0,Math.round(parseFloat(raw))||0)));var t=bv/100,lp=function(a,b){return a+(b-a)*t;};document.documentElement.dataset.bar=String(bv);document.documentElement.style.setProperty('--nb-bar-alpha',lp(.96,.05).toFixed(3));document.documentElement.style.setProperty('--nb-bar-blur',lp(12,34).toFixed(1)+'px');document.documentElement.style.setProperty('--nb-bar-sat',lp(1.2,2.1).toFixed(2));document.documentElement.style.setProperty('--nb-bar-gloss',lp(.16,.62).toFixed(2));}catch(e){document.documentElement.dataset.bg='none';}})();
     // 界面风格（高级/经典）同样首屏前定，避免 Dock/经典顶栏互闪；完整逻辑在 premium.js
     (function(){try{var u=localStorage.getItem('nb-ui-level');document.documentElement.dataset.ui=(u==='classic')?'classic':'premium';}catch(e){document.documentElement.dataset.ui='premium';}})();
     // 首屏数据预取：这几个请求本来要等 app.js（60KB）下载 + 解析完才发得出去，
@@ -89,11 +89,12 @@
             <div class="bg-accordion" id="bg-accordion" role="listbox" aria-label="页面背景"></div>
             <!-- 两根弹性滑杆由 slider.js 就地增强，原生 input 仍是数据源 -->
             <div class="bg-sliders">
-              <div class="es-row"><span class="es-label">浓淡</span>
+              <!-- 满格浓淡(100) + 中格亮度(50) = 原图直出；范围以 1 为中点，别随手改 -->
+              <div class="es-row">
                 <input type="range" id="bg-opacity" data-bg-opacity min="0.15" max="1" step="0.05" aria-label="背景浓淡">
               </div>
-              <div class="es-row"><span class="es-label">亮度</span>
-                <input type="range" id="bg-brightness" data-bg-brightness min="0.25" max="1.6" step="0.05" aria-label="背景亮度">
+              <div class="es-row">
+                <input type="range" id="bg-brightness" data-bg-brightness min="0.2" max="1.8" step="0.05" aria-label="背景亮度">
               </div>
             </div>
             <p class="sm-hint" id="bg-hint" hidden></p>
@@ -101,11 +102,9 @@
           </div>
           <div class="sm-section">
             <span class="sm-label">顶栏通透度</span>
-            <div class="seg" role="group" aria-label="顶栏通透度">
-              <button class="seg-btn" data-bar-set="solid" aria-pressed="false">实心</button>
-              <button class="seg-btn" data-bar-set="medium" aria-pressed="false">适中</button>
-              <button class="seg-btn" data-bar-set="sheer" aria-pressed="false">通透</button>
-              <button class="seg-btn" data-bar-set="glass" aria-pressed="false">极透</button>
+            <!-- 0=实心，100=玻璃：alpha 降下去的同时 theme.js 会把模糊/饱和/高光顶上来 -->
+            <div class="es-row bar-slider">
+              <input type="range" id="bar-alpha" data-bar-alpha min="0" max="100" step="1" aria-label="顶栏通透度">
             </div>
           </div>
           <div class="sm-section">
@@ -132,11 +131,20 @@
       <button class="tab active" data-tab="learn" role="tab" aria-selected="true">Learn</button>
       <button class="tab" data-tab="explore" role="tab" aria-selected="false">Explore</button>
       <button class="tab" data-tab="play" role="tab" aria-selected="false">Play</button>
+      <!-- Time：不按类别筛，改成按「课程加进来的时间」分组显示 -->
+      <button class="tab" data-tab="time" role="tab" aria-selected="false">Time</button>
       <button class="tab" data-tab="all" role="tab" aria-selected="false">All</button>
     </nav>
 
     <section>
-      <h2 class="section-title" id="grid-title">My notebooks</h2>
+      <div class="grid-head">
+        <h2 class="section-title" id="grid-title">My notebooks</h2>
+        <!-- 只在 Time 视图下出现：按自然月 / 按学期两种分组粒度 -->
+        <div class="seg time-seg" id="time-modes" role="group" aria-label="时间分组方式" hidden>
+          <button class="seg-btn" data-time-mode="month" aria-pressed="false">按月份</button>
+          <button class="seg-btn" data-time-mode="term" aria-pressed="false">按学期</button>
+        </div>
+      </div>
       <div id="courses" class="card-grid"></div>
       <p id="empty-hint" class="empty-state" hidden>No notebooks here yet — use <b>Create</b> to add one.</p>
     </section>

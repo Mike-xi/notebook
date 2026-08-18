@@ -1,5 +1,6 @@
 import { createSessionToken, makeAuthCookie, hashOwnerId } from '../_lib/auth.js';
 import { logEvent } from '../_lib/db.js';
+import { buildDetail } from '../_lib/visitlog.js';
 
 // 逗号分隔的多密码 -> 去空数组
 const normPwd = (s) => String(s || '').split(',').map((x) => x.trim()).filter(Boolean);
@@ -42,12 +43,10 @@ export async function onRequestPost({ request, env }) {
 
   const owner = await hashOwnerId(pw);
   const token = await createSessionToken(env, role, owner);
-  // 登录日志：角色 · 大致位置 · 浏览器标识。位置取自 Cloudflare 边缘给的 request.cf，
-  // 只有城市/国家，**不记录 IP**。三段用 ' · ' 分隔，/api/logins 按这个格式解析。
-  const cf = request.cf || {};
-  const place = [cf.city, cf.country].filter(Boolean).join(', ') || '未知';
-  const ua = (request.headers.get('User-Agent') || '').slice(0, 160);
-  await logEvent(env, 'login', `${role} · ${place} · ${ua}`);
+  // 登录日志：角色 · 位置 · IP · 浏览器标识，统一由 _lib/visitlog.js 编码成 JSON。
+  // 位置和 IP 都取自 Cloudflare 边缘（request.cf / CF-Connecting-IP）；IP 只有管理员看得到，
+  // 一二级在 /api/logins 里会被抹掉，别在别处直接把 detail 原样吐给前端。
+  await logEvent(env, 'login', buildDetail(role, request));
   return new Response(JSON.stringify({ ok: true, role }), {
     headers: {
       'Content-Type': 'application/json',

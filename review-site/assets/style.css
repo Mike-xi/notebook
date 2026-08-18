@@ -346,6 +346,50 @@ main {
   gap: 18px;
 }
 
+/* ---- 时间视图（Time Tab）----
+   分组只靠 CSS order 排（DOM 顺序不动，见 app.js layoutTimeline），
+   分组标题是同一个网格里的整行元素。 */
+.grid-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.grid-head { margin: 28px 0 0; }
+.grid-head .section-title { margin: 0 4px; }
+.time-seg { flex: none; width: auto; }
+.time-seg .seg-btn { padding: 6px 14px; font-size: 12px; }
+
+.time-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 -4px;
+}
+.card-grid:not(.by-time) .time-head { display: none; }
+.time-head b {
+  font-size: 13.5px;
+  font-weight: 650;
+  letter-spacing: .01em;
+  color: var(--on-surface);
+}
+.time-head em {
+  font-style: normal;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--on-surface-variant);
+  background: color-mix(in srgb, var(--on-surface) 8%, transparent);
+}
+.time-head i {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--outline-variant) 90%, transparent), transparent);
+}
+
 /* NotebookLM 卡片 */
 .nb-card {
   position: relative;
@@ -740,11 +784,11 @@ body.sorting .nb-card:hover { transform: none; box-shadow: none; }
 .doc-text li + li { margin-top: 5px; }
 
 /* ---------- 登录日志弹窗 ---------- */
-.lg-modal { width: 560px; }
+.lg-modal { width: 660px; }
 .lg-loading { font-size: 13px; color: var(--on-surface-variant); padding: 18px 2px; }
 .lg-scope { margin: -8px 0 14px; font-size: 11.5px; line-height: 1.5; color: var(--on-surface-variant); }
 .lg-wrap { max-height: 46vh; overflow: auto; scrollbar-width: thin; border: 1px solid var(--outline-variant); border-radius: 10px; }
-.lg-table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 420px; }
+.lg-table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 520px; }
 .lg-table th, .lg-table td { padding: 9px 12px; text-align: left; white-space: nowrap; }
 .lg-table thead th {
   position: sticky; top: 0;
@@ -766,6 +810,31 @@ body.sorting .nb-card:hover { transform: none; box-shadow: none; }
   background: color-mix(in srgb, var(--lgc, var(--primary)) 16%, transparent);
   color: color-mix(in srgb, var(--lgc, var(--primary)) 76%, var(--on-surface));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lgc, var(--primary)) 34%, transparent);
+}
+/* 「方式」列：登录=真的敲了密码，访问=已登录设备当天第一次打开（手机基本只出现在这一类） */
+.lg-kind {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  border: 1px solid color-mix(in srgb, var(--on-surface) 18%, transparent);
+  color: var(--on-surface-variant);
+}
+.lg-k-login { border-color: color-mix(in srgb, var(--primary) 42%, transparent); color: color-mix(in srgb, var(--primary) 82%, var(--on-surface)); }
+/* 设备列：图标 + 「浏览器 · 系统」 */
+.lg-dev { display: flex; align-items: center; gap: 6px; }
+.lg-devic { display: inline-grid; place-items: center; line-height: 0; color: var(--on-surface-variant); flex: none; }
+.lg-devic svg { display: block; }
+/* IP 挂在位置下面一行，等宽数字方便对比 */
+.lg-ip {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--on-surface-variant);
+  opacity: .75;
 }
 .lg-guest  { --lgc: #6b8cae; }
 .lg-friend { --lgc: #12a884; }
@@ -2715,15 +2784,18 @@ body.home > main { position: relative; z-index: 1; }
 }
 :root[data-ui="premium"][data-bg]:not([data-bg="none"]) body.home::before { opacity: .22; }
 
-/* 自定义图片背景：铺满视口。图片比着色器实一些，所以同一个滑杆值再打 6 折。 */
+/* 自定义图片背景：铺满视口。
+   这一层不做任何"美化"——浓淡 100 / 亮度 50 就是 opacity:1 + brightness(1)，
+   也就是把用户上传的图原样贴上去。以前这里额外打 6 折又加饱和度，结果是
+   滑杆推满也比原图淡一大截，看着像调不动。要改效果请改滑杆，别在这儿加系数。 */
 .nb-background-image {
   position: fixed; inset: 0; z-index: 0;
   pointer-events: none;
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;
-  opacity: calc(var(--nb-bg-opacity, .55) * .62);
-  filter: brightness(var(--nb-bg-brightness, 1)) saturate(1.05);
+  opacity: var(--nb-bg-opacity, .55);
+  filter: brightness(var(--nb-bg-brightness, 1));
   transition: opacity 160ms ease, filter 160ms ease;
 }
 
@@ -2818,9 +2890,13 @@ body.home > main { position: relative; z-index: 1; }
 .es-row { display: flex; align-items: center; gap: 6px; position: relative; }
 .es-row .es-wrap { flex: 1; min-width: 0; }
 :root[data-bg="none"] .bg-sliders { display: none; }
+/* 顶栏通透度独立成一根杆，和背景选择无关，素色背景下也照常显示 */
+.bar-slider { margin-top: 2px; }
 
 /* ---- 弹性滑杆（移植自 React Bits ElasticSlider，见 assets/slider.js）---- */
 .es-native { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+/* 悬停时原版 ElasticSlider 会把整条杆放大到 1.2，在窄面板里会顶出边界，
+   所以这里不缩放外壳 —— --es-scale 只留给轨道长高（见 .es-track 的 calc）。 */
 .es-wrap {
   --es-scale: 1;
   display: flex;
@@ -2829,10 +2905,8 @@ body.home > main { position: relative; z-index: 1; }
   padding: 3px 0;
   touch-action: none;
   user-select: none;
-  transform: scale(var(--es-scale));
-  transform-origin: center;
   opacity: .7;
-  transition: transform 220ms cubic-bezier(.2,.8,.2,1), opacity 220ms ease;
+  transition: opacity 220ms ease;
 }
 .es-wrap.es-active { opacity: 1; }
 .es-icon {
@@ -2885,12 +2959,6 @@ body.home > main { position: relative; z-index: 1; }
   transition: opacity 180ms ease;
 }
 .es-wrap.es-active .es-value { opacity: 1; }
-.es-label {
-  flex: none;
-  width: 26px;
-  font-size: 11px;
-  color: var(--on-surface-variant);
-}
 
 .sm-hint {
   margin: 7px 1px 0;
@@ -3033,8 +3101,6 @@ body.home > main { position: relative; z-index: 1; }
 
 @media (max-width: 520px) {
   .settings-menu { width: min(340px, calc(100vw - 24px)); max-height: calc(100dvh - 86px); }
-  .nb-background-canvas { opacity: .45; }
-  [data-theme="dark"] .nb-background-canvas { opacity: .72; }
   /* 触屏没有 hover，手风琴退化成网格，每格都看得见 */
   .bg-accordion { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; height: auto; }
   .bg-panel { height: 50px; }

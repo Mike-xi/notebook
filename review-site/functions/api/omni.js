@@ -5,7 +5,8 @@
 // GET /api/omni -> { models, default }（前端下拉用，与课程内对话共用同一份清单）
 import { ensureCoursesSchema, ensureLogsSchema, getChatMessages, appendChatMessages } from '../_lib/db.js';
 import { CHAT_MODELS, CHAT_MODEL, resolveChatModel, extractAIText, stripThink } from '../_lib/rag.js';
-import { getRole } from '../_lib/auth.js';
+import { getRole, ROLE_NAMES } from '../_lib/auth.js';
+import { parseDetail, deviceOf } from '../_lib/visitlog.js';
 
 const OMNI_SCOPE = 'omni';
 // 首页 AI 的对话历史按角色分库：管理员用 'omni'，游客用 'omni:guest'（两者互不可见）
@@ -76,9 +77,19 @@ export async function onRequestPost({ request, env }) {
     courseLines.push(`•《${str(c?.title)}》｜学科：${str(c?.subject) || '—'}｜简介：${str(c?.description) || '—'}`);
   }
 
-  const typeLabel = { login: '登录', upload: '上传课程', delete: '删除课程' };
-  const logLines = logs.map((l) =>
-    `• ${fmtDate(l.created_at)} ${typeLabel[l.type] || l.type}${l.detail ? `：${str(l.detail)}` : ''}`);
+  const typeLabel = { login: '登录', visit: '访问', upload: '上传课程', delete: '删除课程' };
+  // 登录/访问两类的 detail 是 JSON（见 _lib/visitlog.js），原样丢给模型既难读又会把
+  // IP 一起发出去。这里先解成人话，并且**不带 IP**。
+  const logLines = logs.map((l) => {
+    const when = fmtDate(l.created_at);
+    const label = typeLabel[l.type] || l.type;
+    if (l.type === 'login' || l.type === 'visit') {
+      const d = parseDetail(l.detail);
+      const who = ROLE_NAMES[d.role] || d.role;
+      return `• ${when} ${label}：${who} · ${deviceOf(d.ua).name} · ${d.place}`;
+    }
+    return `• ${when} ${label}${l.detail ? `：${str(l.detail)}` : ''}`;
+  });
 
   const sys = '你是「复习笔记」站点的全能助手，掌握用户的全部课程资料、阅读进度与操作日志。'
     + '你可以回答资料库整体情况、各门课程的内容、学习进度、最近的上传/登录等操作，也能跨课程对比、给出复习建议。'

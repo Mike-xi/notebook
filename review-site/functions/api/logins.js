@@ -1,66 +1,49 @@
-// 登录日志。三级都能看，但看到的范围不同：
-//   admin  -> 全部身份的登录记录
-//   friend / guest -> 只看自己那一级的
-// 数据来自 logs 表里 type='login' 的行，detail 格式见 api/login.js：
-//   "<role> · <city, country> · <user-agent>"
-// **只有大致城市，没有 IP**（登录时就没记）。
+// 登录 / 访问日志。三级都能看，但看到的范围不同：
+//   admin          -> 全部身份的记录，且带 IP
+//   friend / guest  -> 只看自己那一级的，IP 一律不下发
+// 数据来自 logs 表里 type='login'（敲密码那一刻）和 type='visit'（带着有效 cookie
+// 每天第一次打开页面，由 _middleware.js 记）。两种一起返回，前端用 kind 区分 ——
+// 手机的会话能撑 30 天，只看 login 会以为手机从来没上过站。
+// detail 的编码与解析都在 _lib/visitlog.js，兼容三代历史格式。
 //
-// GET /api/logins?limit=50 -> { role, scope, items: [{role, place, device, at}] }
+// GET /api/logins?limit=60 -> { role, scope, canSeeIp, items: [{kind, role, place, ip, device, deviceKind, at}] }
 import { ensureLogsSchema } from '../_lib/db.js';
 import { getRole, ROLE_NAMES } from '../_lib/auth.js';
+import { parseDetail, deviceOf } from '../_lib/visitlog.js';
 
-const MAX_LIMIT = 100;
-
-// User-Agent 揉成「Chrome · Windows」这种能一眼认出的设备名
-function deviceOf(ua) {
-  const s = String(ua || '');
-  if (!s) return '未知设备';
-  const os =
-    /Windows/i.test(s) ? 'Windows' :
-    /iPhone|iPad|iPod/i.test(s) ? 'iOS' :
-    /Android/i.test(s) ? 'Android' :
-    /Mac OS X|Macintosh/i.test(s) ? 'macOS' :
-    /Linux/i.test(s) ? 'Linux' : '';
-  const browser =
-    /Edg\//i.test(s) ? 'Edge' :
-    /OPR\/|Opera/i.test(s) ? 'Opera' :
-    /Firefox\//i.test(s) ? 'Firefox' :
-    /Chrome\//i.test(s) ? 'Chrome' :
-    /Safari\//i.test(s) ? 'Safari' : '浏览器';
-  return [browser, os].filter(Boolean).join(' · ');
-}
+const MAX_LIMIT = 200;
 
 export async function onRequestGet({ request, env }) {
   const role = (await getRole(request, env)) || 'guest';
-  if (!env.DB) return Response.json({ role, scope: 'self', items: [] });
+  if (!env.DB) return Response.json({ role, scope: 'self', canSeeIp: false, items: [] });
   await ensureLogsSchema(env);
 
   const url = new URL(request.url);
-  const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(url.searchParams.get('limit') || '50', 10) || 50));
+  const limit = Math.min(MAX_LIMIT, Math.max(1, parseInt(url.searchParams.get('limit') || '60', 10) || 60));
   const isAdmin = role === 'admin';
 
+  // 非管理员要按身份过滤，取多一些回来再筛，免得筛完不够一屏
   const rs = await env.DB.prepare(
-    "SELECT detail, created_at FROM logs WHERE type = 'login' ORDER BY created_at DESC LIMIT ?"
-  ).bind(isAdmin ? limit * 3 : 400).all();
+    "SELECT type, detail, created_at FROM logs WHERE type IN ('login','visit') ORDER BY created_at DESC LIMIT ?"
+  ).bind(isAdmin ? limit : Math.min(600, limit * 8)).all();
 
   const items = [];
   for (const r of rs.results || []) {
-    const parts = String(r.detail || '').split(' · ');
-    // 老格式只有 "<role> · <ua>" 两段，没有位置那一段
-    const rowRole = parts[0] || 'guest';
-    const hasPlace = parts.length >= 3;
-    const place = hasPlace ? parts[1] : '';
-    const ua = hasPlace ? parts.slice(2).join(' · ') : parts.slice(1).join(' · ');
-    if (!isAdmin && rowRole !== role) continue;      // 非管理员只看自己这一级
+    const d = parseDetail(r.detail);
+    if (!isAdmin && d.role !== role) continue;
+    const dev = deviceOf(d.ua);
     items.push({
-      role: rowRole,
-      roleName: ROLE_NAMES[rowRole] || rowRole,
-      place: place || '未知',
-      device: deviceOf(ua),
+      kind: r.type === 'visit' ? 'visit' : 'login',
+      role: d.role,
+      roleName: ROLE_NAMES[d.role] || d.role,
+      place: d.place || '未知',
+      ip: isAdmin ? d.ip : '',        // IP 只给管理员，别下发给一二级
+      device: dev.name,
+      deviceKind: dev.kind,
       at: r.created_at,
     });
     if (items.length >= limit) break;
   }
 
-  return Response.json({ role, scope: isAdmin ? 'all' : 'self', items });
+  return Response.json({ role, scope: isAdmin ? 'all' : 'self', canSeeIp: isAdmin, items });
 }

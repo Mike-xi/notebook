@@ -31,7 +31,7 @@
   var reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // ---------- Dock 顶栏（React Bits <Dock/> 移植） ----------
-  var TAB_ICONS = { learn: 'bookopen', explore: 'compass', play: 'trophy', all: 'stack' };
+  var TAB_ICONS = { learn: 'bookopen', explore: 'compass', play: 'trophy', time: 'clock', all: 'stack' };
 
   function buildDock() {
     var topbar = document.querySelector('.topbar');
