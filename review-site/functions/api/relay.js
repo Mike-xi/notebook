@@ -346,19 +346,35 @@ async function run(env, id, url, dest, parent, name, path, role, lim) {
     const httpMetadata = { contentType: mime };
 
     // 小文件一次 put；大文件走多段上传（每段 8 MB，内存里最多只压着一段）
+    // 攒够一段就传一段。**每段必须严格等长**（R2 只允许最后一段短，否则
+    // completeMultipartUpload 报 "All non-trailing parts must have the same length"）——
+    // 所以不能"攒到超过 PART 就整包传走"，得按 PART 精确切，多出来的留到下一段。
     const reader = res.body.getReader();
-    let buf = [], bufLen = 0, total = 0, partNo = 1, last = 0;
+    let part = new Uint8Array(PART);      // 当前这一段的缓冲，填满 PART 才发
+    let fill = 0;
+    let total = 0, partNo = 1, last = 0;
     const parts = [];
+    const flushPart = async () => {
+      if (!mp) mp = await env.FILES.createMultipartUpload(r2Key, { httpMetadata });
+      parts.push(await mp.uploadPart(partNo++, part.subarray(0, fill)));
+      part = new Uint8Array(PART);        // 换一块新的，不复用刚交出去的那块
+      fill = 0;
+    };
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
       total += value.byteLength;
       if (total > room) { try { await reader.cancel(); } catch {} throw new Error(sizeMsg(total, room)); }
-      buf.push(value); bufLen += value.byteLength;
-      if (bufLen >= PART) {
-        if (!mp) mp = await env.FILES.createMultipartUpload(r2Key, { httpMetadata });
-        parts.push(await mp.uploadPart(partNo++, concat(buf, bufLen)));
-        buf = []; bufLen = 0;
+      let off = 0;
+      while (fill + (value.byteLength - off) >= PART) {
+        const need = PART - fill;
+        part.set(value.subarray(off, off + need), fill);
+        off += need; fill = PART;
+        await flushPart();
+      }
+      if (off < value.byteLength) {
+        part.set(value.subarray(off), fill);
+        fill += value.byteLength - off;
       }
       const now = Date.now();
       if (now - last > PROGRESS_MS) {
@@ -371,11 +387,11 @@ async function run(env, id, url, dest, parent, name, path, role, lim) {
       await throttle(total);
     }
     if (mp) {
-      if (bufLen) parts.push(await mp.uploadPart(partNo++, concat(buf, bufLen)));
+      if (fill) await flushPart();        // 收尾的短段（正好整除时就没有）
       await mp.complete(parts);
       mp = null;
     } else {
-      await env.FILES.put(r2Key, concat(buf, bufLen), { httpMetadata });
+      await env.FILES.put(r2Key, part.subarray(0, fill), { httpMetadata });
     }
 
     // 落库：公共云盘要在 drive_nodes 里登记一条（Xi Pan 的 key 就是路径，不用登记）。
@@ -398,9 +414,3 @@ async function run(env, id, url, dest, parent, name, path, role, lim) {
 const sizeMsg = (n, room) =>
   `文件 ${(n / 1048576).toFixed(1)} MB，超出可用空间 ${(room / 1048576).toFixed(1)} MB（本级单文件上限 ${(room / 1048576).toFixed(0)} MB）`;
 
-function concat(chunks, len) {
-  const out = new Uint8Array(len);
-  let at = 0;
-  for (const c of chunks) { out.set(c, at); at += c.byteLength; }
-  return out;
-}
