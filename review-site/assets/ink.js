@@ -49,30 +49,52 @@
     return c ? lum(c) : (root.dataset.theme === 'dark' ? 0.06 : 0.96);
   }
 
-  // 图片背景：离屏缩到 32px 量左上角那一块（同源，不会污染画布）
-  const imgCache = new Map();
-  function sampleImage(url) {
-    if (imgCache.has(url)) return Promise.resolve(imgCache.get(url));
+  // 图片背景：离屏缩成 N×N 的缩略图存着（同源，不会污染画布），每次取样时再按
+  // 当前视口算「屏幕左上角那一片」落在图的哪个位置 —— background-size: cover 会
+  // 按视口比例裁图，手机竖屏和电脑宽屏看到的根本不是同一块，不能写死一个区域。
+  const THUMB = 32;
+  const thumbCache = new Map();
+  function loadThumb(url) {
+    if (thumbCache.has(url)) return Promise.resolve(thumbCache.get(url));
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
         try {
           const cv = document.createElement('canvas');
-          cv.width = 32; cv.height = 32;
+          cv.width = THUMB; cv.height = THUMB;
           const ctx = cv.getContext('2d', { willReadFrequently: true });
-          ctx.drawImage(img, 0, 0, 32, 32);
-          // 左上角 40% x 25%（字标和标题都在这一片）
-          const d = ctx.getImageData(0, 0, 13, 8).data;
-          let r = 0, g = 0, b = 0, n = 0;
-          for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
-          const c = { r: r / n / 255, g: g / n / 255, b: b / n / 255, a: 1 };
-          imgCache.set(url, c);
-          resolve(c);
+          ctx.drawImage(img, 0, 0, THUMB, THUMB);
+          const t = { ctx, w: img.naturalWidth || 1, h: img.naturalHeight || 1 };
+          thumbCache.set(url, t);
+          resolve(t);
         } catch { resolve(null); }
       };
       img.onerror = () => resolve(null);
       img.src = url;
     });
+  }
+
+  // 屏幕左上角 42% x 26%（字标和标题都在这一片）对应到图里的平均色
+  async function sampleImage(url) {
+    const t = await loadThumb(url);
+    if (!t) return null;
+    try {
+      const vw = Math.max(1, innerWidth), vh = Math.max(1, innerHeight);
+      const scale = Math.max(vw / t.w, vh / t.h);          // cover
+      const offX = (vw - t.w * scale) / 2, offY = (vh - t.h * scale) / 2;   // position: center
+      const u = (x, y) => [(x - offX) / scale / t.w, (y - offY) / scale / t.h];
+      const [ax, ay] = u(0, 0);
+      const [bx, by] = u(vw * 0.42, vh * 0.26);
+      const cl = (v) => Math.min(1, Math.max(0, v));
+      const x0 = Math.floor(cl(ax) * THUMB), y0 = Math.floor(cl(ay) * THUMB);
+      const w = Math.max(1, Math.ceil(cl(bx) * THUMB) - x0);
+      const h = Math.max(1, Math.ceil(cl(by) * THUMB) - y0);
+      const d = t.ctx.getImageData(x0, y0, Math.min(w, THUMB - x0), Math.min(h, THUMB - y0)).data;
+      let r = 0, g = 0, b = 0, n = 0;
+      for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+      if (!n) return null;
+      return { r: r / n / 255, g: g / n / 255, b: b / n / 255, a: 1 };
+    } catch { return null; }
   }
 
   // 背景层的原色 + 有效不透明度，合成到 surface 上得到「眼睛看到的亮度」
@@ -97,11 +119,18 @@
   }
 
   let pending = false;
+  let again = false;
   function measure() {
-    if (pending) return;
+    // 取样是异步的（等一帧 / 等图片加载）。中途又被叫一次不能直接丢掉 ——
+    // 云端偏好回来换背景时正好压在这个窗口里，丢了就一直按旧背景定墨色。
+    if (pending) { again = true; return; }
     pending = true;
     const bg = root.dataset.bg || 'none';
-    const done = (sample) => { pending = false; applyLum(composite(sample)); };
+    const done = (sample) => {
+      pending = false;
+      applyLum(composite(sample));
+      if (again) { again = false; measure(); }
+    };
 
     if (bg === 'none') { done(null); return; }
     if (bg.startsWith('custom:')) {
@@ -122,6 +151,7 @@
   setInterval(() => { if (!document.hidden) measure(); }, REDRAW_MS);
 
   measure();
-  setTimeout(measure, 400);          // 首帧着色器可能还没画出来，补一次
+  // 首帧着色器可能还没画出来、云端偏好也还没回来，前几秒多补几次
+  [400, 1200, 2600, 4200].forEach((t) => setTimeout(measure, t));
   window.NBInk = { measure, get lum() { return lastLum; } };
 })();
