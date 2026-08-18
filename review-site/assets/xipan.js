@@ -126,6 +126,22 @@
   window.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dragging'); } });
   window.addEventListener('drop', (e) => { e.preventDefault(); dragDepth = 0; document.body.classList.remove('dragging'); if (e.dataTransfer?.files?.length) uploadFiles([...e.dataTransfer.files]); });
 
+  // 当前目录写进 hash：浏览器直接打开 /dav/某个文件夹/ 时会被 302 到
+  // /xipan#/某个文件夹（见 functions/dav），这样落地就在那一层，刷新也还在。
+  const fromHash = () => {
+    const h = decodeURIComponent(location.hash.replace(/^#\/?/, ''));
+    return h.replace(/\\/g, '/').replace(/\/+/g, '/').replace(/^\/+|\/+$/g, '');
+  };
+  const origLoad = load;
+  load = function () {
+    if (fromHash() !== cur) {
+      history.replaceState(null, '', location.pathname + (cur ? '#/' + cur.split('/').map(encodeURIComponent).join('/') : ''));
+    }
+    return origLoad();
+  };
+  window.addEventListener('hashchange', () => { const h = fromHash(); if (h !== cur) { cur = h; load(); } });
+
   window.__xipan = { reload: load, cd: (p) => { cur = p || ''; load(); } };
+  cur = fromHash();
   load();
 })();

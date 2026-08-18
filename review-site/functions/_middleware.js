@@ -81,5 +81,8 @@ export async function onRequest(context) {
     });
   }
 
-  return Response.redirect(new URL('/login', url).toString(), 302);
+  // 带上原地址：在别的设备上点开一个深链（云盘、某篇笔记）时，登录完能落回那一页
+  const login = new URL('/login', url);
+  if (request.method === 'GET' && path !== '/') login.searchParams.set('next', path + url.search);
+  return Response.redirect(login.toString(), 302);
 }

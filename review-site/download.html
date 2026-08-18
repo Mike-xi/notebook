@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>下载中心 · Xi Notebook</title>
+  <script>
+    (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
+  </script>
+  <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613d">
+  <link rel="stylesheet" href="/assets/style.css?v=20260818b">
+</head>
+<body class="dlc-page">
+  <header class="topbar">
+    <a class="brand drive-back" href="/" aria-label="返回首页" title="返回首页">
+      <span class="ic" data-icon="back" data-icon-size="20"></span>
+      <img class="brand-logo" src="/assets/brand-xinotebook.png?v=20260613d" alt="Xi Notebook">
+    </a>
+    <div class="topbar-right">
+      <span class="drive-title"><span class="ic" data-icon="download" data-icon-size="18"></span> 下载中心</span>
+      <span class="drive-role-badge" id="dlc-role" hidden></span>
+      <button class="pill-btn" id="help-btn" title="下载中心说明"><span class="ic" data-icon="bookopen" data-icon-size="16"></span><span class="pill-label">说明</span></button>
+    </div>
+  </header>
+
+  <main class="dlc-main">
+    <!-- ① 云端转存：服务端去下，直接落进云盘 -->
+    <section class="dlc-card">
+      <h2 class="dlc-h"><span class="ic" data-icon="stack" data-icon-size="18"></span> 云端转存</h2>
+      <textarea id="dlc-urls" class="dlc-input" rows="3" placeholder="每行一个直链，https:// 开头" spellcheck="false"></textarea>
+      <div class="dlc-row">
+        <div class="seg dlc-dest" id="dlc-dest" role="group" aria-label="存到哪">
+          <button class="seg-btn active" type="button" data-dest="drive">公共云盘</button>
+          <button class="seg-btn" type="button" data-dest="xipan">Xi Pan</button>
+        </div>
+        <input type="text" id="dlc-folder" class="dlc-input dlc-folder" placeholder="目标文件夹（留空＝根目录）" autocomplete="off">
+        <input type="text" id="dlc-name" class="dlc-input dlc-folder" placeholder="另存为（留空＝按链接取名）" autocomplete="off">
+        <button class="pill-btn" id="dlc-probe" type="button"><span class="ic" data-icon="search" data-icon-size="16"></span><span class="pill-label">探测</span></button>
+        <button class="pill-btn pill-primary" id="dlc-go" type="button"><span class="ic" data-icon="download" data-icon-size="16"></span><span class="pill-label">开始转存</span></button>
+      </div>
+      <p class="dlc-msg" id="dlc-msg" hidden></p>
+      <div class="dlc-meters" id="dlc-meters"></div>
+      <div class="dlc-jobs" id="dlc-jobs"></div>
+    </section>
+
+    <!-- ② 限速闸门：只有三级看得到 -->
+    <section class="dlc-card" id="dlc-admin" hidden>
+      <h2 class="dlc-h"><span class="ic" data-icon="gear" data-icon-size="18"></span> 各级限速
+        <button class="pill-btn pill-primary dlc-h-btn" id="dlc-save-limits" type="button">保存</button>
+      </h2>
+      <div class="dlc-limits" id="dlc-limits"></div>
+    </section>
+
+    <!-- ③ 本地下载器：装到自己电脑上跑 -->
+    <section class="dlc-card">
+      <h2 class="dlc-h"><span class="ic" data-icon="laptop" data-icon-size="18"></span> 本地下载器</h2>
+      <div class="dlc-row">
+        <a class="pill-btn pill-primary" href="/dl/dlcenter.zip" download="dlcenter.zip"><span class="ic" data-icon="download" data-icon-size="16"></span><span class="pill-label">下载安装包（38 KB）</span></a>
+      </div>
+      <ol class="dlc-steps">
+        <li>装 <b>Python 3</b> 和 <b>aria2</b>（<code>winget install aria2.aria2</code>）</li>
+        <li>解压后双击 <b>启动下载中心.bat</b></li>
+        <li>浏览器自动打开 <code>http://127.0.0.1:6801</code>，粘链接就能下</li>
+      </ol>
+      <div class="dlc-cmd">
+        <label for="dlc-cmd-out">直接用命令行下（把上面第一行链接填进去）</label>
+        <div class="dlc-cmd-row">
+          <input type="text" id="dlc-cmd-out" readonly value="aria2c -x16 -s16 -c &quot;链接&quot;">
+          <button class="pill-btn" id="dlc-cmd-copy" type="button">复制</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/assets/icons.js?v=20260818b"></script>
+  <script src="/assets/theme.js?v=20260818b"></script>
+  <script src="/assets/segment.js?v=20260818b"></script>
+  <script src="/assets/help.js?v=20260818b"></script>
+  <script src="/assets/dlcenter.js?v=20260818b"></script>
+  <script>
+    NBHelp.attach('#help-btn', {
+      title: '下载中心说明',
+      sections: [
+        { h: '两条路子', body: '<b>云端转存</b>：服务器替你去下，文件直接落进云盘，页面关掉照跑，回头再从云盘取。<b>本地下载器</b>：装到自己电脑上，16 线程直接落到本机硬盘，几个 G 的大件走这条。' },
+        { h: '什么样的链接能转存', body: '公开可直接下载的 http/https 直链（网盘分享页、要登录/要点验证码的页面不行）。粘之前可以先按「探测」看一眼文件名和大小。' },
+        { h: '存到哪', body: '「公共云盘」= 首页那个云盘，一二级转存的文件会先进内容审核队列，管理员通过后才对外可见。「Xi Pan」是管理员私人盘，只有三级能选。' },
+        { h: '为什么有限速', body: '大家共用同一条转存通道和同一块云盘空间，不设闸门一个人就能占满。每一级的速度、单文件大小、每日总量、同时任务数都由管理员在本页调整。' },
+        { h: '中断了怎么办', body: '云端转存没有断点续传：源站太慢、卡住超过 20 分钟会被判定中断，删掉重来即可。真要下大件请用本地下载器（它有断点续传和 sha256 校验）。' },
+        { h: '本地下载器要装什么', body: 'Python 3 与 aria2c。Windows 上装 aria2 一句话：<code>winget install aria2.aria2</code>。压缩包里的 README 有完整说明和 API 用法。' },
+      ],
+    });
+  </script>
+</body>
+</html>

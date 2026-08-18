@@ -26,8 +26,8 @@
     })();
   </script>
   <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613d">
-  <link rel="stylesheet" href="/assets/style.css?v=20260818a">
-  <link rel="stylesheet" href="/assets/premium.css?v=20260818a">
+  <link rel="stylesheet" href="/assets/style.css?v=20260818b">
+  <link rel="stylesheet" href="/assets/premium.css?v=20260818b">
 </head>
 <body class="home">
   <header class="topbar">
@@ -45,7 +45,7 @@
       </div>
       <div class="search-wrap">
         <span class="search-icon ic" data-icon="search" data-icon-size="18"></span>
-        <input type="search" id="search" placeholder="Search notebooks · press Enter for full text" autocomplete="off">
+        <input type="search" id="search" placeholder="Search notebooks" autocomplete="off">
       </div>
       <button class="pill-btn" id="omni-btn" title="Ask AI across all your notebooks">
         <span class="ic" data-icon="sparkle" data-icon-size="18"></span><span class="pill-label">AI</span>
@@ -70,11 +70,37 @@
         <button class="settings-btn" id="settings-btn" title="Settings" aria-haspopup="true" aria-expanded="false">
           <span class="ic" data-icon="gear" data-icon-size="20"></span>
         </button>
-        <div class="settings-menu" id="settings-menu" hidden role="menu">
+        <!-- 设置面板分两屏：根屏（身份 + 活跃 + 各入口）和「页面设置」子屏，
+             靠 data-pane 切换。外观相关的滑杆/分段控件全在子屏里，根屏保持短。 -->
+        <div class="settings-menu" id="settings-menu" hidden role="menu" data-pane="root">
+          <div class="sm-pane" data-pane="root">
           <!-- 身份卡：一级访客 / 二级好友 / 三级管理员，由 /api/me 决定 -->
           <div class="idcard" id="idcard" data-role="guest">
             <span class="idcard-avatar" id="id-avatar" aria-hidden="true"></span>
             <b class="idcard-name" id="id-name">访客</b>
+          </div>
+          <div class="sm-section">
+            <span class="sm-label">登录活跃
+              <span class="seg seg-mini" role="group" aria-label="热力图视图" id="heat-views">
+                <button class="seg-btn" data-heat-view="year" aria-pressed="false">年</button>
+                <button class="seg-btn" data-heat-view="month" aria-pressed="false">月</button>
+              </span>
+            </span>
+            <!-- 登录 / 访问热力图，数据来自 /api/logins?heat=1（见 app.js renderHeat） -->
+            <div class="heat" id="login-heat" aria-label="登录活跃热力图"></div>
+          </div>
+          <div class="sm-divider"></div>
+          <button class="sm-item sm-drill" id="page-settings-btn" role="menuitem"><span class="sm-ic ic" data-icon="palette" data-icon-size="18"></span><span>页面设置</span><span class="sm-chev ic" data-icon="caretright" data-icon-size="15"></span></button>
+          <button class="sm-item" id="review-item" role="menuitem" style="display:none"><span class="sm-ic ic" data-icon="tray" data-icon-size="18"></span><span>内容审核</span><span class="sm-badge" id="review-badge" hidden>0</span></button>
+          <button class="sm-item" id="logins-btn" role="menuitem"><span class="sm-ic ic" data-icon="list" data-icon-size="18"></span><span>登录日志</span></button>
+          <button class="sm-item" id="docs-btn" role="menuitem"><span class="sm-ic ic" data-icon="bookopen" data-icon-size="18"></span><span>说明文档</span></button>
+          <button class="sm-item sm-danger" id="logout-btn" role="menuitem"><span class="sm-ic ic" data-icon="signout" data-icon-size="18"></span><span>退出登录</span></button>
+          </div>
+
+          <div class="sm-pane" data-pane="page" hidden>
+          <div class="sm-pane-head">
+            <button class="sm-back" id="page-back" type="button" aria-label="返回"><span class="ic" data-icon="back" data-icon-size="16"></span></button>
+            <b>页面设置</b>
           </div>
           <div class="sm-section">
             <span class="sm-label">界面风格</span>
@@ -124,11 +150,6 @@
             </div>
           </div>
           <div class="sm-section">
-            <span class="sm-label">登录活跃</span>
-            <!-- 一年的登录 / 访问热力图，数据来自 /api/logins?heat=1（见 app.js renderHeat） -->
-            <div class="heat" id="login-heat" aria-label="登录活跃热力图"></div>
-          </div>
-          <div class="sm-section">
             <span class="sm-label">阅读器工具栏唤出</span>
             <div class="seg" role="group" aria-label="工具栏唤出灵敏度">
               <button class="seg-btn" data-bar-reveal="4" aria-pressed="false">灵敏</button>
@@ -137,11 +158,7 @@
               <button class="seg-btn" data-bar-reveal="off" aria-pressed="false" title="彻底关闭工具栏，不显示任何按钮（靠浏览器返回）">永久</button>
             </div>
           </div>
-          <div class="sm-divider"></div>
-          <button class="sm-item" id="review-item" role="menuitem" style="display:none"><span class="sm-ic ic" data-icon="tray" data-icon-size="18"></span><span>内容审核</span><span class="sm-badge" id="review-badge" hidden>0</span></button>
-          <button class="sm-item" id="logins-btn" role="menuitem"><span class="sm-ic ic" data-icon="list" data-icon-size="18"></span><span>登录日志</span></button>
-          <button class="sm-item" id="docs-btn" role="menuitem"><span class="sm-ic ic" data-icon="bookopen" data-icon-size="18"></span><span>说明文档</span></button>
-          <button class="sm-item sm-danger" id="logout-btn" role="menuitem"><span class="sm-ic ic" data-icon="signout" data-icon-size="18"></span><span>退出登录</span></button>
+          </div>
         </div>
       </div>
     </div>
@@ -296,16 +313,16 @@
     </div>
   </div>
 
-  <script src="/assets/icons.js?v=20260818a" defer></script>
-  <script src="/assets/cropper.js?v=20260818a" defer></script>
-  <script src="/assets/slider.js?v=20260818a" defer></script>
-  <script src="/assets/theme.js?v=20260818a" defer></script>
-  <script src="/assets/backgrounds.js?v=20260818a" defer></script>
-  <script src="/assets/segment.js?v=20260818a" defer></script>
-  <script src="/assets/ink.js?v=20260818a" defer></script>
-  <script src="/assets/appearance.js?v=20260818a" defer></script>
-  <script src="/assets/md.js?v=20260818a" defer></script>
-  <script src="/assets/app.js?v=20260818a" defer></script>
-  <script src="/assets/premium.js?v=20260818a" defer></script>
+  <script src="/assets/icons.js?v=20260818b" defer></script>
+  <script src="/assets/cropper.js?v=20260818b" defer></script>
+  <script src="/assets/slider.js?v=20260818b" defer></script>
+  <script src="/assets/theme.js?v=20260818b" defer></script>
+  <script src="/assets/backgrounds.js?v=20260818b" defer></script>
+  <script src="/assets/segment.js?v=20260818b" defer></script>
+  <script src="/assets/ink.js?v=20260818b" defer></script>
+  <script src="/assets/appearance.js?v=20260818b" defer></script>
+  <script src="/assets/md.js?v=20260818b" defer></script>
+  <script src="/assets/app.js?v=20260818b" defer></script>
+  <script src="/assets/premium.js?v=20260818b" defer></script>
 </body>
 </html>

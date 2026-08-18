@@ -8,7 +8,7 @@
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
   </script>
   <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613d">
-  <link rel="stylesheet" href="/assets/style.css?v=20260818a">
+  <link rel="stylesheet" href="/assets/style.css?v=20260818b">
 </head>
 <body class="drive-page">
   <header class="topbar">
@@ -135,10 +135,10 @@
     </div>
   </div>
 
-  <script src="/assets/icons.js?v=20260818a"></script>
-  <script src="/assets/theme.js?v=20260818a"></script>
-  <script src="/assets/drive.js?v=20260818a"></script>
-  <script src="/assets/help.js?v=20260818a"></script>
+  <script src="/assets/icons.js?v=20260818b"></script>
+  <script src="/assets/theme.js?v=20260818b"></script>
+  <script src="/assets/drive.js?v=20260818b"></script>
+  <script src="/assets/help.js?v=20260818b"></script>
   <script>
     // 页面上原本挂着的灰色小字（审核队列说明等）统一收到这个「说明」里
     NBHelp.attach('#help-btn', {
@@ -148,7 +148,7 @@
         { h: '上传与审核', body: '管理员上传的文件直接进云盘。一二级账号上传的先进「内容审核」队列，管理员通过后才会出现在云盘并对一二级开放。' },
         { h: '拖拽上传', body: '把文件从桌面拖到文件列表上松手，就传到当前所在的文件夹。' },
         { h: '分享链接', body: '任意文件或文件夹都能生成对外链接，可设有效期、访问密码、下载次数上限；「管理分享」里可以随时撤销。' },
-        { h: '挂载到电脑 / 手机', body: '仅管理员：Windows「映射网络驱动器」或 iPhone 的 WebDAV App 连 <code>' + location.origin + '/dav/</code>，用户名随意，密码＝管理员密码。' },
+        { h: '挂载到电脑 / 手机', body: '仅管理员：Windows「映射网络驱动器」或 iPhone 的 WebDAV App 连 <code>' + location.origin + '/dav/</code>，用户名随意，密码＝管理员密码。把这个地址粘进浏览器则会直接跳到 Xi Pan 网页版。' },
       ],
     });
   </script>

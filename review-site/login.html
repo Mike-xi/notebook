@@ -8,7 +8,7 @@
     (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
   </script>
   <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613c">
-  <link rel="stylesheet" href="/assets/style.css?v=20260818a">
+  <link rel="stylesheet" href="/assets/style.css?v=20260818b">
   <!-- 登录页背景固定为极光，浓淡也固定，不读用户偏好 -->
   <script>document.documentElement.style.setProperty('--nb-bg-opacity','.85');</script>
 </head>
@@ -29,6 +29,17 @@
     const err = document.getElementById('error');
     const btn = document.getElementById('submit-btn');
 
+    // 深链被拦下来时中间件会带上 ?next=，登录完回到原来那一页（比如 /dav/ 挂载地址）。
+    // 只认站内相对路径：第二个字符是 / 或 \ 都要挡 —— '//外站' 是协议相对地址，
+    // 而 '/\外站' 会被浏览器规范化成同一个东西，两者都能把人送出站（开放重定向）。
+    function nextPath() {
+      try {
+        const n = new URLSearchParams(location.search).get('next');
+        if (n && n[0] === '/' && n[1] !== '/' && n[1] !== '\\') return n;
+      } catch {}
+      return '/';
+    }
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       err.hidden = true;
@@ -46,7 +57,7 @@
           // 密码可能对应另一位用户；先清掉上一个会话的首屏缓存，再由服务端偏好恢复。
           localStorage.removeItem('nb-theme');
           localStorage.removeItem('nb-background');
-          location.href = '/';
+          location.href = nextPath();
           return;
         }
         err.textContent = 'Wrong password';
@@ -60,6 +71,6 @@
       }
     });
   </script>
-  <script src="/assets/backgrounds.js?v=20260818a" defer></script>
+  <script src="/assets/backgrounds.js?v=20260818b" defer></script>
 </body>
 </html>

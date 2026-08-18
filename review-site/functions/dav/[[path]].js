@@ -3,6 +3,7 @@
 //   保证 WebDAV 与站内浏览器视图同一份真相）。空目录用「以 / 结尾的零字节对象」当占位标记。
 //   鉴权：HTTP Basic（用户名任意，密码 = ADMIN_PASSWORD 之一）给 Windows/iPhone 等外部客户端；
 //        或站点管理员 Cookie，给站内浏览器视图用 fetch 调本接口。
+//        用浏览器直接打开这个地址不会弹 Basic 对话框，见 isBrowserNav。
 //   挂载地址（带末尾斜杠）：https://<域名>/dav/
 //   _middleware.js 已放行 /dav，由本函数自行鉴权。
 import { getRole } from '../_lib/auth.js';
@@ -16,20 +17,36 @@ export async function onRequest(context) {
   const { request, env } = context;
   if (!env.FILES) return new Response('R2 not configured', { status: 500 });
 
-  // ---- 鉴权：Basic 或 管理员 Cookie ----
-  if (!(await authed(request, env))) {
-    return new Response('Unauthorized', {
-      status: 401,
-      headers: { 'WWW-Authenticate': 'Basic realm="Xi Pan", charset="UTF-8"' },
-    });
-  }
-
   const url = new URL(request.url);
   // /dav/<path...> -> path（去掉前缀，规范化，挡 ..）
   let rel = decodeURIComponent(url.pathname.replace(/^\/dav\/?/, ''));
   rel = rel.replace(/\\/g, '/').replace(/\/+/g, '/').replace(/^\/+|\/+$/g, '');
   if (rel.split('/').some((s) => s === '..' || s === '.')) return new Response('Bad path', { status: 400 });
   const isDirReq = url.pathname.endsWith('/') || rel === '';
+
+  // ---- 鉴权：Basic 或 管理员 Cookie ----
+  // 挂载地址被人直接粘进浏览器地址栏时，别走 Basic：本站只有一个密码、根本没有用户名，
+  // 浏览器却会弹一个「用户名 + 密码」的原生框，填对密码也只换来一页 405（GET 目录）。
+  // 所以先认出「浏览器导航请求」，把它引到网页版 Xi Pan / 登录页去。
+  const nav = isBrowserNav(request);
+  if (!(await authed(request, env))) {
+    if (nav) {
+      // 压根没登录 -> 去登录页，登完回到这个地址；登录页只认站内相对路径
+      if (!(await currentRole(request, env))) {
+        return Response.redirect(new URL('/login?next=' + encodeURIComponent(url.pathname), url).toString(), 302);
+      }
+      // 登录了但不是三级：再跳登录页只会来回打转，直接说清楚
+      return adminOnlyPage();
+    }
+    return new Response('Unauthorized', {
+      status: 401,
+      headers: { 'WWW-Authenticate': 'Basic realm="Xi Pan", charset="UTF-8"' },
+    });
+  }
+  // 已登录的浏览器导航：目录交给网页版（这个函数只会吐 XML / 405），文件照常下载
+  if (nav && (isDirReq || (request.method === 'GET' && await isCollection(env, rel)))) {
+    return Response.redirect(new URL('/xipan#/' + rel.split('/').map(encodeURIComponent).join('/'), url).toString(), 302);
+  }
 
   const m = request.method.toUpperCase();
   try {
@@ -50,6 +67,36 @@ export async function onRequest(context) {
   } catch (e) {
     return new Response('Server error: ' + (e && e.message ? e.message : e), { status: 500 });
   }
+}
+
+// 「人用浏览器打开这个地址」判定：只认导航请求。WebDAV 客户端（Windows 资源管理器、
+// iPhone 文件 App、curl、脚本）不带 Sec-Fetch-Mode，Accept 也不是 text/html，
+// 站内 xipan.js 的 fetch 是 same-origin 模式，都不会落进来。
+function isBrowserNav(request) {
+  const m = request.method.toUpperCase();
+  if (m !== 'GET' && m !== 'HEAD') return false;
+  const mode = request.headers.get('Sec-Fetch-Mode');
+  if (mode) return mode === 'navigate';
+  return (request.headers.get('Accept') || '').includes('text/html');
+}
+
+async function currentRole(request, env) {
+  try { return await getRole(request, env); } catch { return null; }
+}
+
+function adminOnlyPage() {
+  const body = `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Xi Pan</title>
+<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+background:#f3f4f6;color:#1c1b1f;font-family:-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+@media (prefers-color-scheme:dark){body{background:#0f1115;color:#e6e1e5}}
+.b{max-width:340px;padding:28px 26px;text-align:center;line-height:1.75;font-size:14px}
+a{color:#6750A4}</style></head><body><div class="b">
+<h3 style="margin:0 0 10px">Xi Pan 是私人云盘</h3>
+<p>当前登录的身份没有权限。这个盘只有<b>管理员密码</b>进得来。</p>
+<p><a href="/login">换个密码登录</a> · <a href="/">回首页</a></p>
+</div></body></html>`;
+  return new Response(body, { status: 403, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
 }
 
 async function authed(request, env) {

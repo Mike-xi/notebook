@@ -2020,7 +2020,10 @@ body.login .eyebrow { display: block; text-align: center; margin: 0 0 26px; colo
 }
 .sm-section { padding: 6px 6px 10px; }
 .sm-label {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: .04em;
@@ -2028,6 +2031,37 @@ body.login .eyebrow { display: block; text-align: center; margin: 0 0 26px; colo
   color: var(--on-surface-variant);
   margin-bottom: 8px;
 }
+/* ---- 设置面板的两屏（根屏 / 页面设置）----
+   子屏用 hidden 收起而不是位移：面板本身要跟着当前屏收高，
+   位移方案得给容器定高，几百像素的外观区在手机上撑不下。 */
+.sm-pane[hidden] { display: none; }
+.sm-pane-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 2px 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--outline-variant);
+}
+.sm-pane-head b { font-size: 14px; font-weight: 650; }
+.sm-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--on-surface-variant);
+  cursor: pointer;
+  transition: background-color var(--transition), color var(--transition);
+}
+.sm-back:hover { background: var(--surface-container-highest); color: var(--on-surface); }
+.sm-drill .sm-chev { margin-left: auto; color: var(--on-surface-variant); display: inline-flex; }
+/* 分段控件的迷你版：塞在小标题右边当视图切换 */
+.seg.seg-mini { display: inline-flex; flex: none; gap: 2px; padding: 2px; }
+.seg.seg-mini .seg-btn { flex: none; padding: 3px 9px; font-size: 11px; letter-spacing: 0; text-transform: none; }
 /* ---- 登录活跃热力图（设置面板，见 app.js renderHeat）----
    7 行 = 周日到周六，一列一周；列数由 JS 写进 grid-template-columns。
    设置面板只有 340px 宽，一整年排不下，所以横向滚动、默认滚到最右（最近一周）。 */
@@ -2044,13 +2078,24 @@ body.login .eyebrow { display: block; text-align: center; margin: 0 0 26px; colo
 }
 .heat-top b { color: var(--on-surface); font-weight: 650; }
 .heat-legend { display: inline-flex; align-items: center; gap: 3px; }
+/* 一年那么宽，面板只有 340px：横向滚。手机上直接手指滑；桌面没有横向滚轮，
+   所以 app.js 里把竖滚轮换算成横向滚动、并支持按住拖动，这里补一条看得见的细滚动条。 */
 .heat-scroll {
   overflow-x: auto;
   overflow-y: hidden;
-  scrollbar-width: none;
-  padding-bottom: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--on-surface) 22%, transparent) transparent;
+  padding-bottom: 4px;
+  cursor: grab;
+  overscroll-behavior-x: contain;
 }
-.heat-scroll::-webkit-scrollbar { height: 0; }
+.heat-scroll.dragging { cursor: grabbing; }
+.heat-scroll::-webkit-scrollbar { height: 6px; }
+.heat-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--on-surface) 22%, transparent);
+  border-radius: 99px;
+}
+.heat-scroll::-webkit-scrollbar-track { background: transparent; }
 .heat-grid {
   display: grid;
   grid-template-rows: repeat(7, var(--hc)) 14px;
@@ -2076,6 +2121,55 @@ body.login .eyebrow { display: block; text-align: center; margin: 0 0 26px; colo
   color: var(--on-surface-variant);
   white-space: nowrap;
 }
+/* ---- 月视图：一整月摊成日历，格子大到能写下日期，不用横向滚 ---- */
+.heat-nav { display: inline-flex; align-items: center; gap: 2px; }
+.heat-nav button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--on-surface-variant);
+  cursor: pointer;
+}
+.heat-nav button:hover:not(:disabled) { background: var(--surface-container-highest); color: var(--on-surface); }
+.heat-nav button:disabled { opacity: .3; cursor: default; }
+.heat-nav b { min-width: 74px; text-align: center; color: var(--on-surface); font-weight: 600; }
+.heat-cal {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.heat-cal .hw {
+  font-size: 10px;
+  font-style: normal;
+  text-align: center;
+  color: var(--on-surface-variant);
+  padding-bottom: 2px;
+}
+.heat-cal .hd {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--on-surface-variant);
+  background: color-mix(in srgb, var(--on-surface) 7%, transparent);
+}
+.heat-cal .hd.l1 { background: color-mix(in srgb, var(--primary) 30%, transparent); }
+.heat-cal .hd.l2 { background: color-mix(in srgb, var(--primary) 52%, transparent); }
+.heat-cal .hd.l3 { background: color-mix(in srgb, var(--primary) 74%, transparent); color: #fff; }
+.heat-cal .hd.l4 { background: var(--primary); color: #fff; }
+[data-theme="dark"] .heat-cal .hd.l3,
+[data-theme="dark"] .heat-cal .hd.l4 { color: #1c1b1f; }
+.heat-cal .hd.pad { background: transparent; color: transparent; }
+.heat-cal .hd.today { box-shadow: 0 0 0 2px var(--primary); }
 
 .seg {
   display: flex;
@@ -2930,6 +3024,7 @@ body.home > main { position: relative; z-index: 1; }
   letter-spacing: 0;
   text-transform: none;
   opacity: .65;
+  margin-right: auto;   /* 计数跟在标题后面，别被 space-between 推到最右 */
 }
 /* 浓淡 / 亮度两根弹性滑杆：选了素色就都没意义，直接收起来 */
 .bg-sliders { margin-top: 10px; display: grid; gap: 2px; }
@@ -3159,3 +3254,192 @@ body.home > main { position: relative; z-index: 1; }
 @media (hover: none) {
   .bp-del { opacity: 1; }
 }
+
+/* ========================================
+   下载中心（download.html + assets/dlcenter.js）
+   ======================================== */
+.dlc-main { max-width: 860px; margin: 0 auto; padding: 18px 20px 60px; display: grid; gap: 16px; }
+.dlc-card {
+  padding: 16px 18px 18px;
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+}
+.dlc-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  font-size: 15.5px;
+  font-weight: 650;
+  color: var(--on-surface);
+}
+.dlc-h .ic { color: var(--primary); }
+.dlc-h-btn { margin-left: auto; }
+.dlc-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  background: var(--surface-container-lowest);
+  color: var(--on-surface);
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+}
+textarea.dlc-input { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; line-height: 1.6; }
+.dlc-input:focus { outline: none; border-color: var(--primary); }
+.dlc-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.dlc-dest { flex: none; width: auto; }
+.dlc-dest .seg-btn { padding: 6px 14px; }
+.dlc-folder { flex: 1 1 180px; width: auto; }
+.dlc-msg { margin: 10px 2px 0; font-size: 13px; color: var(--on-surface-variant); }
+.dlc-msg.ok { color: var(--primary); }
+.dlc-msg.warn { color: var(--error); }
+
+/* 闸门 + 云盘用量 */
+.dlc-meters { margin-top: 14px; display: grid; gap: 8px; }
+.dlc-gate { font-size: 12.5px; color: var(--on-surface-variant); }
+.dlc-gate b { color: var(--on-surface); font-weight: 600; }
+.dlc-dot { margin: 0 8px; opacity: .5; }
+.dlc-quotas { display: flex; flex-wrap: wrap; gap: 16px; }
+.dlc-meter { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--on-surface-variant); }
+.dlc-meter em { font-style: normal; }
+.dlc-meter .dlc-bar { width: 120px; }
+.dlc-bar {
+  display: block;
+  height: 6px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--on-surface) 10%, transparent);
+  overflow: hidden;
+}
+.dlc-bar > i { display: block; height: 100%; background: var(--primary); border-radius: 99px; transition: width 400ms ease; }
+
+/* 任务卡 */
+.dlc-jobs { margin-top: 14px; display: grid; gap: 10px; }
+.dlc-empty { margin: 6px 2px; font-size: 13px; color: var(--on-surface-variant); }
+.dlc-job {
+  padding: 10px 12px;
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  background: var(--surface-container-lowest);
+}
+.dlc-job-top { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+.dlc-job-name { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; word-break: break-all; }
+.dlc-job-tag {
+  flex: none;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 99px;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+.dlc-job-tag.done { color: #16a34a; background: color-mix(in srgb, #16a34a 14%, transparent); }
+.dlc-job-tag.error { color: var(--error); background: color-mix(in srgb, var(--error) 14%, transparent); }
+.dlc-job-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 7px;
+  font-size: 11.5px;
+  color: var(--on-surface-variant);
+}
+.dlc-err { color: var(--error); }
+.dlc-job-acts { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.dlc-job-acts a, .dlc-job-acts button {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--on-surface-variant);
+  cursor: pointer;
+}
+.dlc-job-acts a:hover, .dlc-job-acts button:hover { background: var(--surface-container-highest); color: var(--on-surface); }
+.dlc-who { font-style: normal; opacity: .8; }
+.dlc-clear {
+  justify-self: start;
+  padding: 6px 12px;
+  border: 1px solid var(--outline-variant);
+  border-radius: 99px;
+  background: transparent;
+  color: var(--on-surface-variant);
+  font-size: 12px;
+  cursor: pointer;
+}
+.dlc-clear:hover { background: var(--surface-container-highest); }
+
+/* 限速表（仅管理员） */
+.dlc-limits { display: grid; gap: 10px; }
+.dlc-lrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--outline-variant);
+  border-radius: 12px;
+  background: var(--surface-container-lowest);
+}
+.dlc-lname { flex: 0 0 118px; font-size: 13px; font-weight: 600; }
+.dlc-lf { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--on-surface-variant); }
+.dlc-lf input[type="number"] {
+  width: 68px;
+  padding: 5px 8px;
+  border: 1px solid var(--outline-variant);
+  border-radius: 8px;
+  background: var(--surface-container-high);
+  color: var(--on-surface);
+  font-size: 12.5px;
+}
+.dlc-lnote { margin: 2px; font-size: 12px; color: var(--on-surface-variant); }
+
+/* 本地下载器 */
+.dlc-steps { margin: 14px 0 0; padding-left: 20px; font-size: 13px; line-height: 2; color: var(--on-surface); }
+.dlc-steps code, .dlc-cmd code {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--surface-container-high);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+.dlc-cmd { margin-top: 14px; }
+.dlc-cmd label { display: block; margin-bottom: 6px; font-size: 12.5px; color: var(--on-surface-variant); }
+.dlc-cmd-row { display: flex; gap: 8px; }
+.dlc-cmd-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--outline-variant);
+  border-radius: 10px;
+  background: var(--surface-container-lowest);
+  color: var(--on-surface);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+}
+
+@media (max-width: 600px) {
+  .dlc-main { padding: 14px 12px 48px; }
+  .dlc-card { padding: 14px 13px 16px; }
+  .dlc-lname { flex-basis: 100%; }
+}
+
+/* 下载中心的窄屏修正：
+   ① 顶栏标题会被挤成一列竖字，钉死不折行、并让身份徽章先让位；
+   ② 正文里的胶囊按钮必须留住文字 —— 「探测」「开始转存」「下载安装包」用的都是同一套图标，
+      套用全站那条「窄屏收成纯图标」的规则会变成三个看不出区别的圆钮。 */
+.dlc-page .drive-title { white-space: nowrap; }
+.dlc-main .pill-btn .pill-label { display: inline !important; }
+@media (max-width: 640px) {
+  .dlc-page .topbar { gap: 10px; }
+  .dlc-page .topbar-right { width: auto; flex: 1; justify-content: flex-end; }
+  .dlc-page .drive-role-badge { display: none; }   /* 身份在任务列表里还会标，顶栏这份可省 */
+  .dlc-main .pill-btn { padding: 9px 14px; }
+  .dlc-row { gap: 8px; }
+  .dlc-folder { flex-basis: 100%; }
+}
+/* 只剩一个去处时（非管理员没有 Xi Pan），分段控件退化成一个标签，别再假装能点 */
+.dlc-dest.solo { pointer-events: none; }

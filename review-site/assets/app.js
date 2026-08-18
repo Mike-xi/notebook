@@ -410,6 +410,13 @@ const settingsWrap = document.querySelector('.settings-wrap');
 const settingsBtn = document.getElementById('settings-btn');
 const settingsMenu = document.getElementById('settings-menu');
 
+// 面板分两屏：root（身份 + 活跃 + 各入口）/ page（外观那一堆滑杆和分段控件）。
+// 关掉面板时回到根屏，下次打开不会停在子屏里。
+function showPane(name) {
+  settingsMenu.dataset.pane = name;
+  settingsMenu.querySelectorAll('.sm-pane').forEach((p) => { p.hidden = p.dataset.pane !== name; });
+  settingsMenu.scrollTop = 0;
+}
 function openSettings() {
   settingsMenu.hidden = false;
   settingsBtn.setAttribute('aria-expanded', 'true');
@@ -418,16 +425,26 @@ function openSettings() {
 function closeSettings() {
   settingsMenu.hidden = true;
   settingsBtn.setAttribute('aria-expanded', 'false');
+  showPane('root');
 }
 settingsBtn.addEventListener('click', (e) => {
   e.stopPropagation();
   closeCreateMenu();
   settingsMenu.hidden ? openSettings() : closeSettings();
 });
+const pageSettingsBtn = document.getElementById('page-settings-btn');
+const pageBackBtn = document.getElementById('page-back');
+if (pageSettingsBtn) pageSettingsBtn.addEventListener('click', () => showPane('page'));
+if (pageBackBtn) pageBackBtn.addEventListener('click', () => showPane('root'));
 // 点菜单内部不关闭（主题分段控件要连点）；点外部 / Esc 关闭
 settingsMenu.addEventListener('click', (e) => e.stopPropagation());
 document.addEventListener('click', () => closeSettings());
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSettings(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  // 子屏里按 Esc 先退回根屏，再按一次才关面板
+  if (!settingsMenu.hidden && settingsMenu.dataset.pane === 'page') { showPane('root'); return; }
+  closeSettings();
+});
 
 // 阅读器工具栏唤出灵敏度（存 localStorage，reader.js 读取；数值=上滑触发阈值 px）
 const BAR_REVEAL_KEY = 'nb-bar-reveal';
@@ -1070,7 +1087,8 @@ const DOC_SECTIONS = [
   },
   {
     icon: 'palette', title: '外观与背景',
-    body: `<ul>
+    body: `都在设置面板的<b>「页面设置」</b>里（点进去是一屏，左上角箭头退回来）：
+      <ul>
         <li><b>界面风格</b> —— 「高级」是液态玻璃 Dock、全息卡片、卡堆；「经典」是原版 Material You 界面。</li>
         <li><b>外观</b> —— 跟随系统 / 浅色 / 深色。</li>
         <li><b>页面背景</b> —— 5 套内置着色器（素色、极光、百叶窗、波纹、地形）+ 最多 3 张自己上传的图，一共 8 格。
@@ -1084,7 +1102,7 @@ const DOC_SECTIONS = [
   {
     icon: 'clock', title: '按时间浏览',
     body: `顶部分类标签里的 <b>Time</b> 不是一个分类，而是换一种看法：不分学习/探索/游戏，
-      把所有课程按<b>加进来的时间</b>从新到旧排，分组显示。右上角可以切换分组粒度：
+      把所有课程按<b>加进来的时间</b>从新到旧排，分组显示。分组粒度在设置 →「页面设置」→「时间视图分组」里切换：
       <ul>
         <li><b>按月份</b> —— 每个自然月一组。</li>
         <li><b>按学期</b> —— 按交大作息分组：9 月–次年 1 月是秋季学期，2–6 月是春季学期，7–8 月是夏季小学期。</li>
@@ -1124,8 +1142,29 @@ const DOC_SECTIONS = [
   },
   {
     icon: 'bookopen', title: '各页面的说明',
-    body: `云盘、Xi Pan、留言板这些页面右上角都有一个<b>「说明」</b>按钮 ——
+    body: `云盘、Xi Pan、留言板、下载中心这些页面右上角都有一个<b>「说明」</b>按钮 ——
       原先散在页面上的灰色小字（审核规则、挂载地址、可见范围…）都收进去了，需要时点开看，平时不占版面。`,
+  },
+  {
+    icon: 'clock', title: '登录活跃',
+    body: `设置面板身份卡下面那块方格是<b>登录活跃</b>，一格一天，颜色越深当天来得越多（登录 + 当天首访都算）。
+      右上角切<b>年 / 月</b>两种看法：
+      <ul>
+        <li><b>年</b> —— 过去一整年，一列一周。装不下所以可以横向滚：手机直接手指滑，电脑用鼠标滚轮或按住拖。</li>
+        <li><b>月</b> —— 摊成日历，格子上直接写日期，可以往前翻月份。</li>
+      </ul>
+      管理员看到的是全站合计，访客与好友只看自己那一级。`,
+  },
+  {
+    icon: 'download', title: '下载中心',
+    body: `探索里的<b>下载中心</b>有两条路：
+      <ul>
+        <li><b>云端转存</b> —— 粘一个直链，服务器替你去下，文件直接落进云盘，页面关掉照跑，回头从云盘取。
+            大家共用一条通道，所以按身份限速：速度、单文件大小、每日总量、同时任务数都由管理员在那一页调；
+            访客与好友转进公共云盘的文件同样要过内容审核。</li>
+        <li><b>本地下载器</b> —— 一个 38 KB 的小包，装到自己电脑上跑（要 Python 3 和 aria2），
+            16 线程直连、断点续传、HuggingFace 链接下完自动校验 sha256。几个 G 的大件走这条。</li>
+      </ul>`,
   },
   {
     icon: 'list', title: '登录日志与隐私',
@@ -1193,6 +1232,11 @@ const DAY_MS = 86400e3;
 const bjDate = (ts) => new Date(ts + 8 * 3600e3);
 const bjKey = (d) => d.toISOString().slice(0, 10);
 
+const HEAT_VIEW_KEY = 'nb-heat-view';
+let heatData = null;              // 拉回来的原始数据，切视图时不再请求
+let heatView = 'year';            // year（一年方格）/ month（当月日历）
+let heatMonth = null;             // 月视图当前月份的 1 号（按北京时间的 UTC 字段）
+
 async function loadHeat() {
   if (!heatBox || heatState !== 'idle') return;
   heatState = 'loading';
@@ -1205,10 +1249,19 @@ async function loadHeat() {
   } catch {}
   if (!heat) { heatState = 'idle'; heatBox.innerHTML = '<p class="heat-note">读取失败，重开一次设置再试</p>'; return; }
   heatState = 'done';
-  renderHeat(heat);
+  heatData = heat;
+  renderHeat();
 }
 
-function renderHeat(heat) {
+const lvlOf = (n, peak) => (n === 0 ? 0 : Math.min(4, Math.ceil((n / peak) * 4)));
+
+function renderHeat() {
+  if (!heatData) return;
+  if (heatView === 'month') renderHeatMonth(heatData);
+  else renderHeatYear(heatData);
+}
+
+function renderHeatYear(heat) {
   const end = bjDate(Date.now());
   // 起点：往前 span-1 天，再退到那一周的周日，凑成整列
   const rough = new Date(end.getTime() - ((heat.span || 371) - 1) * DAY_MS);
@@ -1222,8 +1275,7 @@ function renderHeat(heat) {
     const d = new Date(t);
     const key = bjKey(d);
     const n = heat.days[key] || 0;
-    const lvl = n === 0 ? 0 : Math.min(4, Math.ceil((n / peak) * 4));
-    cells.push(`<i class="hc l${lvl}" style="grid-column:${col + 1};grid-row:${d.getUTCDay() + 1}" title="${key} · ${n} 次"></i>`);
+    cells.push(`<i class="hc l${lvlOf(n, peak)}" style="grid-column:${col + 1};grid-row:${d.getUTCDay() + 1}" title="${key} · ${n} 次"></i>`);
     // 每月 1 号所在的那一列打一个月份标
     if (d.getUTCDate() === 1) months.push(`<em class="hm" style="grid-column:${col + 1} / span 5">${d.getUTCMonth() + 1}月</em>`);
     if (d.getUTCDay() === 6) col++;
@@ -1236,8 +1288,107 @@ function renderHeat(heat) {
     <div class="heat-scroll"><div class="heat-grid" style="grid-template-columns:repeat(${col + 1}, var(--hc, 9px))">${cells.join('')}${months.join('')}</div></div>`;
   // 最新的一周在最右边，默认滚到底
   const scroller = heatBox.querySelector('.heat-scroll');
-  if (scroller) scroller.scrollLeft = scroller.scrollWidth;
+  if (scroller) { scroller.scrollLeft = scroller.scrollWidth; wireHeatDrag(scroller); }
 }
+
+// 月视图：一整月摊成日历。年视图那一格只有 9px，具体是哪天全靠 title 悬停，
+// 手机上根本悬不了 —— 这一屏格子大到能直接写日期。
+function renderHeatMonth(heat) {
+  const today = bjDate(Date.now());
+  const firstOfThis = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
+  if (!heatMonth) heatMonth = firstOfThis;
+  // 数据只有过去 span 天，再往前翻没意义
+  const oldest = new Date(today.getTime() - ((heat.span || 371) - 1) * DAY_MS);
+  const earliest = new Date(Date.UTC(oldest.getUTCFullYear(), oldest.getUTCMonth(), 1));
+  const y = heatMonth.getUTCFullYear(), m = heatMonth.getUTCMonth();
+  const days = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  const lead = heatMonth.getUTCDay();
+  const peak = Math.max(1, heat.max || 0);
+
+  let sum = 0;
+  const cells = ['日', '一', '二', '三', '四', '五', '六'].map((w) => `<em class="hw">${w}</em>`);
+  for (let i = 0; i < lead; i++) cells.push('<span class="hd pad"></span>');
+  for (let day = 1; day <= days; day++) {
+    const d = new Date(Date.UTC(y, m, day));
+    const key = bjKey(d);
+    const future = d.getTime() > today.getTime();
+    const n = future ? 0 : (heat.days[key] || 0);
+    sum += n;
+    const isToday = key === bjKey(today);
+    cells.push(`<span class="hd l${future ? 0 : lvlOf(n, peak)}${isToday ? ' today' : ''}" title="${key} · ${n} 次">${day}</span>`);
+  }
+
+  const prevOK = new Date(Date.UTC(y, m - 1, 1)).getTime() >= earliest.getTime();
+  const nextOK = new Date(Date.UTC(y, m + 1, 1)).getTime() <= firstOfThis.getTime();
+  heatBox.innerHTML = `<div class="heat-top">
+      <span class="heat-nav">
+        <button type="button" data-heat-step="-1" ${prevOK ? '' : 'disabled'} aria-label="上一月">${window.NBIcon ? NBIcon("caretleft", { size: 14 }) : "‹"}</button>
+        <b>${y} 年 ${m + 1} 月</b>
+        <button type="button" data-heat-step="1" ${nextOK ? '' : 'disabled'} aria-label="下一月">${window.NBIcon ? NBIcon("caretright", { size: 14 }) : "›"}</button>
+      </span>
+      <span>本月 <b>${sum}</b> 次</span>
+    </div>
+    <div class="heat-cal">${cells.join('')}</div>`;
+  heatBox.querySelectorAll('[data-heat-step]').forEach((b) => b.addEventListener('click', () => {
+    heatMonth = new Date(Date.UTC(y, m + Number(b.dataset.heatStep), 1));
+    renderHeat();
+  }));
+}
+
+// 桌面端没有横向滚轮，鼠标滚上去只会把整个设置面板往下滚 —— 把竖滚轮换算成
+// 横向滚动，再补一个按住拖动。手机的手指滑动是浏览器原生的，不用管。
+function wireHeatDrag(el) {
+  el.addEventListener('wheel', (e) => {
+    const dx = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    const max = el.scrollWidth - el.clientWidth;
+    if (max <= 0) return;
+    // 已经滚到头就把滚轮还给外层面板，不然停在热力图上会卡住整页滚动
+    if ((dx < 0 && el.scrollLeft <= 0) || (dx > 0 && el.scrollLeft >= max - 1)) return;
+    e.preventDefault();
+    el.scrollLeft += dx;
+  }, { passive: false });
+
+  let down = false, startX = 0, startLeft = 0, moved = false;
+  el.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch') return;              // 触摸交给原生惯性滚动
+    down = true; moved = false;
+    startX = e.clientX; startLeft = el.scrollLeft;
+    el.classList.add('dragging');
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!down) return;
+    const dx = e.clientX - startX;
+    if (Math.abs(dx) > 3) { moved = true; el.setPointerCapture(e.pointerId); }
+    el.scrollLeft = startLeft - dx;
+  });
+  const up = () => { down = false; el.classList.remove('dragging'); };
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+  el.addEventListener('click', (e) => { if (moved) { e.preventDefault(); e.stopPropagation(); } }, true);
+}
+
+// 年 / 月视图切换（存本机，下次打开还是这一屏）
+(function initHeatViews() {
+  const box = document.getElementById('heat-views');
+  if (!box) return;
+  const saved = localStorage.getItem(HEAT_VIEW_KEY);
+  heatView = saved === 'month' ? 'month' : 'year';
+  const sync = () => box.querySelectorAll('[data-heat-view]').forEach((b) => {
+    const on = b.dataset.heatView === heatView;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  sync();
+  box.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-heat-view]');
+    if (!btn || btn.dataset.heatView === heatView) return;
+    heatView = btn.dataset.heatView;
+    localStorage.setItem(HEAT_VIEW_KEY, heatView);
+    heatMonth = null;               // 每次切回月视图都从当月看起
+    sync();
+    renderHeat();
+  });
+})();
 
 // ========== 登录日志 ==========
 // 三级都能看：管理员看全部身份，一二级只看自己那一级（后端过滤，见 api/logins.js）。

@@ -562,6 +562,23 @@
     "created_at": 1781679228000
   },
   {
+    "file": "download",
+    "title": "下载中心",
+    "subject": "工具",
+    "description": "粘一个直链，服务器替你下到云盘 · 边下边显示进度，页面关掉照跑，回头从云盘取；也能把本机版多线程下载器（aria2 + 网页界面 + sha256 自动校验）打包带走",
+    "icon": "⬇️",
+    "color": "#22A06B",
+    "kind": "html",
+    "category": "explore",
+    "link": "/download.html",
+    "tags": [
+      "下载",
+      "aria2",
+      "云盘"
+    ],
+    "created_at": 1787067060917
+  },
+  {
     "file": "xipan",
     "title": "Xi Pan",
     "subject": "私人云盘",
