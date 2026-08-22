@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "notebook",
+  "compatibility_date": "2026-05-23",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "review-site"
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ]
+}
