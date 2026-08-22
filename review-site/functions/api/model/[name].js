@@ -27,9 +27,11 @@ export async function onRequestGet({ params, env, request }) {
   if (!meta) return new Response('未知模型', { status: 404 });
   if (!env.FILES) return new Response('R2 未绑定', { status: 503 });
 
+  // 支持断点续传：28MB 在弱网上很容易断，浏览器 fetch 失败后能靠 Range 续。
+  // 注意 R2 的 range 收的是 **request.headers**，不是 request 本身 ——
+  // 传错了本地测不出来（本地 R2 store 里没有这个对象，走不到这行），线上直接 500。
   const obj = await env.FILES.get(meta.key, {
-    // 支持断点续传：28MB 在弱网上很容易断，浏览器 fetch 失败后能靠 Range 续
-    range: request.headers.get('Range') ? request : undefined,
+    range: request.headers.get('Range') ? request.headers : undefined,
   });
   if (!obj) return new Response('模型不在桶里，先按注释里的命令上传', { status: 404 });
 
