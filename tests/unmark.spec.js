@@ -2,6 +2,8 @@
 // 真正跑推理要下 28MB 权重 + WebGPU/WASM 计算，标记为 slow，需要 --ai 的服务器不是必须的
 // （模型走 R2，不走 Workers AI），但需要联网能拿到 R2 对象。
 const { test, expect } = require('@playwright/test');
+const fs = require('fs');
+const path = require('path');
 
 async function login(page) {
   await page.goto('/login');
@@ -140,37 +142,55 @@ test('没选区就点找相同，给出提示而不是报错', async ({ page }) 
   await expect(page.locator('#um-msg.err')).toContainText('先框住');
 });
 
-test('端到端擦除：真下模型、真跑推理 @slow', async ({ page }) => {
-  test.setTimeout(300_000);
-  // 本地 R2 store 拿不到模型体时（见上一条注释），这条没法跑
-  const probe = await inPage(page, '/api/model/migan', { headers: { Range: 'bytes=0-15' } });
-  test.skip(probe.status === 404, '本地 R2 store 里没有模型体，端到端推理只能在部署后验');
+// 端到端要真的跑模型。不走 R2（本地 store 灌不进去），直接拦下请求喂本地那份 28MB 权重。
+// 没有这份文件就跳过 —— 拿法见 unmark-core.js 顶部注释里的 HuggingFace 地址。
+const MODEL_FILE = path.join(process.env.TEMP || '/tmp', 'claude', 'C--Users-28205',
+  'fb781126-9ed0-4e8c-82e6-334a93f51b2a', 'scratchpad', 'migan.onnx');
 
-  await dropImage(page, await makeImage(page));
+test('端到端擦除：只动蒙版区域，别处逐字节不变 @slow', async ({ page }) => {
+  test.setTimeout(300_000);
+  test.skip(!fs.existsSync(MODEL_FILE), '本地没有 migan.onnx，跳过真实推理');
+  await page.route('**/api/model/migan', (route) => route.fulfill({
+    status: 200,
+    headers: { 'Content-Type': 'application/octet-stream', 'X-Model-Bytes': '28079181' },
+    path: MODEL_FILE,
+  }));
+
+  // 小一点，纯 WASM 才跑得完（160×120 实测约 7 秒）
+  await dropImage(page, await makeImage(page, { w: 160, h: 120 }));
   await page.locator('#um-mask').evaluate((c) => {
     const x = c.getContext('2d');
     x.fillStyle = 'rgba(230,70,60,.55)';
-    x.fillRect(26, 26, 68, 30);
+    x.fillRect(26, 26, 68, 30);   // 盖住整枚水印（30,30 起 60×22）
   });
 
-  // 擦之前，那块是深色水印
-  const before = await page.locator('#um-base').evaluate((c) =>
-    Array.from(c.getContext('2d').getImageData(40, 40, 1, 1).data.slice(0, 3)));
-  expect(before[0]).toBeLessThan(120);
+  const grab = () => page.locator('#um-base').evaluate((c) => {
+    const g = c.getContext('2d');
+    const px = (X, Y) => Array.from(g.getImageData(X, Y, 1, 1).data.slice(0, 3));
+    // 取水印方块的右上角：避开中间那行白色 'MARK' 文字，那里是亮的
+    return { hole: px(85, 34), far1: px(8, 8), far2: px(150, 112) };
+  });
+
+  const before = await grab();
+  expect(before.hole[0]).toBeLessThan(120);          // 水印是深色的
 
   await page.click('#um-run');
   await expect(page.locator('#um-save')).toBeEnabled({ timeout: 280_000 });
+  const after = await grab();
 
-  const after = await page.locator('#um-base').evaluate((c) =>
-    Array.from(c.getContext('2d').getImageData(40, 40, 1, 1).data.slice(0, 3)));
-  // 应该被周围的浅灰补上了
-  expect(after[0]).toBeGreaterThan(before[0] + 40);
+  // 洞里必须被填上（这是核心断言：蒙版极性反了的话，变的会是别处而不是这里）
+  const d = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+  expect(d(before.hole, after.hole)).toBeGreaterThan(100);
+  // 蒙版之外必须原样保留
+  expect(d(before.far1, after.far1)).toBe(0);
+  expect(d(before.far2, after.far2)).toBe(0);
+
   await expect(page.locator('#um-msg')).toContainText('擦完了');
   // 擦完蒙版清空，可以接着擦下一处
   const left = await page.locator('#um-mask').evaluate((c) => {
-    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    const dd = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
     let n = 0;
-    for (let i = 3; i < d.length; i += 4) if (d[i] > 8) n++;
+    for (let i = 3; i < dd.length; i += 4) if (dd[i] > 8) n++;
     return n;
   });
   expect(left).toBe(0);

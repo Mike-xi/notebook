@@ -8,7 +8,7 @@
 // 同样用这个模型的 inpaint-web (lxfater) 是 **GPL-3.0**，所以这份胶水是照着模型的
 // 输入输出约定重写的，没有抄它的代码。实际要做的事也就三件：
 //   ① canvas 的 RGBA 拆成 uint8 的 NCHW（三通道，去掉 alpha）
-//   ② 蒙版做成 1×1×H×W 的 uint8，**要擦的地方是 255**
+//   ② 蒙版做成 1×1×H×W 的 uint8，**要擦的地方是 0、保留的地方是 255**（极性反直觉，见下）
 //   ③ 输出的 NCHW 拼回 RGBA 画到 canvas
 // pipeline_v2 这一版内部自己做分块，任意分辨率进、同分辨率出，不用外面切图。
 (function () {
@@ -158,17 +158,23 @@
     return out;
   }
 
-  // 蒙版画布约定：涂过的地方 alpha > 0。模型要的是「要擦的地方 = 255」的单通道图。
+  // 蒙版画布约定：涂过的地方 alpha > 0。
+  //
+  // ⚠ **MI-GAN 的极性跟直觉相反：0 = 要重画的洞，255 = 原样保留。**
+  // 一开始按「要擦的地方给 255」写，结果是把水印当成了唯一要保留的东西、
+  // 整张图其余部分全被模型重画——出来一片糊，而水印稳稳地还在原地。
+  // 参考实现里那句 `(v !== 255) * 255` 就是在做同一个反转，只是绕了一道。
   function maskToPlane(maskRGBA, w, h) {
     const n = w * h;
     const out = new Uint8Array(n);
-    for (let i = 0; i < n; i++) out[i] = maskRGBA[i * 4 + 3] > 8 ? 255 : 0;
+    for (let i = 0; i < n; i++) out[i] = maskRGBA[i * 4 + 3] > 8 ? 0 : 255;
     return out;
   }
 
-  function countMask(plane) {
+  // 数的是「洞」的像素数，也就是值为 0 的那些
+  function countHoles(plane) {
     let n = 0;
-    for (let i = 0; i < plane.length; i++) if (plane[i]) n++;
+    for (let i = 0; i < plane.length; i++) if (plane[i] === 0) n++;
     return n;
   }
 
@@ -182,7 +188,7 @@
     const { width: w, height: h } = image;
     if (mask.width !== w || mask.height !== h) throw new Error('蒙版与原图尺寸不一致');
     const plane = maskToPlane(mask.data, w, h);
-    if (!countMask(plane)) throw new Error('还没涂任何区域');
+    if (!countHoles(plane)) throw new Error('还没涂任何区域');
 
     const ort = await ensureOrt();
     const sess = await ensureSession(onProgress);
@@ -193,7 +199,28 @@
 
     const out = await sess.run(feeds);
     const res = out[sess.outputNames[0]];
-    return new ImageData(fromCHW(res.data, w, h), w, h);
+
+    // 别假设输出就是原尺寸——按张量自己报的 dims 来拆（[N,C,H,W]）。
+    // pipeline 版本内部会分块/补边，万一某个尺寸下吐回来的不是原大小，
+    // 用错的 w/h 去拆 CHW 只会得到一张条纹状的乱图，而且很难看出是哪儿错了。
+    const d = res.dims || [];
+    const oh = d.length >= 4 ? d[d.length - 2] : h;
+    const ow = d.length >= 4 ? d[d.length - 1] : w;
+    if (res.data.length < 3 * ow * oh) throw new Error('模型输出尺寸异常：' + JSON.stringify(d));
+
+    const got = new ImageData(fromCHW(res.data, ow, oh), ow, oh);
+    if (ow === w && oh === h) return got;
+
+    // 尺寸对不上就缩回原大小，宁可损一点清晰度也不能错位
+    const cv = document.createElement('canvas');
+    cv.width = ow; cv.height = oh;
+    cv.getContext('2d').putImageData(got, 0, 0);
+    const dst = document.createElement('canvas');
+    dst.width = w; dst.height = h;
+    const dx = dst.getContext('2d');
+    dx.imageSmoothingQuality = 'high';
+    dx.drawImage(cv, 0, 0, w, h);
+    return dx.getImageData(0, 0, w, h);
   }
 
   window.NBUnmark = {

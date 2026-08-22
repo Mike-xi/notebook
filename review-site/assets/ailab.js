@@ -441,10 +441,11 @@
     return h.toString(16).padStart(8, '0').toUpperCase();
   }
 
+  // 报告里用正式命名，别用页面上那套「引擎 A/B/C」的口语叫法
   const ENGINE_DESC = {
-    A: ['文风统计（本地）', '句长突发度、套话密度、AI 句式套路等 8 项特征加权'],
-    B: ['大模型评审', '三个不同来源的模型分别判读后取共识'],
-    C: ['困惑度 / GLTR', '文本在参照模型下的对数概率与 token 排名分布'],
+    A: ['文体统计特征分析', '本地量化 8 项形态特征', '计量文体学（stylometry）；句长变异系数与固定搭配密度'],
+    B: ['多模型交叉评审', '三个异源大语言模型独立判读取共识', 'LLM-as-a-judge；以分歧幅度反映判定稳定性'],
+    C: ['语言模型困惑度分析', '样本在参照模型下的 token 概率分布', 'GLTR，Gehrmann et al., ACL 2019 Demo'],
   };
 
   function buildReport() {
@@ -470,12 +471,15 @@
     $('rp-excerpt').textContent = ex.length > 220 ? ex.slice(0, 220) + '……' : ex;
 
     const wsum = f.parts.reduce((a, p) => a + p[2], 0);
+    $('rp-scheme').textContent = `三项加权合成（${f.parts.map((p) => p[0]).join(' + ')}）`;
     $('rp-engines').innerHTML = f.parts.map((p) => {
       const d = ENGINE_DESC[p[0]];
-      return `<tr><td>引擎 ${p[0]}</td><td>${esc(d[0])}</td><td style="text-align:center">${p[1]}</td>`
-        + `<td style="text-align:center">${Math.round(p[2] / wsum * 100)}%</td><td>${esc(d[1])}</td></tr>`;
-    }).join('')
-      + (f.parts.length < 3 ? '<tr><td colspan="5">注：部分引擎本次未参与（未启用或调用失败），权重已按剩余引擎重新归一。</td></tr>' : '');
+      return `<tr><td>${esc(d[0])}</td><td>${esc(d[1])}</td><td>${esc(d[2])}</td>`
+        + `<td style="text-align:center">${p[1]}</td><td style="text-align:center">${Math.round(p[2] / wsum * 100)}%</td></tr>`;
+    }).join('');
+    $('rp-fuse-note').textContent = f.parts.length < 3
+      ? '注：本次检测有部分检测项未参与（未启用或调用失败），上表权重已按参与项重新归一。'
+      : `注：各项权重按其在对照样本上的判别力经验设定，非等权平均。三项间最大分歧 ${f.spread} 分。`;
 
     // 证据：句式命中 + 引擎 A 靠前的指标 + 引擎 C 的分布 + 引擎 B 的理由
     const ev = [];
