@@ -1,0 +1,6 @@
+node_modules/
+.wrangler/
+review-site/.wrangler/
+playwright-report/
+test-results/
+shots/

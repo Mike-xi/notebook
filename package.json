@@ -1,0 +1,13 @@
+{
+  "name": "xinotebook",
+  "private": true,
+  "scripts": {
+    "test:serve": "cd review-site && wrangler pages dev . --port=8788 --d1=DB --r2=FILES --binding=GUEST_PASSWORD=test-guest --binding=FRIEND_PASSWORD=test-friend --binding=ADMIN_PASSWORD=test-admin --binding=AUTH_SECRET=test-auth-secret --binding=XINOTE_TEST_SETUP=1 --persist-to=.wrangler/test-state",
+    "test:serve:ai": "cd review-site && wrangler pages dev . --port=8788 --d1=DB --r2=FILES --ai AI --binding=GUEST_PASSWORD=test-guest --binding=FRIEND_PASSWORD=test-friend --binding=ADMIN_PASSWORD=test-admin --binding=AUTH_SECRET=test-auth-secret --binding=XINOTE_TEST_SETUP=1 --persist-to=.wrangler/test-state",
+    "test:e2e": "playwright test --project=desktop-chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "wrangler": "4.110.0"
+  }
+}

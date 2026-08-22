@@ -6,7 +6,9 @@
 import { ensurePrefsSchema } from '../_lib/db.js';
 import { getOwner } from '../_lib/auth.js';
 
-const ALLOWED_PREFIXES = ['reader:', 'appearance:'];
+const ALLOWED_PREFIXES = ['reader:', 'appearance:', 'editor:'];
+// 这些前缀按账号隔离（key 前面套 user:<owner>:），其余是全站共享的一份
+const PER_OWNER_PREFIXES = ['appearance:', 'editor:'];
 const MAX_KEY_LEN = 200;
 const MAX_VALUE_LEN = 2000;
 
@@ -16,7 +18,7 @@ function validKey(k) {
 }
 
 async function storageKey(request, env, key) {
-  if (!key.startsWith('appearance:')) return key;
+  if (!PER_OWNER_PREFIXES.some((p) => key.startsWith(p))) return key;
   const owner = await getOwner(request, env);
   return owner ? `user:${owner}:${key}` : null;
 }

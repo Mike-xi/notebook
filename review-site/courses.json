@@ -579,6 +579,23 @@
     "created_at": 1787067060917
   },
   {
+    "file": "ai-lab",
+    "title": "AI 痕迹实验室",
+    "subject": "工具",
+    "description": "粘一段文字或拖个文件进来，看它有多少「AI 味」· 本地统计七项文风特征 + 三个大模型当评委各判一次，分歧也一并告诉你 · 顺带说清楚这类检测为什么不能当证据",
+    "icon": "🕵️",
+    "color": "#7C5CD6",
+    "kind": "html",
+    "category": "explore",
+    "link": "/ai-lab.html",
+    "tags": [
+      "AI检测",
+      "文本分析",
+      "实验"
+    ],
+    "created_at": 1787397555659
+  },
+  {
     "file": "xipan",
     "title": "Xi Pan",
     "subject": "私人云盘",

@@ -60,22 +60,35 @@
     .ed-status { flex: none; font-size: 12px; color: var(--on-surface-variant); white-space: nowrap; }
     .ed-status.dirty { color: var(--primary); }
     .ed-status.err { color: var(--error); }
-    #ed-preview-toggle { display: none; }
 
-    /* Markdown 工具栏 */
+    /* Markdown 工具栏：外层只管边框和那颗常驻齿轮，横向滚动交给内层 .ed-tools */
     .ed-toolbar {
       display: flex;
-      align-items: center;
-      gap: 2px;
+      align-items: stretch;
       padding: 5px 10px;
       border-bottom: 1px solid var(--outline-variant);
       background: var(--surface-container-lowest);
       flex: none;
+    }
+    .ed-tools {
+      flex: 1; min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 2px;
       overflow-x: auto;
       scrollbar-width: thin;
       -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
     }
-    .ed-toolbar::-webkit-scrollbar { height: 0; }
+    .ed-tools::-webkit-scrollbar { height: 0; }
+    .ed-tool-cfg {
+      flex: none;
+      margin-left: 6px;
+      padding-left: 12px;
+      border-left: 1px solid var(--outline-variant);
+      border-radius: 0 8px 8px 0;
+      font-size: 15px;
+    }
     .ed-tool {
       flex: none;
       min-width: 36px; height: 34px;
@@ -91,6 +104,104 @@
     .ed-tool b, .ed-tool i { font-style: normal; }
     .ed-tool i { font-style: italic; }
     .ed-tool-sep { flex: none; width: 1px; align-self: stretch; margin: 6px 5px; background: var(--outline-variant); }
+
+    /* 两个都是窄屏专用：「⋯」展开被顶栏挤掉的学科/字数/状态；桌面是左右分栏，用不上视图切换 */
+    .ed-more { display: none; }
+    .seg.ed-view { display: none; flex: none; }
+
+    /* ===== 自定义工具栏面板 ===== */
+    .ed-cfg {
+      position: fixed; inset: 0; z-index: 210;   /* 高于 .dock-menu-detached(130) 与 .modal-overlay(200) */
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, .38);
+      backdrop-filter: blur(3px);
+    }
+    .ed-cfg[hidden] { display: none; }
+    .ed-cfg-sheet {
+      width: min(420px, 100%);
+      max-height: min(560px, 86vh);
+      display: flex; flex-direction: column;
+      border: 1px solid var(--outline-variant); border-radius: 18px;
+      background: var(--surface-container-low);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, .3);
+      overflow: hidden;
+    }
+    .cfg-head { display: flex; align-items: center; gap: 10px; padding: 15px 16px 9px; }
+    .cfg-head h2 { flex: 1; margin: 0; font-size: 15.5px; font-weight: 650; color: var(--on-surface); }
+    .cfg-x {
+      flex: none; width: 30px; height: 30px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border: none; border-radius: var(--radius-full);
+      background: transparent; color: var(--on-surface-variant);
+      font-size: 14px; cursor: pointer;
+    }
+    .cfg-x:hover { background: var(--surface-container-high); color: var(--on-surface); }
+    .cfg-hint { margin: 0; padding: 0 16px 10px; font-size: 12px; line-height: 1.55; color: var(--on-surface-variant); }
+    .cfg-list {
+      flex: 1; min-height: 0;
+      margin: 0; padding: 0 10px 10px; list-style: none;
+      overflow-y: auto; scrollbar-width: thin;
+      touch-action: pan-y;
+    }
+    .cfg-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px 6px 4px;
+      border-radius: 10px;
+      background: var(--surface-container-low);
+    }
+    .cfg-item + .cfg-item { margin-top: 2px; }
+    .cfg-item.off .cfg-name, .cfg-item.off .cfg-icon { opacity: .42; }
+    .cfg-item.dragging {
+      background: var(--surface-container-highest);
+      box-shadow: 0 8px 22px rgba(0, 0, 0, .22);
+      position: relative; z-index: 2;
+    }
+    .cfg-grip {
+      flex: none; width: 26px; height: 32px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border: none; background: transparent;
+      color: var(--on-surface-variant); font-size: 14px;
+      cursor: grab; touch-action: none;   /* 不加这条，手机上拖动会被当成页面滚动 */
+    }
+    .cfg-grip:active { cursor: grabbing; }
+    .cfg-icon {
+      flex: none; min-width: 30px; height: 28px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border: 1px solid var(--outline-variant); border-radius: 8px;
+      background: var(--surface); color: var(--on-surface); font-size: 13px;
+    }
+    .cfg-icon i { font-style: italic; }
+    .cfg-icon b { font-style: normal; }
+    .cfg-name { flex: 1; min-width: 0; font-size: 13px; color: var(--on-surface); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cfg-move {
+      flex: none; width: 26px; height: 28px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border: none; border-radius: 7px;
+      background: transparent; color: var(--on-surface-variant);
+      font-size: 12px; cursor: pointer;
+    }
+    .cfg-move:hover:not(:disabled) { background: var(--surface-container-high); color: var(--on-surface); }
+    .cfg-move:disabled { opacity: .25; cursor: default; }
+    /* 显隐开关：小圆点看着像装饰，做成真开关才一眼认得出能点 */
+    .cfg-eye {
+      flex: none; position: relative;
+      width: 36px; height: 21px; margin-left: 4px;
+      border: none; border-radius: var(--radius-full);
+      background: var(--outline-variant);
+      cursor: pointer;
+      transition: background-color var(--transition);
+    }
+    .cfg-eye::after {
+      content: ''; position: absolute; top: 2.5px; left: 2.5px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .28);
+      transition: transform var(--transition);
+    }
+    .cfg-item:not(.off) .cfg-eye { background: var(--primary); }
+    .cfg-item:not(.off) .cfg-eye::after { transform: translateX(15px); }
+    .cfg-foot { display: flex; align-items: center; gap: 10px; padding: 10px 16px 14px; border-top: 1px solid var(--outline-variant); }
+    .cfg-foot #cfg-reset { margin-right: auto; }
 
     /* 编辑 + 预览 双栏 */
     .ed-main { flex: 1; display: flex; min-height: 0; max-width: none; margin: 0; padding: 0; width: 100%; }
@@ -221,23 +332,54 @@
     [data-theme="dark"] .ed-tool.on { color: #1c1b1f; }
     .ed-count { flex: none; font-size: 11.5px; color: var(--on-surface-variant); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-    /* 窄屏：编辑/预览二选一切换，手机更顺手 */
+    /* ===== 窄屏（手机 / iPhone）=====
+       两处结构性改动：
+       ① 工具栏和符号面板用 order 挪到编辑区**下方**——手机打字时工具栏贴在键盘上沿才够得着，
+          放顶上会被内容顶走，而且拇指要横穿整个屏幕。DOM 顺序不动，只翻 flex order。
+       ② 高度改吃 --ed-vh（由 editor.js 从 visualViewport 写入）：iOS 弹出键盘时 dvh/vh 都不缩，
+          只有 visualViewport.height 会缩，不跟着它算工具栏就被键盘盖住。配合 position:fixed
+          防止 iOS 把整个布局视口往上顶。 */
     @media (max-width: 760px) {
-      .ed-bar { gap: 8px; padding: 9px 12px; }
-      #ed-subject { display: none; }
-      .ed-status { display: none; }
-      #ed-title { font-size: 16px; }
-      #ed-preview-toggle { display: inline-flex; padding: 7px 14px; font-size: 12.5px; }
-      #ed-input { font-size: 16px; padding: 18px 18px 120px; }   /* 16px 防 iOS 聚焦缩放 */
-      #ed-preview { padding: 20px 18px 120px; }
+      body.editor {
+        position: fixed; inset: 0;
+        height: var(--ed-vh, 100dvh);
+      }
+      .ed-bar { gap: 8px; padding: 9px 12px; flex-wrap: wrap; order: 1; }
+      .ed-main { order: 2; }
+      .ed-syms { order: 3; }
+      .ed-toolbar { order: 4; }
+
+      #ed-title { font-size: 16px; flex-basis: 0; }
+      .ed-more { display: inline-flex; align-items: center; justify-content: center;
+        flex: none; width: 32px; height: 32px;
+        border: none; border-radius: var(--radius-full);
+        background: transparent; color: var(--on-surface-variant);
+        font-size: 17px; line-height: 1; cursor: pointer; }
+      .ed-more[aria-expanded="true"] { background: var(--surface-container-high); color: var(--on-surface); }
+      .seg.ed-view { display: inline-flex; }
+      /* 学科 / 字数 / 状态换到第二行，默认收着，点 ⋯ 才出来 */
+      #ed-subject, .ed-count, .ed-status { display: none; order: 10; }
+      .ed-bar.expanded #ed-subject { display: block; flex: 1 1 100%; width: auto; }
+      .ed-bar.expanded .ed-count, .ed-bar.expanded .ed-status { display: inline; }
+
+      #ed-input { font-size: 16px; padding: 18px 18px 28px; }   /* 16px 防 iOS 聚焦缩放 */
+      #ed-preview { padding: 20px 18px 40px; }
       .ed-main.show-preview #ed-input { display: none; }
       .ed-main:not(.show-preview) #ed-preview-wrap { display: none; }
       #ed-preview-wrap { border-left: none; }
-      .ed-toolbar { padding: 4px 8px; }
-      .ed-tool { min-width: 40px; height: 38px; }   /* 触控更大 */
-      .ed-count { display: none; }
+
+      .ed-toolbar {
+        padding: 5px 8px calc(5px + env(safe-area-inset-bottom));
+        border-bottom: none;
+        border-top: 1px solid var(--outline-variant);
+        background: var(--surface-container-low);
+      }
+      .ed-tool { min-width: 42px; height: 40px; }   /* 触控更大 */
+      .ed-tool-cfg { margin-left: 4px; padding-left: 10px; min-width: 34px; }
+      .ed-syms { border-top: 1px solid var(--outline-variant); border-bottom: none; }
       .sym-search { width: 120px; }
-      .sym-grid { max-height: 150px; }
+      .sym-grid { max-height: 34vh; padding-bottom: 12px; }
+
       /* 手机上大纲改成盖在正文上的一层，不挤编辑区 */
       .ed-outline {
         position: absolute; left: 0; top: 0; bottom: 0; z-index: 5;
@@ -245,6 +387,15 @@
         box-shadow: 6px 0 24px rgba(0, 0, 0, .18);
       }
       .ed-main { position: relative; }
+
+      /* 自定义面板在手机上走底部抽屉 */
+      .ed-cfg { align-items: flex-end; padding: 0; }
+      .ed-cfg-sheet {
+        width: 100%; max-height: 82vh;
+        border-radius: 18px 18px 0 0;
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+      .cfg-item { padding-top: 8px; padding-bottom: 8px; }
     }
   </style>
 </head>
@@ -255,30 +406,21 @@
     <input id="ed-subject" placeholder="学科（可选）" maxlength="40" autocomplete="off">
     <span class="ed-count" id="ed-count"></span>
     <span class="ed-status" id="ed-status"></span>
-    <button class="ghost-btn" id="ed-preview-toggle" type="button">预览</button>
+    <!-- 窄屏专用：学科/字数/状态在顶栏里挤不下，收进这颗按钮展开的第二行 -->
+    <button class="ed-more" id="ed-more-btn" type="button" title="更多" aria-label="更多" aria-expanded="false">⋯</button>
+    <div class="seg seg-mini ed-view" id="ed-view" role="tablist" aria-label="视图">
+      <button class="seg-btn active" type="button" data-view="edit">编辑</button>
+      <button class="seg-btn" type="button" data-view="preview">预览</button>
+    </div>
     <button class="create-btn" id="ed-save" type="button">保存</button>
   </header>
 
-  <!-- Markdown 工具栏：点一下即插入/包裹语法，手机也好用 -->
-  <div class="ed-toolbar" id="ed-toolbar" role="toolbar" aria-label="Markdown 工具">
-    <button class="ed-tool" type="button" data-md="h2" title="标题">H</button>
-    <button class="ed-tool" type="button" data-md="bold" title="加粗 (Ctrl/⌘+B)"><b>B</b></button>
-    <button class="ed-tool" type="button" data-md="italic" title="斜体 (Ctrl/⌘+I)"><i>I</i></button>
-    <button class="ed-tool" type="button" data-md="strike" title="删除线">S̶</button>
-    <span class="ed-tool-sep" aria-hidden="true"></span>
-    <button class="ed-tool" type="button" data-md="ul" title="无序列表">•—</button>
-    <button class="ed-tool" type="button" data-md="ol" title="有序列表">1.</button>
-    <button class="ed-tool" type="button" data-md="task" title="任务清单">☑</button>
-    <button class="ed-tool" type="button" data-md="quote" title="引用">❝</button>
-    <span class="ed-tool-sep" aria-hidden="true"></span>
-    <button class="ed-tool" type="button" data-md="code" title="行内代码 / 代码块">&lt;/&gt;</button>
-    <button class="ed-tool" type="button" data-md="formula" title="数学公式">∑</button>
-    <button class="ed-tool" type="button" data-md="link" title="链接">🔗</button>
-    <button class="ed-tool" type="button" data-md="table" title="表格">▦</button>
-    <button class="ed-tool" type="button" data-md="hr" title="分隔线">—</button>
-    <span class="ed-tool-sep" aria-hidden="true"></span>
-    <button class="ed-tool" type="button" id="ed-sym-btn" title="公式符号面板（希腊字母 / 物理记号 / 常用公式）">π</button>
-    <button class="ed-tool" type="button" id="ed-ol-btn" title="大纲">☰</button>
+  <!-- Markdown 工具栏：点一下即插入/包裹语法，手机也好用。
+       按钮不再写死在这里，改由 editor.js 的 TOOL_DEFS 渲染进 #ed-tools —— 顺序和显隐都能自定义。
+       最右边的齿轮固定不参与滚动，否则工具排多了就找不着它。 -->
+  <div class="ed-toolbar" id="ed-toolbar">
+    <div class="ed-tools" id="ed-tools" role="toolbar" aria-label="Markdown 工具"></div>
+    <button class="ed-tool ed-tool-cfg" type="button" id="ed-cfg-btn" title="自定义工具栏" aria-label="自定义工具栏">⚙</button>
   </div>
 
   <!-- 公式符号面板：分组 + 搜索，按钮本身由 KaTeX 渲染（数据见 editor-symbols.js） -->
@@ -288,6 +430,22 @@
       <input class="sym-search" id="sym-search" type="search" placeholder="搜：希腊 / 求和 / 雷诺…" autocomplete="off">
     </div>
     <div class="sym-grid" id="sym-grid"></div>
+  </div>
+
+  <!-- 自定义工具栏：拖 ⠿ 排序、点开关显隐。手机上拖不准，另给 ↑↓ 两颗。 -->
+  <div class="ed-cfg" id="ed-cfg" hidden>
+    <div class="ed-cfg-sheet" role="dialog" aria-modal="true" aria-label="自定义工具栏">
+      <header class="cfg-head">
+        <h2>自定义工具栏</h2>
+        <button class="cfg-x" id="cfg-close" type="button" aria-label="关闭">✕</button>
+      </header>
+      <p class="cfg-hint">拖住 <span aria-hidden="true">⠿</span> 排序，点右侧开关决定要不要显示。设置跟着账号走。</p>
+      <ul class="cfg-list" id="cfg-list"></ul>
+      <footer class="cfg-foot">
+        <button class="ghost-btn" id="cfg-reset" type="button">恢复默认</button>
+        <button class="create-btn" id="cfg-done" type="button">完成</button>
+      </footer>
+    </div>
   </div>
 
   <main class="ed-main" id="ed-main">
@@ -304,8 +462,9 @@
   <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/markdown-it-texmath@1.0.0/texmath.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
-  <script src="/assets/theme.js?v=20260818b"></script>
-  <script src="/assets/editor-symbols.js?v=20260818b"></script>
-  <script src="/assets/editor.js?v=20260818b"></script>
+  <script src="/assets/theme.js?v=20260822a"></script>
+  <script src="/assets/segment.js?v=20260822a"></script>
+  <script src="/assets/editor-symbols.js?v=20260822a"></script>
+  <script src="/assets/editor.js?v=20260822a"></script>
 </body>
 </html>

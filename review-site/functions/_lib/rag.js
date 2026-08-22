@@ -3,11 +3,19 @@ export const EMBED_MODEL = '@cf/baai/bge-m3';                       // 1024 维�
 
 // 对话可选模型：白名单 + 单一数据源（前端下拉与后端校验都用它，避免两处写死跑偏）。
 // 第一个为默认。仅保留 Workers AI 当前在售、且用标准 messages 接口稳定可用的模型 ID。
+// 这份清单里的每一个都要在本账号上实测能调通 —— 挂掉的模型在下拉里看不出来，
+// 用户选中之后只会得到一句「AI 调用失败」，很难查。核对办法：`npx wrangler ai models`。
+//
+// 2026-08-22 换掉两个死条目：
+//   · @cf/google/gemma-3-12b-it        -> 本账号 5018 not allowed，换 Qwen3 30B（中文更顺，且换个门派）
+//   · @cf/meta/llama-3.1-8b-instruct   -> 这个 id 根本不存在，实际叫 -fp8
+// Qwen3 / DeepSeek R1 是推理型，会吐 <think>；两条聊天路径都已经走 stripThink，
+// 且 max_tokens 给到 700/800（够思考 + 正文，给少了会只剩空串）。
 export const CHAT_MODELS = [
   { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',     label: 'Llama 3.3 70B',  hint: '均衡 · 默认' },
-  { id: '@cf/google/gemma-3-12b-it',                    label: 'Gemma 3 12B',    hint: '中文流畅' },
+  { id: '@cf/qwen/qwen3-30b-a3b-fp8',                   label: 'Qwen3 30B',      hint: '中文流畅' },
   { id: '@cf/mistralai/mistral-small-3.1-24b-instruct', label: 'Mistral Small',  hint: '综合较强' },
-  { id: '@cf/meta/llama-3.1-8b-instruct',               label: 'Llama 3.1 8B',   hint: '轻快' },
+  { id: '@cf/meta/llama-3.1-8b-instruct-fp8',           label: 'Llama 3.1 8B',   hint: '轻快' },
   { id: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b', label: 'DeepSeek R1',    hint: '深度思考' },
 ];
 export const CHAT_MODEL = CHAT_MODELS[0].id;

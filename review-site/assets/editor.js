@@ -153,7 +153,133 @@
   });
 
   // ===== Markdown 工具栏 =====
-  const toolbar = document.getElementById('ed-toolbar');
+  // 按钮不写死在 HTML 里，改由这份 TOOL_DEFS 渲染；顺序和显隐存本机 nb-ed-tools，
+  // 再同步到账号（/api/prefs 的 editor: 前缀），换台设备也是同一套排布。
+  //
+  // 关键约束：节点只 new 一次，重排靠 replaceChildren 搬**同一批**节点。
+  // π / ☰ 这两颗的点击监听和 .on 高亮都挂在节点上，重新 createElement 会把它们抹掉。
+  // 隐藏的工具节点仍然造好放在 toolNodes 里（只是没挂进 DOM），所以随时可以再显示出来。
+  const svg = (body) => `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+  const SVG_LINK = svg('<path d="M10 13.5a4 4 0 0 0 5.66 0l3-3A4 4 0 0 0 13 4.8l-1.7 1.7"/><path d="M14 10.5a4 4 0 0 0-5.66 0l-3 3A4 4 0 0 0 11 19.2l1.7-1.7"/>');
+  const SVG_IMAGE = svg('<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="8.6" cy="10" r="1.6"/><path d="M21 15.5 16 10.5 6.5 19.5"/>');
+
+  const TOOL_DEFS = [
+    { id: 'h1',      name: '一级标题', label: 'H1',        title: '一级标题' },
+    { id: 'h2',      name: '二级标题', label: 'H',         title: '标题' },
+    { id: 'h3',      name: '三级标题', label: 'H3',        title: '三级标题' },
+    { id: 'bold',    name: '加粗',     label: '<b>B</b>',  title: '加粗 (Ctrl/⌘+B)' },
+    { id: 'italic',  name: '斜体',     label: '<i>I</i>',  title: '斜体 (Ctrl/⌘+I)' },
+    { id: 'strike',  name: '删除线',   label: 'S&#822;',   title: '删除线' },
+    { id: 'sep1',    name: '分隔符',   kind: 'sep' },
+    { id: 'ul',      name: '无序列表', label: '&bull;—',   title: '无序列表' },
+    { id: 'ol',      name: '有序列表', label: '1.',        title: '有序列表' },
+    { id: 'task',    name: '任务清单', label: '☑',         title: '任务清单' },
+    { id: 'quote',   name: '引用',     label: '❝',         title: '引用' },
+    { id: 'sep2',    name: '分隔符',   kind: 'sep' },
+    { id: 'code',    name: '代码',     label: '&lt;/&gt;', title: '行内代码 / 代码块' },
+    { id: 'formula', name: '数学公式', label: '∑',         title: '数学公式' },
+    // 链接和图片没有靠谱的等宽字形：emoji 在 Windows 上要么是彩色的（跟旁边一排
+    // 单色字形不搭），要么直接豆腐块。这两颗改画内联 SVG，跟着 currentColor 走。
+    { id: 'link',    name: '链接',     label: SVG_LINK,    title: '链接' },
+    { id: 'image',   name: '插入图片', label: SVG_IMAGE,   title: '插入图片（也可直接粘贴 / 拖入）' },
+    { id: 'table',   name: '表格',     label: '▦',         title: '表格' },
+    { id: 'hr',      name: '分隔线',   label: '—',         title: '分隔线' },
+    { id: 'sep3',    name: '分隔符',   kind: 'sep' },
+    { id: 'sym',     name: '公式符号', label: 'π',         title: '公式符号面板（希腊字母 / 物理记号 / 常用公式）', domId: 'ed-sym-btn' },
+    { id: 'outline', name: '大纲',     label: '☰',         title: '大纲', domId: 'ed-ol-btn' },
+  ];
+  const DEF_BY_ID = new Map(TOOL_DEFS.map((d) => [d.id, d]));
+  const DEFAULT_HIDDEN = ['h1', 'h3'];   // 造好但默认收着，去自定义面板里开
+  const TOOLS_KEY = 'nb-ed-tools';
+  const TOOLS_PREF = 'editor:tools';
+
+  const toolsEl = document.getElementById('ed-tools');
+  const toolNodes = new Map();
+
+  function nodeFor(def) {
+    let el = toolNodes.get(def.id);
+    if (el) return el;
+    if (def.kind === 'sep') {
+      el = document.createElement('span');
+      el.className = 'ed-tool-sep';
+      el.setAttribute('aria-hidden', 'true');
+    } else {
+      el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'ed-tool';
+      el.title = def.title || def.name;
+      el.setAttribute('aria-label', def.name);
+      el.innerHTML = def.label;
+      el.dataset.md = def.id;
+      if (def.domId) el.id = def.domId;
+    }
+    toolNodes.set(def.id, el);
+    return el;
+  }
+  TOOL_DEFS.forEach(nodeFor);
+
+  function defaultCfg() {
+    return { order: TOOL_DEFS.map((d) => d.id), hidden: DEFAULT_HIDDEN.slice() };
+  }
+  // 只认识得出的 id；老配置里没有的新工具补到末尾（宁可多一颗，也别让新功能悄悄消失）
+  function normCfg(raw) {
+    const order = [];
+    (Array.isArray(raw && raw.order) ? raw.order : []).forEach((id) => {
+      if (DEF_BY_ID.has(id) && !order.includes(id)) order.push(id);
+    });
+    TOOL_DEFS.forEach((d) => { if (!order.includes(d.id)) order.push(d.id); });
+    const hidden = (Array.isArray(raw && raw.hidden) ? raw.hidden : []).filter((id) => DEF_BY_ID.has(id));
+    return { order, hidden };
+  }
+
+  let toolCfg = defaultCfg();
+  let cfgDirty = false;
+  let cfgTimer = 0;
+  try {
+    const raw = localStorage.getItem(TOOLS_KEY);
+    if (raw) toolCfg = normCfg(JSON.parse(raw));
+  } catch (_) { /* 本机存坏了就用默认，不值得打断编辑 */ }
+
+  function renderToolbar() {
+    if (!toolsEl) return;
+    const hidden = new Set(toolCfg.hidden);
+    toolsEl.replaceChildren(...toolCfg.order
+      .filter((id) => !hidden.has(id))
+      .map((id) => DEF_BY_ID.get(id))
+      .filter(Boolean)
+      .map(nodeFor));
+  }
+
+  function saveToolCfg() {
+    try { localStorage.setItem(TOOLS_KEY, JSON.stringify(toolCfg)); } catch (_) { /* 隐私模式写不进去，随它 */ }
+    clearTimeout(cfgTimer);
+    cfgTimer = window.setTimeout(() => {
+      fetch('/api/prefs', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: TOOLS_PREF, value: JSON.stringify(toolCfg) }),
+        keepalive: true,
+      }).catch(() => { /* 本机那份仍然有效，下次改动再同步 */ });
+    }, 200);
+  }
+
+  // 云端那份只在用户本次还没动过配置时才覆盖本机，避免刚拖完就被慢半拍的响应打回去
+  async function hydrateToolCfg() {
+    try {
+      const r = await fetch(`/api/prefs?key=${encodeURIComponent(TOOLS_PREF)}`, { headers: { Accept: 'application/json' } });
+      if (!r.ok) return;
+      const d = await r.json();
+      if (!d.value || cfgDirty) return;
+      toolCfg = normCfg(JSON.parse(d.value));
+      try { localStorage.setItem(TOOLS_KEY, JSON.stringify(toolCfg)); } catch (_) { /* 同上 */ }
+      renderToolbar();
+      if (cfgBox && !cfgBox.hidden) renderCfgList();
+    } catch (_) { /* 离线就用本机的 */ }
+  }
+
+  renderToolbar();
+  const symBtn = toolNodes.get('sym');
+  const olBtn = toolNodes.get('outline');
 
   function afterEdit() {
     inputEl.focus();
@@ -200,7 +326,9 @@
       case 'bold': return wrapInline('**', '**', '粗体');
       case 'italic': return wrapInline('*', '*', '斜体');
       case 'strike': return wrapInline('~~', '~~', '删除线');
+      case 'h1': return prefixLines((ln) => '# ' + ln.replace(/^#{1,6}\s*/, ''));
       case 'h2': return prefixLines((ln) => '## ' + ln.replace(/^#{1,6}\s*/, ''));
+      case 'h3': return prefixLines((ln) => '### ' + ln.replace(/^#{1,6}\s*/, ''));
       case 'ul': return prefixLines((ln) => '- ' + ln.replace(/^[-*]\s+/, ''));
       case 'ol': return prefixLines((ln, i) => (i + 1) + '. ' + ln.replace(/^\d+\.\s+/, ''));
       case 'task': return prefixLines((ln) => '- [ ] ' + ln.replace(/^- \[[ x]\]\s+/, ''));
@@ -216,15 +344,146 @@
       case 'link': return wrapInline('[', '](https://)', '链接文字');
       case 'table': return insertBlock('| 列 1 | 列 2 |\n| --- | --- |\n| 内容 | 内容 |');
       case 'hr': return insertBlock('---');
+      case 'image': return pickImage();
     }
   }
 
-  if (toolbar) toolbar.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-md]');
-    if (!btn) return;
-    e.preventDefault();
-    applyMd(btn.dataset.md);
-  });
+  // 手机没法拖拽、粘贴也别扭，所以工具栏里给一颗直通相册/文件的按钮
+  let picker = null;
+  function pickImage() {
+    if (!picker) {
+      picker = document.createElement('input');
+      picker.type = 'file';
+      picker.accept = 'image/*';
+      picker.hidden = true;
+      picker.addEventListener('change', () => {
+        const f = picker.files && picker.files[0];
+        picker.value = '';
+        if (f) insertImage(f);
+      });
+      document.body.appendChild(picker);
+    }
+    picker.click();
+  }
+
+  if (toolsEl) {
+    toolsEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-md]');
+      if (!btn) return;
+      e.preventDefault();
+      applyMd(btn.dataset.md);
+    });
+    // 桌面上按下工具按钮会先夺走焦点，光标位置一闪；触屏不走 mousedown，靠 afterEdit 的 focus() 收回来
+    toolsEl.addEventListener('mousedown', (e) => {
+      if (e.target.closest('.ed-tool')) e.preventDefault();
+    });
+  }
+
+  // ===== 自定义工具栏面板 =====
+  const cfgBox = document.getElementById('ed-cfg');
+  const cfgList = document.getElementById('cfg-list');
+  const cfgBtn = document.getElementById('ed-cfg-btn');
+
+  function renderCfgList() {
+    if (!cfgList) return;
+    const hidden = new Set(toolCfg.hidden);
+    const last = toolCfg.order.length - 1;
+    cfgList.innerHTML = toolCfg.order.map((id, i) => {
+      const d = DEF_BY_ID.get(id);
+      if (!d) return '';
+      const off = hidden.has(id);
+      const icon = d.kind === 'sep' ? '<span style="opacity:.45">｜</span>' : d.label;
+      return `<li class="cfg-item${off ? ' off' : ''}" data-id="${id}">
+        <button class="cfg-grip" type="button" aria-label="拖动排序">⠿</button>
+        <span class="cfg-icon" aria-hidden="true">${icon}</span>
+        <span class="cfg-name">${d.name}</span>
+        <button class="cfg-move" type="button" data-dir="-1" aria-label="上移"${i === 0 ? ' disabled' : ''}>▲</button>
+        <button class="cfg-move" type="button" data-dir="1" aria-label="下移"${i === last ? ' disabled' : ''}>▼</button>
+        <button class="cfg-eye" type="button" role="switch" aria-label="${d.name}：${off ? '当前隐藏' : '当前显示'}" aria-checked="${off ? 'false' : 'true'}"></button>
+      </li>`;
+    }).join('');
+  }
+
+  function commitCfg() {
+    cfgDirty = true;
+    saveToolCfg();
+    renderToolbar();
+  }
+
+  if (cfgList) {
+    cfgList.addEventListener('click', (e) => {
+      const li = e.target.closest('.cfg-item');
+      if (!li) return;
+      const id = li.dataset.id;
+      const move = e.target.closest('.cfg-move');
+      if (move) {
+        const i = toolCfg.order.indexOf(id);
+        const j = i + Number(move.dataset.dir);
+        if (i < 0 || j < 0 || j >= toolCfg.order.length) return;
+        toolCfg.order.splice(j, 0, toolCfg.order.splice(i, 1)[0]);
+        commitCfg();
+        renderCfgList();
+        return;
+      }
+      if (e.target.closest('.cfg-eye')) {
+        const k = toolCfg.hidden.indexOf(id);
+        if (k >= 0) toolCfg.hidden.splice(k, 1); else toolCfg.hidden.push(id);
+        commitCfg();
+        renderCfgList();
+      }
+    });
+
+    // 拖拽排序：DOM 先动，松手时再把顺序回写进 toolCfg.order
+    let drag = null;
+    cfgList.addEventListener('pointerdown', (e) => {
+      const grip = e.target.closest('.cfg-grip');
+      if (!grip) return;
+      const li = grip.closest('.cfg-item');
+      if (!li) return;
+      e.preventDefault();
+      try { grip.setPointerCapture(e.pointerId); } catch (_) { /* 老浏览器没有就算了 */ }
+      drag = { li, grip, id: e.pointerId };
+      li.classList.add('dragging');
+    });
+    cfgList.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const y = e.clientY;
+      for (const other of cfgList.children) {
+        if (other === drag.li) continue;
+        const r = other.getBoundingClientRect();
+        const mid = r.top + r.height / 2;
+        const after = other.compareDocumentPosition(drag.li) & Node.DOCUMENT_POSITION_FOLLOWING;
+        if (y < mid && after) { cfgList.insertBefore(drag.li, other); break; }
+        if (y > mid && !after) { cfgList.insertBefore(drag.li, other.nextSibling); break; }
+      }
+    });
+    const endDrag = () => {
+      if (!drag) return;
+      drag.li.classList.remove('dragging');
+      drag = null;
+      toolCfg.order = [...cfgList.children].map((li) => li.dataset.id).filter(Boolean);
+      commitCfg();
+      renderCfgList();
+    };
+    cfgList.addEventListener('pointerup', endDrag);
+    cfgList.addEventListener('pointercancel', endDrag);
+  }
+
+  function closeCfg() { if (cfgBox) cfgBox.hidden = true; }
+  if (cfgBtn && cfgBox) {
+    cfgBtn.addEventListener('click', () => { renderCfgList(); cfgBox.hidden = false; });
+    cfgBox.addEventListener('click', (e) => { if (e.target === cfgBox) closeCfg(); });
+    document.getElementById('cfg-close').addEventListener('click', closeCfg);
+    document.getElementById('cfg-done').addEventListener('click', closeCfg);
+    document.getElementById('cfg-reset').addEventListener('click', () => {
+      toolCfg = defaultCfg();
+      commitCfg();
+      renderCfgList();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !cfgBox.hidden) closeCfg();
+    });
+  }
 
   // 编辑区内快捷键（保存快捷键见下方全局监听）
   const HOTKEYS = { b: 'bold', i: 'italic', k: 'link', e: 'code', m: 'formula' };
@@ -241,7 +500,7 @@
   const symTabs = document.getElementById('sym-tabs');
   const symGrid = document.getElementById('sym-grid');
   const symSearch = document.getElementById('sym-search');
-  const symBtn = document.getElementById('ed-sym-btn');
+  // symBtn 在上面的工具栏注册表里建好（隐藏时节点不在 DOM，getElementById 找不到）
   const GROUPS = window.NB_SYMBOLS || [];
   let symGroup = GROUPS.length ? GROUPS[0].key : '';
 
@@ -338,7 +597,7 @@
   // ===== 大纲 =====
   // 从正文里抓 # 标题（跳过 ``` 代码块里的假标题），点一下把编辑区滚过去。
   const outlineEl = document.getElementById('ed-outline');
-  const olBtn = document.getElementById('ed-ol-btn');
+  // olBtn 同上，见工具栏注册表
 
   function headings() {
     const lines = inputEl.value.split('\n');
@@ -594,13 +853,38 @@
     if (dirty) { e.preventDefault(); e.returnValue = ''; }
   });
 
-  // 窄屏：编辑/预览切换
-  const previewToggle = document.getElementById('ed-preview-toggle');
-  previewToggle.addEventListener('click', () => {
-    const showing = mainEl.classList.toggle('show-preview');
-    previewToggle.textContent = showing ? '编辑' : '预览';
-    if (showing) renderPreview();
+  // 窄屏：编辑/预览分段控件（桌面是左右分栏，控件由 CSS 隐藏）。
+  // 药丸滑块交给 segment.js 就地增强，这里只管切 .active。
+  const viewSeg = document.getElementById('ed-view');
+  if (viewSeg) viewSeg.addEventListener('click', (e) => {
+    const b = e.target.closest('.seg-btn');
+    if (!b) return;
+    const preview = b.dataset.view === 'preview';
+    mainEl.classList.toggle('show-preview', preview);
+    viewSeg.querySelectorAll('.seg-btn').forEach((x) => x.classList.toggle('active', x === b));
+    if (preview) renderPreview();
   });
+
+  // 窄屏顶栏放不下学科/字数/状态，收进「⋯」展开的第二行
+  const barEl = document.querySelector('.ed-bar');
+  const moreBtn = document.getElementById('ed-more-btn');
+  if (barEl && moreBtn) moreBtn.addEventListener('click', () => {
+    const on = barEl.classList.toggle('expanded');
+    moreBtn.setAttribute('aria-expanded', on ? 'true' : 'false');
+  });
+
+  // iOS 弹出键盘时 vh/dvh 都不缩，只有 visualViewport 会缩 —— 不跟着它算，
+  // 贴在底部的工具栏就整条被键盘盖住。--ed-vh 只在窄屏的媒体查询里被用到。
+  const vv = window.visualViewport;
+  if (vv) {
+    const syncVH = () => {
+      document.documentElement.style.setProperty('--ed-vh', vv.height + 'px');
+      if (vv.offsetTop > 1) window.scrollTo(0, 0);   // 顺手把被顶上去的布局视口拉回来
+    };
+    vv.addEventListener('resize', syncVH);
+    vv.addEventListener('scroll', syncVH);
+    syncVH();
+  }
 
   // hljs 主题随站点主题切换
   function syncHljs() {
@@ -614,4 +898,5 @@
   syncHljs();
 
   load();
+  hydrateToolCfg();
 })();

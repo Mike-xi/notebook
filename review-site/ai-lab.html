@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>AI 痕迹实验室 · Xi Notebook</title>
+  <script>
+    (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
+  </script>
+  <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613d">
+  <link rel="stylesheet" href="/assets/style.css?v=20260818b">
+  <style>
+    /* 页面自带样式：这套 .lab-* 只有本页用得上，塞进全站 style.css 会让每个页面都白背 */
+    .lab-main { max-width: 940px; margin: 0 auto; padding: 20px 16px 80px; display: flex; flex-direction: column; gap: 16px; }
+    .lab-card {
+      border: 1px solid var(--outline-variant); border-radius: 16px;
+      background: var(--surface-container-low);
+      padding: 16px 18px;
+    }
+    .lab-card > h2 {
+      display: flex; align-items: center; gap: 8px;
+      margin: 0 0 12px; font-size: 15px; font-weight: 650; color: var(--on-surface);
+    }
+    .lab-card > h2 .tag {
+      margin-left: auto; padding: 2px 9px;
+      border-radius: var(--radius-full); background: var(--surface-container-high);
+      font-size: 11px; font-weight: 500; color: var(--on-surface-variant);
+    }
+
+    /* ---- 输入 ---- */
+    .lab-drop { position: relative; border: 1.5px dashed var(--outline-variant); border-radius: 12px; transition: border-color var(--transition), background-color var(--transition); }
+    .lab-drop.over { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 7%, transparent); }
+    .lab-drop textarea {
+      display: block; width: 100%; min-height: 190px; resize: vertical;
+      padding: 14px 15px; border: none; outline: none; background: transparent;
+      color: var(--on-surface); font-family: inherit; font-size: 14.5px; line-height: 1.75;
+    }
+    .lab-row { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin-top: 11px; }
+    .lab-count { font-size: 12px; color: var(--on-surface-variant); font-variant-numeric: tabular-nums; }
+    .lab-check { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: 12.5px; color: var(--on-surface-variant); cursor: pointer; }
+    .lab-check input { accent-color: var(--primary); }
+    .lab-msg { margin: 10px 0 0; font-size: 12.5px; color: var(--on-surface-variant); }
+    .lab-msg.ok { color: var(--primary); }
+    .lab-msg.err { color: var(--error); }
+    #lab-run:disabled { opacity: .45; cursor: default; }
+
+    /* ---- 总览：三档引擎并排 ---- */
+    .lab-verdicts { display: grid; grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); gap: 14px; }
+    .vd { display: flex; align-items: center; gap: 14px; padding: 14px; border: 1px solid var(--outline-variant); border-radius: 14px; background: var(--surface-container-lowest); }
+    .vd-ring { flex: none; width: 64px; height: 64px; }
+    .vd-ring circle { fill: none; stroke-width: 6; }
+    .vd-ring .bg { stroke: var(--surface-container-highest); }
+    .vd-ring .fg { stroke: var(--primary); stroke-linecap: round; transform: rotate(-90deg); transform-origin: 32px 32px; transition: stroke-dasharray 600ms cubic-bezier(.22,1,.36,1); }
+    .vd-num { font-size: 21px; font-weight: 700; fill: var(--on-surface); }
+    .vd-body { min-width: 0; }
+    .vd-eng { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--on-surface-variant); }
+    .vd-label { margin: 2px 0 3px; font-size: 16px; font-weight: 650; color: var(--on-surface); }
+    .lab-sub { font-size: 12px; line-height: 1.5; color: var(--on-surface-variant); }
+    .lab-sub.warn { color: #c9721f; }
+    [data-theme="dark"] .lab-sub.warn { color: #e2a35d; }
+
+    .lab-disclaimer {
+      margin: 14px 0 0; padding: 11px 13px;
+      border-radius: 11px; background: var(--surface-container);
+      font-size: 12.5px; line-height: 1.65; color: var(--on-surface-variant);
+    }
+    .lab-disclaimer b { color: var(--on-surface); }
+
+    /* ---- 指标条 ---- */
+    .mt + .mt { margin-top: 13px; }
+    .mt-top { display: flex; align-items: baseline; gap: 8px; }
+    .mt-name { font-size: 13px; font-weight: 600; color: var(--on-surface); }
+    .mt-val { font-size: 12.5px; color: var(--on-surface-variant); font-variant-numeric: tabular-nums; }
+    .mt-w { margin-left: auto; font-size: 11px; color: var(--on-surface-variant); }
+    .mt-w b { font-weight: 600; color: var(--on-surface); }
+    .mt-bar { height: 6px; margin: 6px 0 4px; border-radius: 3px; background: var(--surface-container-highest); overflow: hidden; }
+    .mt-bar i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, #59a869, #d9a441 55%, #d9603c); transition: width 500ms cubic-bezier(.22,1,.36,1); }
+    .mt-note { margin: 0; font-size: 11.5px; line-height: 1.55; color: var(--on-surface-variant); }
+    .mt-aside { margin: 14px 0 0; padding-top: 11px; border-top: 1px solid var(--outline-variant); font-size: 11.5px; line-height: 1.55; color: var(--on-surface-variant); }
+    #lab-register {
+      margin: 0 0 13px; padding: 10px 12px;
+      border-left: 3px solid #d9a441; border-radius: 0 9px 9px 0;
+      background: color-mix(in srgb, #d9a441 12%, transparent);
+      font-size: 12.5px; line-height: 1.6; color: var(--on-surface);
+    }
+
+    /* ---- 评委卡 ---- */
+    .lab-judges { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 11px; }
+    .jg { padding: 12px 13px; border: 1px solid var(--outline-variant); border-radius: 12px; background: var(--surface-container-lowest); }
+    .jg-bad { opacity: .6; }
+    .jg-h { display: flex; align-items: baseline; gap: 8px; }
+    .jg-h b { font-size: 13px; font-weight: 620; color: var(--on-surface); }
+    .jg-s { margin-left: auto; font-size: 19px; font-weight: 700; color: var(--on-surface-variant); font-variant-numeric: tabular-nums; }
+    .jg-s[data-hot="1"] { color: #d9603c; }
+    .jg-v { margin: 3px 0 7px; font-size: 12.5px; font-weight: 600; color: var(--primary); }
+    ul.jg-r { margin: 0; padding-left: 16px; }
+    .jg-r li { font-size: 11.5px; line-height: 1.6; color: var(--on-surface-variant); }
+    p.jg-r { margin: 4px 0 0; font-size: 11.5px; color: var(--on-surface-variant); }
+    .jg-l { margin: 8px 0 0; padding-top: 7px; border-top: 1px dashed var(--outline-variant); font-size: 11.5px; color: var(--on-surface-variant); }
+    .lab-wait { margin: 0; font-size: 12.5px; color: var(--on-surface-variant); }
+    .lab-wait.err { color: var(--error); }
+    #lab-attr { margin: 12px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--on-surface); }
+    .lab-caveat { color: var(--on-surface-variant); }
+
+    /* ---- 引擎 C：GLTR 分桶 ----
+       四种颜色沿用 GLTR 原版的约定：绿=模型的第一选择，黄=前 10，红=前 100，紫=更冷门。
+       AI 生成的文本绿色会压倒性地多。 */
+    .gl-nums { display: flex; flex-wrap: wrap; gap: 18px; margin: 0 0 14px; }
+    .gl-num { min-width: 84px; }
+    .gl-num b { display: block; font-size: 19px; font-weight: 700; color: var(--on-surface); font-variant-numeric: tabular-nums; }
+    .gl-num span { font-size: 11.5px; color: var(--on-surface-variant); }
+    .gl-stack { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--surface-container-highest); }
+    .gl-stack i { display: block; height: 100%; transition: width 500ms cubic-bezier(.22,1,.36,1); }
+    .gl-legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 9px 0 0; }
+    .gl-legend span { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--on-surface-variant); }
+    .gl-legend i { width: 9px; height: 9px; border-radius: 2px; }
+    .gl-b1 { background: #4CAF7D; }
+    .gl-b2 { background: #E8C547; }
+    .gl-b3 { background: #E2743A; }
+    .gl-b4 { background: #9B6BD6; }
+    /* token 色带：一格一个 token。**不画原文**——decoded_token 对 CJK 是有损的
+       （一个汉字被拆成多个字节级 token，单独解码是空串），拿它拼原文会缺字。
+       所以这里只画「模型有多意外」的节奏，悬停才看具体 token。 */
+    .gl-strip { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 14px; }
+    .gl-strip i { width: 9px; height: 14px; border-radius: 2px; cursor: help; }
+    .gl-note { margin: 12px 0 0; font-size: 11.5px; line-height: 1.6; color: var(--on-surface-variant); }
+
+    /* ---- 逐句热力 ---- */
+    .lab-heat {
+      max-height: 380px; overflow-y: auto; scrollbar-width: thin;
+      padding: 13px 14px; border: 1px solid var(--outline-variant); border-radius: 12px;
+      background: var(--surface-container-lowest);
+      font-size: 14px; line-height: 2; color: var(--on-surface);
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .hs { border-radius: 4px; padding: 1px 0; cursor: help; }
+
+    /* 全站规则在 ≤640px 会把胶囊按钮的文字收掉只留图标（style.css 那条）。
+       本页正文里的按钮不能这么收：「来个示例」压根没配图标，收完就是个空白圆圈。
+       下载中心踩过同一个坑，这里照它的修法办。 */
+    .lab-main .pill-btn .pill-label { display: inline !important; }
+
+    @media (max-width: 700px) {
+      .lab-main { padding: 14px 12px 60px; }
+      .lab-verdicts { grid-template-columns: 1fr; }
+      .lab-check { margin-left: 0; flex-basis: 100%; order: 5; }
+      .lab-drop textarea { min-height: 150px; font-size: 16px; }   /* 16px 防 iOS 聚焦缩放 */
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand drive-back" href="/" aria-label="返回首页" title="返回首页">
+      <span class="ic" data-icon="back" data-icon-size="20"></span>
+      <img class="brand-logo" src="/assets/brand-xinotebook.png?v=20260613d" alt="Xi Notebook">
+    </a>
+    <div class="topbar-right">
+      <span class="drive-title"><span class="ic" data-icon="robot" data-icon-size="18"></span> AI 痕迹实验室</span>
+      <button class="pill-btn" id="help-btn" title="怎么用 / 靠不靠谱"><span class="ic" data-icon="bookopen" data-icon-size="16"></span><span class="pill-label">说明</span></button>
+    </div>
+  </header>
+
+  <main class="lab-main">
+    <section class="lab-card">
+      <h2><span class="ic" data-icon="textaa" data-icon-size="18"></span> 待检文本<span class="tag">.txt / .md / .docx / .pdf 可直接拖进来</span></h2>
+      <div class="lab-drop" id="lab-drop">
+        <textarea id="lab-text" placeholder="把要查的文字粘进来，或者把文件拖到这个框里…&#10;&#10;至少 100 字才判得准。不确定怎么用就先点「来个示例」。" spellcheck="false"></textarea>
+      </div>
+      <div class="lab-row">
+        <button class="pill-btn" id="lab-file" type="button"><span class="ic" data-icon="upload" data-icon-size="16"></span><span class="pill-label">选文件</span></button>
+        <button class="pill-btn" id="lab-sample" type="button"><span class="ic" data-icon="sparkle" data-icon-size="16"></span><span class="pill-label">来个示例</span></button>
+        <span class="lab-count" id="lab-count"></span>
+        <label class="lab-check"><input type="checkbox" id="lab-usellm" checked> 同时跑引擎 B + C（联网，慢 5–15 秒）</label>
+        <button class="pill-btn pill-primary" id="lab-run" type="button" disabled>开始检测</button>
+      </div>
+      <input type="file" id="lab-fileinput" accept=".txt,.md,.markdown,.csv,.json,.log,.srt,.docx,.pdf,text/*" hidden>
+      <p class="lab-msg" id="lab-msg" hidden></p>
+    </section>
+
+    <div id="lab-result" hidden>
+      <section class="lab-card">
+        <h2><span class="ic" data-icon="crosshair" data-icon-size="18"></span> 结论</h2>
+        <div class="lab-verdicts">
+          <div class="vd">
+            <svg class="vd-ring" viewBox="0 0 64 64" aria-hidden="true">
+              <circle class="bg" cx="32" cy="32" r="26"></circle>
+              <circle class="fg" id="lab-a-ring" cx="32" cy="32" r="26" stroke-dasharray="0 164"></circle>
+              <text class="vd-num" x="32" y="39" text-anchor="middle" id="lab-a-score">—</text>
+            </svg>
+            <div class="vd-body">
+              <div class="vd-eng">引擎 A · 文风统计</div>
+              <div class="vd-label" id="lab-a-label">待检测</div>
+              <div class="lab-sub" id="lab-a-meta"></div>
+            </div>
+          </div>
+          <div class="vd">
+            <svg class="vd-ring" viewBox="0 0 64 64" aria-hidden="true">
+              <circle class="bg" cx="32" cy="32" r="26"></circle>
+              <circle class="fg" id="lab-b-ring" cx="32" cy="32" r="26" stroke-dasharray="0 164"></circle>
+              <text class="vd-num" x="32" y="39" text-anchor="middle" id="lab-b-score">—</text>
+            </svg>
+            <div class="vd-body">
+              <div class="vd-eng">引擎 B · 模型评审</div>
+              <div class="vd-label" id="lab-b-label">待检测</div>
+              <div class="lab-sub" id="lab-b-meta"></div>
+            </div>
+          </div>
+          <div class="vd">
+            <svg class="vd-ring" viewBox="0 0 64 64" aria-hidden="true">
+              <circle class="bg" cx="32" cy="32" r="26"></circle>
+              <circle class="fg" id="lab-c-ring" cx="32" cy="32" r="26" stroke-dasharray="0 164"></circle>
+              <text class="vd-num" x="32" y="39" text-anchor="middle" id="lab-c-score">—</text>
+            </svg>
+            <div class="vd-body">
+              <div class="vd-eng">引擎 C · 困惑度</div>
+              <div class="vd-label" id="lab-c-label">待检测</div>
+              <div class="lab-sub" id="lab-c-meta"></div>
+            </div>
+          </div>
+        </div>
+        <p class="lab-disclaimer">
+          <b>这三个数字都不是证据。</b>没有任何检测器能可靠区分 AI 与人类文本 ——
+          OpenAI 自己的检测器就是因为准确率不够在 2023 年下线的。
+          分数高只说明「文风更接近模型的默认输出」：写惯了论文公文的人会偏高，
+          被人改写润色过的 AI 文本会偏低。<b>三档吵起来的时候，那本身就是结论</b>——
+          说明这段文本处在检测方法够不着的地方。拿它当线索去读原文，别拿它当判决。
+        </p>
+      </section>
+
+      <section class="lab-card" style="margin-top:16px">
+        <h2><span class="ic" data-icon="gridfour" data-icon-size="18"></span> 引擎 A 明细<span class="tag">本地计算 · 不联网</span></h2>
+        <p id="lab-register" hidden></p>
+        <div id="lab-metrics"></div>
+      </section>
+
+      <section class="lab-card" id="lab-judges-card" style="margin-top:16px" hidden>
+        <h2><span class="ic" data-icon="users" data-icon-size="18"></span> 引擎 B 评委<span class="tag">Workers AI</span></h2>
+        <div class="lab-judges" id="lab-judges"></div>
+        <p id="lab-attr" hidden></p>
+      </section>
+
+      <section class="lab-card" id="lab-ppl-card" style="margin-top:16px" hidden>
+        <h2><span class="ic" data-icon="crosshair" data-icon-size="18"></span> 引擎 C · 困惑度明细<span class="tag" id="lab-ppl-model"></span></h2>
+        <div id="lab-ppl-body"></div>
+      </section>
+
+      <section class="lab-card" id="lab-heat-card" style="margin-top:16px" hidden>
+        <h2><span class="ic" data-icon="highlighter" data-icon-size="18"></span> 逐句热力<span class="tag">引擎 A · 颜色越深越可疑 · 悬停看原因</span></h2>
+        <div class="lab-heat" id="lab-heat"></div>
+      </section>
+    </div>
+  </main>
+
+  <script src="/assets/icons.js?v=20260822a"></script>
+  <script src="/assets/theme.js?v=20260822a"></script>
+  <script src="/assets/help.js?v=20260822a"></script>
+  <script src="/assets/ailab-stats.js?v=20260822a"></script>
+  <script src="/assets/ailab.js?v=20260822a"></script>
+  <script>
+    NBHelp.attach('#help-btn', {
+      title: 'AI 痕迹实验室 · 说明',
+      sections: [
+        { h: '先说结论：这东西不能当证据', body: '目前<b>没有</b>任何方法能可靠地判定一段文字是不是 AI 写的。OpenAI 自家的 AI Text Classifier 因为准确率太低已于 2023 年下线；学术界公认的问题是对非母语者和正式文体的<b>误报率极高</b>。这个页面是拿来<b>观察文本特征</b>的教具，不是查重系统。' },
+        { h: '引擎 A：文风统计', body: '纯在你浏览器里算，文字一个字节都不出本机。数七项形状特征：句长突发度、段落齐整度、套话密度、连接词密度、口语痕迹、自我复读率、结构规整度，加权成一个分。<b>阈值是手调的，没有在标注语料上校准过</b>，所以每项都把原始数值和权重摊开给你看——它的用处是让你自己判断，不是替你判断。' },
+        { h: '引擎 B：三个模型当评委', body: '把文本交给 Llama 3.3 70B / Gemma 3 12B / Mistral Small 三个模型各判一次，取平均，同时把<b>分歧量</b>报给你。单个模型对这种主观题方差极大，同一段换个模型能差 30 分；三个评委吵起来，本身就说明这段不好判。' },
+        { h: '「像哪家模型」是怎么猜的', body: '纯靠文风，不是水印也不是指纹。各家模型的训练语料高度重叠、还互相蒸馏，风格归因本来就不可靠。<b>当个乐子看</b>，别当真。真正可验证的溯源只有模型厂商主动嵌入的水印（如 Google SynthID），而那个不对外提供检测接口。' },
+        { h: '引擎 C：真·困惑度（GLTR）', body: '这是三档里唯一有学术依据的。把文本喂给一个参照模型（Mistral Small 24B），看它<b>事先</b>能不能猜中每一个 token。模型写的东西，token 大多正好是参照模型的第一选择；人写的会不断冒出它想不到的词。四色分桶的画法出自 <b>GLTR</b>（Gehrmann et al., ACL 2019）。<br><br>三个必须记住的前提：① 参照模型是 Mistral，<b>同族模型写的文本会得分更高，别家的偏低</b>；② 把 AI 文本改写一遍就能骗过它；③ 非母语者和正式文体的困惑度天然偏低——这是这类方法公认的误报来源，也是学术界反对拿它当证据的主要理由。' },
+        { h: '技术上它是怎么做到的', body: 'Cloudflare Workers AI 给每个模型公布的输出 schema 里只有 <code>response</code> / <code>usage</code> / <code>tool_calls</code>，按文档看是拿不到 logprob 的。但实测下来，vLLM 后端的模型在 <b>chat（messages）通道</b>上会透传 <code>prompt_logprobs</code>，返回每个输入 token 的对数概率和排名——<code>prompt</code> + <code>raw:true</code> 那条路则没有。各模型差别很大：llama-3.3-70b-fp8-fast 给出的是废数据，gpt-oss-120b 对三种样本一律同一个数（没有区分度），mistral-small-3.1-24b 最干净。' },
+        { h: '文件怎么读的', body: '.txt/.md 直接读；.docx 在浏览器里解压出 word/document.xml 剥标签；.pdf 用 pdf.js 抽前 20 页文字。<b>全程在本地解析</b>，只有你勾了「交给大模型评审」时，文本才会发到服务端（上限 6000 字）。扫描版 PDF 是图片，抽不出文字，需要 OCR。' },
+      ],
+    });
+  </script>
+</body>
+</html>
