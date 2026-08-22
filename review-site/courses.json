@@ -596,6 +596,23 @@
     "created_at": 1787397555659
   },
   {
+    "file": "unmark",
+    "title": "水印橡皮",
+    "subject": "工具",
+    "description": "把图片上的水印、角标、多余文字涂掉，剩下的交给模型按周围内容重画 · 满屏重复水印可以框一个自动找出全部 · 图片全程不出浏览器",
+    "icon": "🩹",
+    "color": "#E2743A",
+    "kind": "html",
+    "category": "explore",
+    "link": "/unmark.html",
+    "tags": [
+      "图像修复",
+      "水印",
+      "本地推理"
+    ],
+    "created_at": 1787403065584
+  },
+  {
     "file": "xipan",
     "title": "Xi Pan",
     "subject": "私人云盘",

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>水印橡皮 · Xi Notebook</title>
+  <script>
+    (function(){try{var p=localStorage.getItem('nb-theme')||'auto';var d=p==='dark'||(p==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';}catch(e){}})();
+  </script>
+  <link rel="icon" type="image/png" href="/assets/favicon-xi.png?v=20260613d">
+  <link rel="stylesheet" href="/assets/style.css?v=20260818b">
+  <style>
+    .um-main { max-width: 1020px; margin: 0 auto; padding: 20px 16px 80px; display: flex; flex-direction: column; gap: 14px; }
+    .um-card {
+      border: 1px solid var(--outline-variant); border-radius: 16px;
+      background: var(--surface-container-low); padding: 16px 18px;
+    }
+    .um-card > h2 {
+      display: flex; align-items: center; gap: 8px;
+      margin: 0 0 12px; font-size: 15px; font-weight: 650; color: var(--on-surface);
+    }
+    .um-card > h2 .tag {
+      margin-left: auto; padding: 2px 9px; border-radius: var(--radius-full);
+      background: var(--surface-container-high); font-size: 11px; font-weight: 500; color: var(--on-surface-variant);
+    }
+
+    /* ---- 画布区 ---- */
+    .um-drop {
+      position: relative; display: flex; align-items: center; justify-content: center;
+      min-height: 240px; padding: 12px;
+      border: 1.5px dashed var(--outline-variant); border-radius: 13px;
+      transition: border-color var(--transition), background-color var(--transition);
+    }
+    .um-drop.over { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 7%, transparent); }
+    .um-empty { text-align: center; color: var(--on-surface-variant); }
+    .um-empty p { margin: 0 0 10px; font-size: 13.5px; line-height: 1.7; }
+    /* 棋盘底纹：透明 PNG 才看得出哪儿是空的 */
+    .um-stage {
+      position: relative; line-height: 0; border-radius: 8px; overflow: hidden;
+      background-image: linear-gradient(45deg, #0001 25%, transparent 25%), linear-gradient(-45deg, #0001 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #0001 75%), linear-gradient(-45deg, transparent 75%, #0001 75%);
+      background-size: 18px 18px;
+      background-position: 0 0, 0 9px, 9px -9px, -9px 0;
+    }
+    .um-stage canvas { display: block; }
+    #um-mask { position: absolute; inset: 0; cursor: cell; touch-action: none; }
+
+    /* ---- 工具条 ---- */
+    .um-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .um-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--radius-full); background: var(--surface-container-high); }
+    .um-seg button {
+      padding: 6px 13px; border: none; border-radius: var(--radius-full);
+      background: transparent; color: var(--on-surface-variant);
+      font-size: 12.5px; font-family: inherit; cursor: pointer;
+      transition: background-color var(--transition), color var(--transition);
+    }
+    .um-seg button.active { background: var(--primary); color: #fff; }
+    [data-theme="dark"] .um-seg button.active { color: #1c1b1f; }
+    .um-brush { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--on-surface-variant); }
+    .um-brush input { width: 96px; accent-color: var(--primary); }
+    .um-brush b { min-width: 22px; font-variant-numeric: tabular-nums; color: var(--on-surface); }
+    .um-spacer { flex: 1; }
+    .um-msg { margin: 11px 0 0; font-size: 12.5px; line-height: 1.6; color: var(--on-surface-variant); }
+    .um-msg.ok { color: var(--primary); }
+    .um-msg.err { color: var(--error); }
+    .um-env {
+      margin: 0 0 12px; padding: 9px 12px;
+      border-left: 3px solid #d9a441; border-radius: 0 9px 9px 0;
+      background: color-mix(in srgb, #d9a441 12%, transparent);
+      font-size: 12px; line-height: 1.6; color: var(--on-surface);
+    }
+    #um-run:disabled, #um-save:disabled, #um-compare:disabled, #um-undo:disabled { opacity: .4; cursor: default; }
+
+    /* ---- 用法 ---- */
+    .um-steps { margin: 0; padding-left: 1.3em; }
+    .um-steps li { margin: 6px 0; font-size: 13px; line-height: 1.75; color: var(--on-surface-variant); }
+    .um-steps b { color: var(--on-surface); }
+
+    @media (max-width: 700px) {
+      .um-main { padding: 14px 12px 60px; }
+      .um-main .pill-btn .pill-label { display: inline !important; }
+      .um-tools { gap: 6px; }
+      .um-brush input { width: 70px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand drive-back" href="/" aria-label="返回首页" title="返回首页">
+      <span class="ic" data-icon="back" data-icon-size="20"></span>
+      <img class="brand-logo" src="/assets/brand-xinotebook.png?v=20260613d" alt="Xi Notebook">
+    </a>
+    <div class="topbar-right">
+      <span class="drive-title"><span class="ic" data-icon="eraser" data-icon-size="18"></span> 水印橡皮</span>
+      <button class="pill-btn" id="help-btn" title="怎么用 / 能去到什么程度"><span class="ic" data-icon="bookopen" data-icon-size="16"></span><span class="pill-label">说明</span></button>
+    </div>
+  </header>
+
+  <main class="um-main">
+    <section class="um-card">
+      <h2><span class="ic" data-icon="image" data-icon-size="18"></span> 图片<span class="tag">全程在本机处理，不上传</span></h2>
+      <p class="um-env" id="um-env" hidden></p>
+
+      <div class="um-drop" id="um-drop">
+        <div class="um-empty" id="um-empty">
+          <p>把图片拖进来，或者直接 <b>Ctrl/⌘ + V</b> 粘贴</p>
+          <button class="pill-btn pill-primary" id="um-pick" type="button">
+            <span class="ic" data-icon="upload" data-icon-size="16"></span><span class="pill-label">选一张图</span>
+          </button>
+        </div>
+        <div class="um-stage" id="um-stage" hidden>
+          <canvas id="um-base"></canvas>
+          <canvas id="um-mask"></canvas>
+        </div>
+      </div>
+      <input type="file" id="um-file" accept="image/*" hidden>
+
+      <div class="um-tools" id="um-tools" hidden>
+        <div class="um-seg">
+          <button type="button" data-tool="brush" class="active">画笔</button>
+          <button type="button" data-tool="rect">方框</button>
+          <button type="button" data-tool="erase">橡皮</button>
+        </div>
+        <label class="um-brush">笔刷 <input type="range" id="um-brush" min="6" max="120" value="34"><b id="um-brush-val">34</b></label>
+        <button class="pill-btn" id="um-find" type="button" title="框住其中一个水印后点这里，自动找出图中所有同款">
+          <span class="ic" data-icon="crosshair" data-icon-size="16"></span><span class="pill-label">找出所有相同水印</span>
+        </button>
+        <button class="pill-btn" id="um-undo" type="button" disabled><span class="ic" data-icon="undo" data-icon-size="16"></span><span class="pill-label">撤销</span></button>
+        <button class="pill-btn" id="um-clear" type="button"><span class="pill-label">清空选区</span></button>
+        <span class="um-spacer"></span>
+        <button class="pill-btn" id="um-compare" type="button" disabled><span class="pill-label">按住看原图</span></button>
+        <button class="pill-btn" id="um-reset" type="button"><span class="pill-label">还原</span></button>
+        <button class="pill-btn" id="um-save" type="button" disabled><span class="ic" data-icon="download" data-icon-size="16"></span><span class="pill-label">保存 PNG</span></button>
+        <button class="pill-btn pill-primary" id="um-run" type="button" disabled>擦掉选中区域</button>
+      </div>
+      <p class="um-msg" id="um-msg" hidden></p>
+    </section>
+
+    <section class="um-card">
+      <h2><span class="ic" data-icon="list" data-icon-size="18"></span> 怎么用</h2>
+      <ol class="um-steps">
+        <li>把图拖进来。超过 2000px 会自动缩一下，不然纯浏览器算起来太慢。</li>
+        <li><b>涂出要去掉的东西</b>。画笔适合不规则的，方框适合角标。<b>可以涂好几处，一次擦掉</b>。</li>
+        <li>如果是<b>满屏重复的水印</b>：先用方框框住其中一个，再点「找出所有相同水印」，它会在全图找同款并一起选上。</li>
+        <li>点「擦掉选中区域」。<b>首次使用要下载 28MB 的模型</b>，之后就存在本机不用再下了。</li>
+        <li>没擦干净就接着涂、再擦一次 —— 每次都是在上一次的结果上继续。</li>
+      </ol>
+    </section>
+  </main>
+
+  <script src="/assets/icons.js?v=20260822a"></script>
+  <script src="/assets/theme.js?v=20260822a"></script>
+  <script src="/assets/help.js?v=20260822a"></script>
+  <script src="/assets/unmark-core.js?v=20260822a"></script>
+  <script src="/assets/unmark.js?v=20260822a"></script>
+  <script>
+    NBHelp.attach('#help-btn', {
+      title: '水印橡皮 · 说明',
+      sections: [
+        { h: '它到底在做什么', body: '不是「把水印减掉」，而是<b>把你圈出来的地方按周围内容重新画一遍</b>（图像修复 / inpainting）。所以擦掉之后那块是模型编出来的，不是原图被遮住的真实内容——<span class="hl">背景越简单越干净，纹理越复杂越容易露馅</span>。' },
+        { h: '多处水印怎么弄', body: '蒙版本来就支持多个不连通的区域，<b>涂几处就一次擦几处</b>，不用一个个来。如果是图库那种满屏斜排的重复水印，用「找出所有相同水印」：框住其中一个，它会把全图同款一起选上。<br><br>原理是归一化互相关模板匹配，为了在浏览器里跑得动，先降到 1/4 分辨率的灰度图再匹配。所以<b>大小差得多、或者旋转过的同款水印可能漏掉</b>，漏了就手动补涂。' },
+        { h: '模型与隐私', body: '用的是 Picsart 的 <b>MI-GAN</b>（migan_pipeline_v2.onnx，28MB），跑在 onnxruntime-web 上，有 WebGPU 就用 WebGPU。<span class="hl">图片一个字节都不会离开你的浏览器</span>，服务器只负责发那份权重，而且权重下过一次就存进 IndexedDB，换页面也不用重下。' },
+        { h: '为什么有的擦不干净', body: '① 水印压在复杂纹理上（人脸、文字、密集花纹），模型编不出合理内容；② 选区太贴边，把水印边缘的半透明像素留下了——<b>往外多涂一圈</b>通常就好；③ 半透明大面积水印覆盖了主体，这种本质上信息已经丢了，谁也补不回来。' },
+        { h: '这个模型的许可', body: 'MI-GAN 来自 Picsart AI Research，是<b>研究用途许可（非商用）</b>。本页是自用工具，别拿它做商业服务。另外，请只处理<b>你有权处理的图片</b>：去掉他人作品上的版权水印再传播，是侵权。' },
+      ],
+    });
+  </script>
+</body>
+</html>

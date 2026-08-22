@@ -149,10 +149,18 @@
     runBtn.textContent = '检测中…';
     say('');
 
+    last.A = last.B = last.C = null;
+    last.judges = last.ppl = null;
+    last.text = text;
+
     const stat = window.NBTextStats.analyze(text);
+    last.stat = stat;
+    last.A = stat.ok ? stat.score : null;
     resultEl.hidden = false;
     renderStats(stat);
+    renderSyntax(stat);
     renderHeat(text, stat);
+    renderFinal();
 
     const wantLLM = llmBox.checked && text.trim().length >= 60;
     $('lab-judges-card').hidden = !wantLLM;
@@ -191,6 +199,7 @@
       $('lab-c-label').textContent = '未启用';
     }
 
+    renderFinal();          // B / C 回来之后再融合一次
     running = false;
     runBtn.disabled = false;
     runBtn.textContent = '开始检测';
@@ -219,8 +228,10 @@
         <div class="mt-top">
           <span class="mt-name">${esc(m.name)}</span>
           <span class="mt-val">${esc(m.display)}</span>
-          <!-- 进度条画的是「AI 味」不是左边那个原始值，不把百分比写出来两者容易看串 -->
-          <span class="mt-w"><b>AI 味 ${(m.ainess * 100).toFixed(0)}%</b> · 权重 ${(m.weight * 100).toFixed(0)}%</span>
+          <!-- 进度条画的是「AI 味」不是左边那个原始值，不把百分比写出来两者容易看串。
+               加分项写「权重 0%」会让人以为它不起作用，单独标注。 -->
+          <span class="mt-w"><b>AI 味 ${(m.ainess * 100).toFixed(0)}%</b> · ${
+            m.bonus ? '<span class="mt-bonus">强证据 · 单独加分</span>' : '权重 ' + (m.weight * 100).toFixed(0) + '%'}</span>
         </div>
         <div class="mt-bar"><i style="width:${(m.ainess * 100).toFixed(1)}%"></i></div>
         <p class="mt-note">${esc(m.note)}</p>
@@ -236,6 +247,76 @@
     if (!el) return;
     const C = 2 * Math.PI * 26;
     el.style.strokeDasharray = `${(C * score / 100).toFixed(2)} ${C.toFixed(2)}`;
+  }
+
+  // ===== 三档融合 =====
+  // 权重按实测准确度定，不是平均主义：
+  //   C 最高 —— 它测的是文本在参照模型下的真实概率分布，唯一有学术依据的一档；
+  //   A 次之 —— 加了句式套路检测之后，对中文公文体/排比句的辨识力明显上来了；
+  //   B 最低 —— 大模型对这种主观题方差极大，胜在能给出「人看得懂的理由」，
+  //             但那是解释价值，不是判别力，所以只给两成。
+  // 某一档缺席（没绑 AI / 调用失败 / 文本太短）时，剩下的权重按比例重新归一。
+  const FUSION = { A: 0.30, B: 0.20, C: 0.50 };
+  const last = { A: null, B: null, C: null, stat: null, judges: null, ppl: null, text: '' };
+
+  function fuse() {
+    const parts = [];
+    if (last.A != null) parts.push(['A', last.A, FUSION.A]);
+    if (last.B != null) parts.push(['B', last.B, FUSION.B]);
+    if (last.C != null) parts.push(['C', last.C, FUSION.C]);
+    if (!parts.length) return null;
+    const wsum = parts.reduce((a, p) => a + p[2], 0);
+    const score = Math.round(parts.reduce((a, p) => a + p[1] * p[2], 0) / wsum);
+    const vals = parts.map((p) => p[1]);
+    const spread = parts.length > 1 ? Math.max(...vals) - Math.min(...vals) : 0;
+    return {
+      score, spread, parts,
+      // 一致性直接影响这个数字该被信几分，所以摆在最显眼的位置说
+      agree: parts.length < 2 ? 'single' : spread <= 15 ? 'high' : spread <= 30 ? 'mid' : 'low',
+    };
+  }
+
+  const AGREE_TEXT = {
+    single: '只有一档引擎给出了结果，参考价值有限',
+    high: '三档结论接近，判断相对稳',
+    mid: '三档有一定分歧，建议自己读一遍原文',
+    low: '三档分歧很大 —— 这本身就是结论：这段文本落在检测方法够不着的地方',
+  };
+
+  function renderFinal() {
+    const f = fuse();
+    const numEl = $('lab-final'), labEl = $('lab-final-label'), barEl = $('lab-final-bar'), metaEl = $('lab-final-meta');
+    if (!f) {
+      numEl.textContent = '—';
+      labEl.textContent = '待检测';
+      barEl.style.width = '0';
+      $('lab-report-btn').disabled = true;
+      return;
+    }
+    numEl.textContent = f.score;
+    labEl.textContent = window.NBTextStats.band(f.score).label;
+    barEl.style.width = f.score + '%';
+    const detail = f.parts.map((p) => `${p[0]} ${p[1]}`).join(' · ');
+    metaEl.textContent = `${AGREE_TEXT[f.agree]}（${detail}，最大分歧 ${f.spread} 分）`;
+    metaEl.className = 'lab-sub' + (f.agree === 'low' ? ' warn' : '');
+    $('lab-report-btn').disabled = false;
+  }
+
+  // ===== 命中句式 =====
+  function renderSyntax(stat) {
+    const card = $('lab-syn-card');
+    const groups = (stat.ok && stat.syntax && stat.syntax.groups) || [];
+    card.hidden = false;
+    if (!groups.length) {
+      $('lab-syn').innerHTML = '<p class="sy-none">没有命中任何一类 AI 套路句式。'
+        + '这是偏人写的信号，但不能反过来当成「一定是人写」—— 很多模型输出（尤其是论述文、说明文）本来就不用排比句式。</p>';
+      return;
+    }
+    $('lab-syn').innerHTML = groups.map((g) => `
+      <div class="sy">
+        <div class="sy-h"><b>${esc(g.name)}</b><span class="sy-n">${g.n} 处</span><span class="sy-why">${esc(g.why)}</span></div>
+        <div class="sy-samples">${g.samples.map((s) => `<code>${esc(s)}</code>`).join('')}</div>
+      </div>`).join('');
   }
 
   async function callEngine(url, body, ok, fail) {
@@ -258,6 +339,8 @@
   const GL_NAME = ['第一选择 (rank 1)', '前 10', '前 100', '更冷门'];
 
   function renderPpl(d) {
+    last.ppl = d;
+    last.C = d.score;
     $('lab-c-score').textContent = d.score;
     $('lab-c-label').textContent = window.NBTextStats.band(d.score).label;
     setRing($('lab-c-ring'), d.score);
@@ -281,15 +364,15 @@
         return `<i class="${GL_CLASS[i]}" title="${esc(label)} · rank ${m.rank} · logprob ${m.lp}"></i>`;
       }).join('')}</div>
       <p class="gl-note">
-        做法出自 <b>GLTR</b>(Gehrmann et al., ACL 2019)：把文本喂给一个参照模型，看它事先能不能猜中每个 token。
-        模型写的东西，token 大多正好是参照模型的第一选择（绿色）；人写的会不断冒出它想不到的词（红/紫）。
-        <b>三个前提要记住：</b>① 参照模型是 Mistral，出自同族模型的文本会得分更高，别家的会偏低；
-        ② 把 AI 文本改写一遍就能骗过它；③ 非母语者和正式文体的困惑度天然偏低，这是这类方法公认的误报来源。
+        绿色＝该 token 正好是参照模型的第一选择。模型写的东西绿得多，人写的会不断冒出它想不到的词（红/紫）。
+        方法出自 GLTR (ACL 2019)，<b>三条前提见「说明」</b>。
       </p>`;
   }
 
   // ===== 引擎 B 渲染 =====
   function renderJudges(d) {
+    last.judges = d;
+    last.B = (d.consensus && d.consensus.score != null) ? d.consensus.score : null;
     const c = d.consensus || {};
     $('lab-b-score').textContent = c.score == null ? '—' : c.score;
     // 后端在平票时故意留空 verdict —— 别把「没共识」显示成某一方赢了
@@ -341,6 +424,108 @@
     if (cur < text.length) html += esc(text.slice(cur));
     box.innerHTML = html;
   }
+
+  // ===== PDF 报告 =====
+  // 走浏览器原生打印（另存为 PDF），不引 jsPDF —— 它内置字体不含中文，
+  // 嵌一份 CJK 字体要多下好几 MB，断行还得自己算。报告排版全在 @media print 里。
+  //
+  // 刻意做成「自查报告」而不是「鉴定证书」：没有公章、没有资质编号，
+  // 局限那一节和「不得作为认定学术不端依据」的话直接印在正文里，不塞进小字。
+  // 这个功能本来就有被拿去指控别人的风险，能做的就是让文件自己说清楚它不算数。
+  function fnv1a(s) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h.toString(16).padStart(8, '0').toUpperCase();
+  }
+
+  const ENGINE_DESC = {
+    A: ['文风统计（本地）', '句长突发度、套话密度、AI 句式套路等 8 项特征加权'],
+    B: ['大模型评审', '三个不同来源的模型分别判读后取共识'],
+    C: ['困惑度 / GLTR', '文本在参照模型下的对数概率与 token 排名分布'],
+  };
+
+  function buildReport() {
+    const f = fuse();
+    if (!f) return false;
+    const stat = last.stat;
+    const now = new Date();
+    const id = fnv1a(last.text) + '-' + fnv1a(String(now.getTime())).slice(0, 4);
+
+    $('rp-id').textContent = id;
+    $('rp-foot-id').textContent = '报告编号 ' + id + '　本报告不构成鉴定结论';
+    $('rp-time').textContent = now.toLocaleString('zh-CN', { hour12: false });
+    $('rp-score').textContent = f.score;
+    $('rp-band').textContent = window.NBTextStats.band(f.score).label;
+    $('rp-consensus').textContent = AGREE_TEXT[f.agree] + `（最大分歧 ${f.spread} 分）`;
+
+    $('rp-chars').textContent = last.text.length;
+    $('rp-tokens').textContent = stat.ok ? stat.tokens : '—';
+    $('rp-sents').textContent = stat.ok ? stat.sentences.length : '—';
+    $('rp-lang').textContent = { zh: '中文', en: '英文', mix: '中英混排' }[stat.lang] || '—';
+    $('rp-hash').textContent = 'FNV-1a ' + fnv1a(last.text) + '（同一段文字每次生成的指纹相同，可用于核对送检内容是否被改动）';
+    const ex = last.text.replace(/\s+/g, ' ').trim();
+    $('rp-excerpt').textContent = ex.length > 220 ? ex.slice(0, 220) + '……' : ex;
+
+    const wsum = f.parts.reduce((a, p) => a + p[2], 0);
+    $('rp-engines').innerHTML = f.parts.map((p) => {
+      const d = ENGINE_DESC[p[0]];
+      return `<tr><td>引擎 ${p[0]}</td><td>${esc(d[0])}</td><td style="text-align:center">${p[1]}</td>`
+        + `<td style="text-align:center">${Math.round(p[2] / wsum * 100)}%</td><td>${esc(d[1])}</td></tr>`;
+    }).join('')
+      + (f.parts.length < 3 ? '<tr><td colspan="5">注：部分引擎本次未参与（未启用或调用失败），权重已按剩余引擎重新归一。</td></tr>' : '');
+
+    // 证据：句式命中 + 引擎 A 靠前的指标 + 引擎 C 的分布 + 引擎 B 的理由
+    const ev = [];
+    const groups = (stat.ok && stat.syntax && stat.syntax.groups) || [];
+    if (groups.length) {
+      ev.push(`<div class="rp-ev"><b>典型句式命中（共 ${stat.syntax.total} 处）</b><ul>`
+        + groups.map((g) => `<li>${esc(g.name)} ×${g.n} —— ${esc(g.why)}；原文如 ${g.samples.map((s) => `<code>${esc(s)}</code>`).join('、')}</li>`).join('')
+        + '</ul></div>');
+    } else {
+      ev.push('<div class="rp-ev"><b>典型句式命中</b><ul><li>未命中任何一类 AI 套路句式。</li></ul></div>');
+    }
+    if (stat.ok) {
+      const top = stat.metrics.filter((m) => !m.bonus).sort((a, b) => b.ainess - a.ainess).slice(0, 3);
+      ev.push('<div class="rp-ev"><b>引擎 A 贡献最大的三项特征</b><ul>'
+        + top.map((m) => `<li>${esc(m.name)}：${esc(String(m.display))}（AI 味 ${(m.ainess * 100).toFixed(0)}%，权重 ${(m.weight * 100).toFixed(0)}%）—— ${esc(m.note)}</li>`).join('')
+        + '</ul></div>');
+      if (stat.register) ev.push(`<div class="rp-ev"><b>语体提示</b><ul><li>${esc(stat.register)}</li></ul></div>`);
+    }
+    if (last.ppl) {
+      const b = last.ppl.buckets;
+      const n = b.top1 + b.top10 + b.top100 + b.rest || 1;
+      ev.push('<div class="rp-ev"><b>引擎 C 概率分布</b><ul>'
+        + `<li>困惑度 ${last.ppl.ppl}，参与计算 ${last.ppl.tokens} 个 token，参照模型 ${esc(last.ppl.model)}</li>`
+        + `<li>token 命中参照模型第一选择 ${(b.top1 / n * 100).toFixed(0)}%，前 10 ${(b.top10 / n * 100).toFixed(0)}%，`
+        + `前 100 ${(b.top100 / n * 100).toFixed(0)}%，更冷门 ${(b.rest / n * 100).toFixed(0)}%</li></ul></div>`);
+    }
+    if (last.judges && last.judges.judges) {
+      const good = last.judges.judges.filter((j) => j.score != null);
+      if (good.length) {
+        ev.push('<div class="rp-ev"><b>引擎 B 各评委意见</b><ul>'
+          + good.map((j) => `<li>${esc(j.label)}：${j.score} 分 / ${esc(j.verdict)} —— ${j.reasons.map(esc).join('；') || '未给出理由'}</li>`).join('')
+          + '</ul></div>');
+      }
+    }
+    $('rp-evidence').innerHTML = ev.join('');
+    return true;
+  }
+
+  $('lab-report-btn').addEventListener('click', () => {
+    if (!buildReport()) { say('还没有可用的检测结果', 'err'); return; }
+    // 等一帧，确保上面写进 DOM 的内容已经完成布局再唤起打印
+    requestAnimationFrame(() => requestAnimationFrame(() => window.print()));
+  });
+
+  // 「为什么？」直接跳到说明弹窗（NBHelp 的按钮就在顶栏）
+  const whyBtn = $('lab-why');
+  if (whyBtn) whyBtn.addEventListener('click', () => {
+    const h = document.getElementById('help-btn');
+    if (h) h.click();
+  });
 
   updateCount();
 })();

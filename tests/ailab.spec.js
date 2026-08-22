@@ -56,15 +56,53 @@ test('AI 样本判高分、人写样本判低分', async ({ page }) => {
   expect(ai - human).toBeGreaterThan(30);
 });
 
-test('七项指标都渲染出来，权重加起来是一份', async ({ page }) => {
+test('八项指标都渲染出来，加权项权重合计为一', async ({ page }) => {
   await page.uncheck('#lab-usellm');
   await page.fill('#lab-text', AI_SAMPLE);
   await page.click('#lab-run');
-  await expect(page.locator('#lab-metrics .mt')).toHaveCount(7);
+  await expect(page.locator('#lab-metrics .mt')).toHaveCount(8);
   // 每条都得有非空的说明，别出现光秃秃的条
   for (const note of await page.locator('#lab-metrics .mt-note').allTextContents()) {
     expect(note.trim().length).toBeGreaterThan(5);
   }
+  // 「AI 句式套路」是加分项不进加权，其余七项的权重必须正好凑满 100%
+  const sum = await page.evaluate(() => window.NBTextStats
+    .analyze(document.getElementById('lab-text').value)
+    .metrics.filter((m) => !m.bonus)
+    .reduce((a, m) => a + m.weight, 0));
+  expect(Math.abs(sum - 1)).toBeLessThan(1e-9);
+});
+
+test('AI 句式套路：公文体全中、人写不误报', async ({ page }) => {
+  await page.uncheck('#lab-usellm');
+  await page.fill('#lab-text', `在数字经济蓬勃发展的大背景下，推动产业转型升级是一项系统工程。面对新一轮科技革命的新形势，我们既要抓住机遇，也要防范风险。
+
+据统计，去年全市数字经济规模突破八千亿元。这一数据充分说明，数字化转型已经成为高质量发展的新引擎。要以创新为引领，以人才为支撑，以制度为保障，进一步加强顶层设计，持续深化改革攻坚。
+
+这不是一次简单的技术升级，而是一场发展方式的深刻变革。从政策扶持到平台搭建，每一环都是不可或缺的压舱石。`);
+  await page.click('#lab-run');
+  await expect(page.locator('#lab-syn-card')).toBeVisible();
+  // 十二类里至少踩中八类
+  expect(await page.locator('#lab-syn .sy').count()).toBeGreaterThanOrEqual(8);
+  expect(Number(await page.locator('#lab-a-score').textContent())).toBeGreaterThanOrEqual(75);
+
+  // 换成人写的影评，一处都不该命中
+  await page.fill('#lab-text', HUMAN_SAMPLE);
+  await page.click('#lab-run');
+  await expect(page.locator('#lab-syn .sy')).toHaveCount(0);
+  await expect(page.locator('#lab-syn .sy-none')).toBeVisible();
+});
+
+test('综合判定给出融合分，三档缺席时权重重新归一', async ({ page }) => {
+  await page.uncheck('#lab-usellm');
+  await page.fill('#lab-text', AI_SAMPLE);
+  await page.click('#lab-run');
+  const final = Number(await page.locator('#lab-final').textContent());
+  const a = Number(await page.locator('#lab-a-score').textContent());
+  // 只有引擎 A 时，融合分就等于 A
+  expect(final).toBe(a);
+  await expect(page.locator('#lab-final-meta')).toContainText('只有一档');
+  await expect(page.locator('#lab-report-btn')).toBeEnabled();
 });
 
 test('逐句热力覆盖全文且不丢字', async ({ page }) => {

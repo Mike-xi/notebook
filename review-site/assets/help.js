@@ -55,6 +55,11 @@
 .nbh-sec ul { margin: 4px 0 0; padding-left: 1.25em; font-size: 13.5px; line-height: 1.75; color: var(--on-surface-variant, var(--muted, #6b7280)); }
 .nbh-sec li { margin: 2px 0; }
 .nbh-sec b, .nbh-sec strong { color: var(--on-surface, var(--fg, #1c1b1f)); font-weight: 600; }
+/* .hl：红字强调。给「这条一定要看到」的句子用，比如免责声明里的硬约束。
+   别整段套，一屏里超过两三处就没有强调效果了。 */
+.nbh-sec .hl { color: #c0392b; font-weight: 600; }
+.nbh-sec .hl b { color: inherit; }
+[data-theme="dark"] .nbh-sec .hl { color: #ef8b7a; }
 .nbh-sec code {
   padding: 1px 6px; border-radius: 6px;
   background: var(--surface-container-highest, var(--chip, #eef0f4));

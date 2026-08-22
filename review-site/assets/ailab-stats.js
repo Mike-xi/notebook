@@ -19,12 +19,14 @@
   const CLICHE_ZH = [
     '值得注意的是', '需要注意的是', '需要强调的是', '值得一提的是', '需要指出的是',
     '综上所述', '总而言之', '总的来说', '由此可见', '不难看出', '换句话说', '换言之',
-    '在当今社会', '在当今时代', '随着科技的不断发展', '随着社会的发展', '随着时代的发展',
+    '在当今社会', '在当今时代',
     '至关重要', '具有重要意义', '起到了重要作用', '发挥着重要作用',
     '深入探讨', '全方位', '多维度', '多层面',
     '让我们一起', '希望以上', '以下是一些', '首先我们需要', '接下来我们',
-    '不仅如此', '与此同时', '归根结底', '进一步提升', '进一步优化',
+    '不仅如此', '与此同时', '归根结底',
   ];
+  // 从这张表里挪走的：「随着…的发展」「进一步提升/优化」下面的 SYNTAX 用正则覆盖得更全，
+  // 两张表都留着会把同一处文字算两遍，白白抬高分数。
   // 故意**不**收进词表的几个，都是踩过的误报：
   //   闭环 → 命中「闭环系统」（控制论标准术语）
   //   旨在 / 在一定程度上 / 深入分析 / 不可忽视 → 中文学术写作的常规措辞
@@ -47,6 +49,34 @@
     'consequently', 'thus', 'hence', 'meanwhile', 'in addition', 'overall',
     'firstly', 'secondly', 'finally', 'for instance', 'for example',
   ];
+  // ===== AI 句式套路 =====
+  // 词是点，句式是面。一个词出现一两次能混过去，但句式决定的是节奏，而模型的节奏
+  // 跟人对不上——这一档抓的就是节奏。分七类，前两类是「对举排比」（听起来两边都
+  // 照顾到了，其实没给出真正的判断），后五类是公文体里模型最容易上瘾的结构。
+  //
+  // **重要：判的是密度不是有无。** 这些句式人也在用，「不是…而是…」本身没毛病；
+  // 问题在于模型没想清楚的时候最容易拿它们来凑气势，于是扎堆出现。所以计分走
+  // 每千词命中数，并且把命中的原文摘出来给用户自己看，而不是命中一次就定罪。
+  const SYNTAX = [
+    { name: '不是…而是',   re: /不是[^，。；！？、\n]{1,24}[，,]\s*而是/g,                                  why: '两边都照顾到，但没说出真正的判断' },
+    { name: '不仅…更/还',  re: /不仅[^，。；！？、\n]{0,24}[，,]\s*(?:更|还|也|而且)/g,                     why: '递进式凑气势，删掉后半句意思通常还在' },
+    { name: '既要…也要',   re: /既要[^，。；！？、\n]{1,24}[，,]\s*(?:也要|又要|还要)/g,                    why: '面面俱到＝没有取舍' },
+    { name: '既…又…',      re: /既[^，。；！？、\n]{2,20}[，,]\s*又[^，。；！？、\n]{2,20}/g,               why: '同上，对举句式' },
+    { name: '从…到…',      re: /从[^，。；！？、\n]{1,16}到[^，。；！？、\n]{1,16}[，。；]/g,                why: '铺排范围，常用来充篇幅' },
+    { name: '开场三件套',  re: /(?:在[^，。；！？\n]{2,20}的(?:大)?背景下|面对[^，。；！？\n]{2,20}的新形势|根据[^，。；！？\n]{2,20}的(?:统一)?部署|随着[^，。；！？\n]{2,24}的(?:不断|持续|快速)?(?:发展|推进|深入|提升|普及))/g,
+      why: '先铺垫背景再进正题——模型不确定从哪儿开口才「安全」' },
+    { name: '万能定性句',  re: /(?:是一项系统(?:性)?工程|是一个系统(?:性)?工程|涉及方方面面|具有多重意义|意义重大而深远)/g,
+      why: '换成任何主题都成立，等于没传递信息' },
+    { name: '推进家族',    re: /(?:进一步|持续|不断|深入|扎实|稳步|统筹|加快|全面|协调|大力|积极|切实)(?:加强|深化|推进|提升|优化|完善|落实|强化|拓展|巩固)/g,
+      why: '每个动词前面都配个副词，全都强调＝全都没强调' },
+    { name: '以…为…',      re: /以[^，。；！？、\n]{1,14}为(?:引领|导向|抓手|支撑|保障|底线|核心|基础|重点|依托|契机|主线|遵循|根本)/g,
+      why: '太好用所以上瘾，一段里能套三四个' },
+    { name: '数据报幕',    re: /(?:据统计|数据显示|从数据来看|统计数据表明|有数据表明)/g,                    why: '数据前面要报幕' },
+    { name: '数据谢幕',    re: /(?:这一数据充分说明|这充分说明|这一数字背后|充分体现了|这一数据表明)/g,      why: '数据后面还要谢幕，怕读者看不懂' },
+    { name: '比喻复读机',  re: /(?:压舱石|助推器|定盘星|风向标|组合拳|先手棋|新引擎|新动能|试金石|催化剂|加速器|稳定器|突破口)/g,
+      why: '把比喻当成文体特征，一篇里扎堆用' },
+  ];
+
   // 口语/情绪痕迹：出现得多说明是人在说话，反过来压 AI 分
   const HUMAN_MARK = /[!！?？]|……|\.\.\.|[（(](?:笑|汗|捂脸|狗头)[)）]|哈哈|嘛|呗|啦|吧了|233|orz/;
 
@@ -91,6 +121,29 @@
     const tail = text.slice(start);
     if (tail.trim().length >= 2) out.push({ text: tail.trim(), start, end: text.length });
     return out;
+  }
+
+  // 扫句式套路。回传总命中数、按类别聚合的明细（含原文片段），以及命中位置区间
+  // ——位置给逐句热力用，让「哪一句踩了哪个套路」能直接指出来。
+  function scanSyntax(text) {
+    let total = 0;
+    const groups = [];
+    const spans = [];
+    for (const p of SYNTAX) {
+      p.re.lastIndex = 0;
+      let m;
+      const samples = [];
+      let n = 0;
+      while ((m = p.re.exec(text)) !== null) {
+        if (m[0].length === 0) { p.re.lastIndex++; continue; }   // 防零宽匹配死循环
+        n++;
+        spans.push({ start: m.index, end: m.index + m[0].length, name: p.name });
+        if (samples.length < 3) samples.push(m[0].length > 26 ? m[0].slice(0, 26) + '…' : m[0]);
+      }
+      if (n) { total += n; groups.push({ name: p.name, n, why: p.why, samples }); }
+    }
+    groups.sort((a, b) => b.n - a.n);
+    return { total, groups, spans };
   }
 
   function countHits(lower, list) {
@@ -174,35 +227,51 @@
     const rep = repeatRate(text);
     const div = mattr(text, 100);
 
+    const syn = scanSyntax(text);
+
     // 每条：value 原始值、ainess 0..1、weight 权重。阈值全是手调的经验值，注释里写明方向。
     const metrics = [
       {
-        key: 'burst', name: '句长突发度', weight: 0.22,
+        // **不进加权平均，只作加分项**（weight: 0，下面单独算 bonus / floor）。
+        // 原因是这条证据是不对称的：命中＝强证据（人写不出一段连堆五类套路的节奏），
+        // 但没命中**不是**人写的证据——大量 AI 论述文根本不用排比句式。
+        // 一开始把它按 0.24 的权重塞进加权平均，结果一段明显的 AI 论述文只中 1 处，
+        // 反倒把总分从 80 稀释到 69。加分项才符合它的证据性质。
+        key: 'syntax', name: 'AI 句式套路', weight: 0, bonus: true,
+        value: per1k(syn.total), display: syn.total + ' 处 · ' + per1k(syn.total).toFixed(1) + '/千词',
+        ainess: ramp(per1k(syn.total), 0, 14),
+        note: syn.groups.length
+          ? syn.groups.map((g) => `${g.name}×${g.n}`).join('、')
+          : '没踩到任何一类套路句式。',
+        groups: syn.groups,
+      },
+      {
+        key: 'burst', name: '句长突发度', weight: 0.24,
         value: sLen.cv, display: sLen.cv.toFixed(2),
         // 人写句子忽长忽短，变异系数常在 .45~.80；模型输出普遍更齐整
         ainess: ramp(sLen.cv, 0.70, 0.25),
         note: `平均 ${sLen.mean.toFixed(0)} 词/句，标准差 ${sLen.sd.toFixed(1)}。越接近 0 说明每句长得越像。`,
       },
       {
-        key: 'para', name: '段落齐整度', weight: 0.12,
+        key: 'para', name: '段落齐整度', weight: 0.10,
         value: pLen.cv, display: pLen.cv ? pLen.cv.toFixed(2) : '—',
         ainess: pLen.n >= 3 ? ramp(pLen.cv, 0.60, 0.15) : 0.5,
         note: pLen.n >= 3 ? `${pLen.n} 段，平均 ${pLen.mean.toFixed(0)} 词。模型爱把每段写成差不多长。` : '段落太少，此项按中性计。',
       },
       {
-        key: 'cliche', name: '套话密度', weight: 0.22,
+        key: 'cliche', name: '套话密度', weight: 0.24,
         value: per1k(cliche.n), display: per1k(cliche.n).toFixed(1) + '/千词',
         ainess: ramp(per1k(cliche.n), 0, 12),
         note: cliche.hit.length ? '命中：' + cliche.hit.slice(0, 10).join('、') : '没命中词表里的 AI 常用套话。',
       },
       {
-        key: 'conn', name: '连接词密度', weight: 0.14,
+        key: 'conn', name: '连接词密度', weight: 0.13,
         value: per1k(conn.n), display: per1k(conn.n).toFixed(1) + '/千词',
         ainess: ramp(per1k(conn.n), 8, 40),
         note: '「首先/其次/因此/然而」这类。模型爱把逻辑显式铺满，人写常靠语序带过。',
       },
       {
-        key: 'human', name: '口语与情绪痕迹', weight: 0.10,
+        key: 'human', name: '口语与情绪痕迹', weight: 0.13,
         value: humanSent, display: (humanSent * 100).toFixed(0) + '%',
         // 方向相反：痕迹越少越像 AI。论文/公文天然是 0，所以权重压低，
         // 另外靠下面的 register 提示单独说明，别让它一条把正式文体拖进 AI 区。
@@ -210,7 +279,7 @@
         note: '带感叹号、疑问、省略号或口语词的句子占比。模型的默认语气很少这样，但论文/公文同样如此。',
       },
       {
-        key: 'repeat', name: '自我复读率', weight: 0.06,
+        key: 'repeat', name: '自我复读率', weight: 0.05,
         value: rep, display: (rep * 100).toFixed(1) + '%',
         // 上限原来写的 0.22，是拍脑袋拍错了：几百词的短文本 4-gram 重复率实测就在
         // 0~8% 之间，22% 那档谁都够不着，结果这条指标对所有样本一律输出 100%（等于没有）。
@@ -226,8 +295,22 @@
     ];
 
     let score = 0, wsum = 0;
-    for (const m of metrics) { score += m.ainess * m.weight; wsum += m.weight; }
+    for (const m of metrics) {
+      if (m.bonus) continue;                       // 加分项不进加权平均
+      score += m.ainess * m.weight; wsum += m.weight;
+    }
     score = Math.round((score / wsum) * 100);
+
+    // 句式套路单独结算：命中越密加得越多（封顶 +30），密到一定程度再压一条下限。
+    // 下限是为了兜住「句式全中但其它指标不极端」的公文体——实测那种文本加权和只有 60，
+    // 而它 10 类套路全踩，17 处命中，判成「偏 AI」明显过轻。
+    const synPer1k = per1k(syn.total);
+    const synBonus = Math.min(30, Math.round(syn.total * 2.5 + synPer1k * 0.2));
+    const synFloor = (syn.total >= 8 && synPer1k >= 30) ? 78
+      : (syn.total >= 4 && synPer1k >= 15) ? 66
+        : 0;
+    score = Math.min(100, score + synBonus);
+    if (synFloor > score) score = synFloor;
 
     // 词汇多样性只作为旁证展示，不进总分（它对文体和长度太敏感）
     const aside = { key: 'div', name: '词汇多样性', display: div.toFixed(3), note: '字符 bigram 的移动平均类符形符比，仅供参考，不计入总分。' };
@@ -238,6 +321,12 @@
       const low = s.text.toLowerCase();
       let v = 0;
       const why = [];
+      // 句式套路命中这一句就直接顶上去——它比套话更能说明问题，所以给的分也更重
+      const hitsHere = syn.spans.filter((sp) => sp.start >= s.start && sp.start < s.end);
+      if (hitsHere.length) {
+        v += Math.min(0.55, hitsHere.length * 0.34);
+        why.push('句式：' + [...new Set(hitsHere.map((h) => h.name))].join('、'));
+      }
       const c = countHits(low, lang === 'en' ? CLICHE_EN : CLICHE_ZH.concat(CLICHE_EN));
       if (c.n) { v += Math.min(0.42, c.n * 0.24); why.push('套话：' + c.hit.slice(0, 3).join('、')); }
       const startsConn = (lang === 'en' ? CONNECTIVE_EN : CONNECTIVE_ZH).some((w) => low.startsWith(w));
@@ -265,7 +354,7 @@
 
     return {
       ok: true, chars: text.length, tokens: total, lang, cjkRatio,
-      sentences, metrics, aside, score, register,
+      sentences, metrics, aside, score, register, syntax: syn,
       confidence: total < 120 ? 'low' : total < 400 ? 'mid' : 'high',
       band: band(score),
     };
